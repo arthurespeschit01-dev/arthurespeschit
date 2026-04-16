@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 
 interface Notification {
   id: string;
-  type: 'task_overdue' | 'task_due_today' | 'task_due_soon' | 'contract_expiring' | 'contract_expired';
+  type: 'task_overdue' | 'task_due_today' | 'task_due_soon' | 'contract_expiring' | 'contract_expired' | 'payment_today' | 'payment_soon';
   title: string;
   description: string;
   route: string;
@@ -106,9 +106,10 @@ export default function NotificationBar() {
       const thirtyDays = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30);
       const thirtyDaysStr = `${thirtyDays.getFullYear()}-${String(thirtyDays.getMonth() + 1).padStart(2, '0')}-${String(thirtyDays.getDate()).padStart(2, '0')}`;
 
-      const [{ data: tasks }, { data: contracts }] = await Promise.all([
+      const [{ data: tasks }, { data: contracts }, { data: clients }] = await Promise.all([
         supabase.from('operational_tasks').select('id, title, end_date, status').eq('user_id', user.id),
         supabase.from('signed_contracts').select('id, title, client_name, expiry_date, status').eq('user_id', user.id),
+        supabase.from('clients').select('id, name, payment_day, status').eq('user_id', user.id),
       ]);
 
       const notifs: Notification[] = [];
@@ -137,6 +138,22 @@ export default function NotificationBar() {
           notifs.push({ id: `contract-expired-${c.id}`, type: 'contract_expired', title: `Contrato "${c.title}" está vencido`, description: `Cliente: ${c.client_name} — venceu em ${new Date(c.expiry_date + 'T00:00:00').toLocaleDateString('pt-BR')}`, route: '/contratos', priority: 0 });
         } else if (c.expiry_date <= thirtyDaysStr) {
           notifs.push({ id: `contract-expiring-${c.id}`, type: 'contract_expiring', title: `Contrato "${c.title}" está vencendo`, description: `Cliente: ${c.client_name} — vence em ${days} dias (${new Date(c.expiry_date + 'T00:00:00').toLocaleDateString('pt-BR')})`, route: '/contratos', priority: 2 });
+        }
+      });
+
+      // Payment day notifications
+      const currentDay = now.getDate();
+      (clients || []).forEach(cl => {
+        if (cl.status !== 'Ativo' || !cl.payment_day) return;
+        const payDay = cl.payment_day;
+        if (payDay === currentDay) {
+          notifs.push({ id: `payment-today-${cl.id}`, type: 'payment_today', title: `Pagamento de "${cl.name}" é hoje`, description: `Dia ${payDay} — verifique o recebimento.`, route: `/clientes/${cl.id}`, priority: 1 });
+        } else {
+          // Check if payment is in the next 3 days
+          const daysUntilPay = ((payDay - currentDay) + 31) % 31 || 31;
+          if (daysUntilPay <= 3 && daysUntilPay > 0) {
+            notifs.push({ id: `payment-soon-${cl.id}`, type: 'payment_soon', title: `Pagamento de "${cl.name}" em ${daysUntilPay} dia${daysUntilPay > 1 ? 's' : ''}`, description: `Dia ${payDay} de cada mês.`, route: `/clientes/${cl.id}`, priority: 2 });
+          }
         }
       });
 
@@ -206,15 +223,16 @@ export default function NotificationBar() {
 
   const getIcon = (type: Notification['type']) => {
     if (type === 'task_overdue' || type === 'contract_expired') return <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />;
-    if (type === 'task_due_today') return <Clock className="w-4 h-4 text-amber-400 shrink-0" />;
+    if (type === 'task_due_today' || type === 'payment_today') return <Clock className="w-4 h-4 text-amber-400 shrink-0" />;
     if (type === 'contract_expiring') return <FileText className="w-4 h-4 text-amber-400 shrink-0" />;
+    if (type === 'payment_soon') return <Clock className="w-4 h-4 text-[hsl(var(--neon-blue))] shrink-0" />;
     return <Clock className="w-4 h-4 text-[hsl(var(--neon-blue))] shrink-0" />;
   };
 
   const getBg = (type: Notification['type'], isRead: boolean) => {
     if (isRead) return 'bg-muted/30 border-border/30 opacity-60';
     if (type === 'task_overdue' || type === 'contract_expired') return 'bg-destructive/10 border-destructive/20';
-    if (type === 'task_due_today') return 'bg-amber-400/10 border-amber-400/20';
+    if (type === 'task_due_today' || type === 'payment_today') return 'bg-amber-400/10 border-amber-400/20';
     return 'bg-[hsl(var(--neon-blue))]/10 border-[hsl(var(--neon-blue))]/20';
   };
 
@@ -224,12 +242,14 @@ export default function NotificationBar() {
     if (type === 'task_due_soon') return 'EM BREVE';
     if (type === 'contract_expired') return 'VENCIDO';
     if (type === 'contract_expiring') return 'EXPIRANDO';
+    if (type === 'payment_today') return 'HOJE';
+    if (type === 'payment_soon') return 'EM BREVE';
     return '';
   };
 
   const getLabelColor = (type: Notification['type']) => {
     if (type === 'task_overdue' || type === 'contract_expired') return 'bg-destructive/20 text-destructive text-[9px]';
-    if (type === 'task_due_today') return 'bg-amber-500/20 text-amber-400 text-[9px]';
+    if (type === 'task_due_today' || type === 'payment_today') return 'bg-amber-500/20 text-amber-400 text-[9px]';
     return 'bg-primary/20 text-primary text-[9px]';
   };
 
