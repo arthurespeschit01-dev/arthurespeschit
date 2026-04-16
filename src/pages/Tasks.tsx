@@ -79,6 +79,9 @@ export default function Tasks() {
   const [editing, setEditing] = useState<Task | null>(null);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('todos');
+  const [filterPeriod, setFilterPeriod] = useState('todos');
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
   const [uploading, setUploading] = useState(false);
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [newComment, setNewComment] = useState('');
