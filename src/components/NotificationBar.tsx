@@ -23,6 +23,7 @@ export default function NotificationBar() {
   const [open, setOpen] = useState(false);
   const [read, setRead] = useState<Set<string>>(new Set());
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [tab, setTab] = useState<'unread' | 'read'>('unread');
   const toastShownRef = useRef(false);
 
   useEffect(() => {
