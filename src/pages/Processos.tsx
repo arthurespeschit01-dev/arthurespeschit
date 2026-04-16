@@ -1,21 +1,6 @@
 import { BookOpen, Users, Rocket, BarChart3, MessageSquare, Settings, RefreshCw } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
-const defaultSteps = [
-  'Briefing inicial com o cliente',
-  'Coleta de acessos às plataformas (Facebook, Google, etc.)',
-  'Configuração de Pixel e Tags de conversão',
-  'Análise de mercado e concorrência',
-  'Criação de estratégia de campanha',
-  'Configuração das campanhas nas plataformas',
-  'Reunião de alinhamento com o cliente',
-  'Lançamento das campanhas',
-  'Monitoramento e otimização inicial (primeiros 7 dias)',
-  'Relatório semanal de resultados',
-];
-
-interface Step { id: string; title: string; position: number; }
-
 const guideContent = [
   {
     icon: Users,
