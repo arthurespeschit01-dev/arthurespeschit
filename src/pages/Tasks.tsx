@@ -193,13 +193,39 @@ export default function Tasks() {
   };
 
   const filtered = useMemo(() => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
     return tasks.filter(t => {
       const matchSearch = t.title.toLowerCase().includes(search.toLowerCase()) ||
         (t.description || '').toLowerCase().includes(search.toLowerCase());
       const matchStatus = filterStatus === 'todos' || t.status === filterStatus;
-      return matchSearch && matchStatus;
+
+      // Period filter
+      let matchPeriod = true;
+      if (filterPeriod === 'custom') {
+        const endDate = t.end_date ? new Date(t.end_date + 'T00:00:00') : null;
+        if (dateFrom && endDate && endDate < dateFrom) matchPeriod = false;
+        if (dateTo && endDate && endDate > dateTo) matchPeriod = false;
+        if (!endDate) matchPeriod = false;
+      } else if (filterPeriod === 'vencidas') {
+        const endDate = t.end_date ? new Date(t.end_date + 'T00:00:00') : null;
+        matchPeriod = !!endDate && endDate < today && t.status !== 'concluída' && t.status !== 'cancelada';
+      } else if (filterPeriod === 'hoje') {
+        const endDate = t.end_date ? new Date(t.end_date + 'T00:00:00') : null;
+        matchPeriod = !!endDate && endDate.getTime() === today.getTime();
+      } else if (filterPeriod === 'semana') {
+        const endDate = t.end_date ? new Date(t.end_date + 'T00:00:00') : null;
+        const weekEnd = new Date(today);
+        weekEnd.setDate(weekEnd.getDate() + 7);
+        matchPeriod = !!endDate && endDate >= today && endDate <= weekEnd;
+      } else if (filterPeriod === 'sem_data') {
+        matchPeriod = !t.end_date;
+      }
+
+      return matchSearch && matchStatus && matchPeriod;
     });
-  }, [tasks, search, filterStatus]);
+  }, [tasks, search, filterStatus, filterPeriod, dateFrom, dateTo]);
 
   const getClientName = (clientId: string | null) => {
     if (!clientId) return null;
