@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 
 interface Notification {
   id: string;
-  type: 'task_overdue' | 'task_due_today' | 'task_due_soon' | 'contract_expiring' | 'contract_expired';
+  type: 'task_overdue' | 'task_due_today' | 'task_due_soon' | 'contract_expiring' | 'contract_expired' | 'payment_today' | 'payment_soon';
   title: string;
   description: string;
   route: string;
