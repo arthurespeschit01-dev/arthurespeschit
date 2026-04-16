@@ -272,8 +272,8 @@ export default function Tasks() {
       </div>
 
       {/* Search & Filter */}
-      <div className="flex gap-3">
-        <div className="relative flex-1">
+      <div className="flex gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Buscar tasks..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 bg-secondary/50 border-border/50" />
         </div>
@@ -289,7 +289,54 @@ export default function Tasks() {
             <SelectItem value="cancelada">Cancelada</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={filterPeriod} onValueChange={(v) => { setFilterPeriod(v); if (v !== 'custom') { setDateFrom(undefined); setDateTo(undefined); } }}>
+          <SelectTrigger className="w-44 bg-secondary/50 border-border/50">
+            <SelectValue placeholder="Período" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos os Períodos</SelectItem>
+            <SelectItem value="vencidas">Vencidas</SelectItem>
+            <SelectItem value="hoje">Vence Hoje</SelectItem>
+            <SelectItem value="semana">Próx. 7 dias</SelectItem>
+            <SelectItem value="sem_data">Sem Data</SelectItem>
+            <SelectItem value="custom">Período Personalizado</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
+
+      {/* Custom date range */}
+      {filterPeriod === 'custom' && (
+        <div className="flex gap-3 items-center flex-wrap">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className={cn("w-44 justify-start text-left font-normal bg-secondary/50 border-border/50", !dateFrom && "text-muted-foreground")}>
+                <Calendar className="w-4 h-4 mr-2" />
+                {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Data inicial"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <CalendarComponent mode="single" selected={dateFrom} onSelect={setDateFrom} locale={ptBR} initialFocus className={cn("p-3 pointer-events-auto")} />
+            </PopoverContent>
+          </Popover>
+          <span className="text-muted-foreground text-sm">até</span>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className={cn("w-44 justify-start text-left font-normal bg-secondary/50 border-border/50", !dateTo && "text-muted-foreground")}>
+                <Calendar className="w-4 h-4 mr-2" />
+                {dateTo ? format(dateTo, "dd/MM/yyyy") : "Data final"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <CalendarComponent mode="single" selected={dateTo} onSelect={setDateTo} locale={ptBR} initialFocus className={cn("p-3 pointer-events-auto")} />
+            </PopoverContent>
+          </Popover>
+          {(dateFrom || dateTo) && (
+            <Button variant="ghost" size="sm" onClick={() => { setDateFrom(undefined); setDateTo(undefined); }} className="text-muted-foreground hover:text-foreground">
+              <X className="w-4 h-4 mr-1" /> Limpar
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Task List grouped by status as accordion */}
       {filtered.length === 0 ? (
