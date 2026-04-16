@@ -15,8 +15,13 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import {
   Plus, Search, Calendar, Paperclip, Trash2, Edit2,
   CheckCircle2, Clock, AlertCircle, Upload, X, FileText, XCircle,
-  MessageSquare, Send, Eye
+  MessageSquare, Send, Eye, CalendarIcon, Filter
 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 
@@ -74,6 +79,9 @@ export default function Tasks() {
   const [editing, setEditing] = useState<Task | null>(null);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('todos');
+  const [filterPeriod, setFilterPeriod] = useState('todos');
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
   const [uploading, setUploading] = useState(false);
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [newComment, setNewComment] = useState('');
@@ -185,13 +193,39 @@ export default function Tasks() {
   };
 
   const filtered = useMemo(() => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
     return tasks.filter(t => {
       const matchSearch = t.title.toLowerCase().includes(search.toLowerCase()) ||
         (t.description || '').toLowerCase().includes(search.toLowerCase());
       const matchStatus = filterStatus === 'todos' || t.status === filterStatus;
-      return matchSearch && matchStatus;
+
+      // Period filter
+      let matchPeriod = true;
+      if (filterPeriod === 'custom') {
+        const endDate = t.end_date ? new Date(t.end_date + 'T00:00:00') : null;
+        if (dateFrom && endDate && endDate < dateFrom) matchPeriod = false;
+        if (dateTo && endDate && endDate > dateTo) matchPeriod = false;
+        if (!endDate) matchPeriod = false;
+      } else if (filterPeriod === 'vencidas') {
+        const endDate = t.end_date ? new Date(t.end_date + 'T00:00:00') : null;
+        matchPeriod = !!endDate && endDate < today && t.status !== 'concluída' && t.status !== 'cancelada';
+      } else if (filterPeriod === 'hoje') {
+        const endDate = t.end_date ? new Date(t.end_date + 'T00:00:00') : null;
+        matchPeriod = !!endDate && endDate.getTime() === today.getTime();
+      } else if (filterPeriod === 'semana') {
+        const endDate = t.end_date ? new Date(t.end_date + 'T00:00:00') : null;
+        const weekEnd = new Date(today);
+        weekEnd.setDate(weekEnd.getDate() + 7);
+        matchPeriod = !!endDate && endDate >= today && endDate <= weekEnd;
+      } else if (filterPeriod === 'sem_data') {
+        matchPeriod = !t.end_date;
+      }
+
+      return matchSearch && matchStatus && matchPeriod;
     });
-  }, [tasks, search, filterStatus]);
+  }, [tasks, search, filterStatus, filterPeriod, dateFrom, dateTo]);
 
   const getClientName = (clientId: string | null) => {
     if (!clientId) return null;
@@ -238,8 +272,8 @@ export default function Tasks() {
       </div>
 
       {/* Search & Filter */}
-      <div className="flex gap-3">
-        <div className="relative flex-1">
+      <div className="flex gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Buscar tasks..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 bg-secondary/50 border-border/50" />
         </div>
@@ -255,7 +289,54 @@ export default function Tasks() {
             <SelectItem value="cancelada">Cancelada</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={filterPeriod} onValueChange={(v) => { setFilterPeriod(v); if (v !== 'custom') { setDateFrom(undefined); setDateTo(undefined); } }}>
+          <SelectTrigger className="w-44 bg-secondary/50 border-border/50">
+            <SelectValue placeholder="Período" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos os Períodos</SelectItem>
+            <SelectItem value="vencidas">Vencidas</SelectItem>
+            <SelectItem value="hoje">Vence Hoje</SelectItem>
+            <SelectItem value="semana">Próx. 7 dias</SelectItem>
+            <SelectItem value="sem_data">Sem Data</SelectItem>
+            <SelectItem value="custom">Período Personalizado</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
+
+      {/* Custom date range */}
+      {filterPeriod === 'custom' && (
+        <div className="flex gap-3 items-center flex-wrap">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className={cn("w-44 justify-start text-left font-normal bg-secondary/50 border-border/50", !dateFrom && "text-muted-foreground")}>
+                <Calendar className="w-4 h-4 mr-2" />
+                {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Data inicial"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <CalendarComponent mode="single" selected={dateFrom} onSelect={setDateFrom} locale={ptBR} initialFocus className={cn("p-3 pointer-events-auto")} />
+            </PopoverContent>
+          </Popover>
+          <span className="text-muted-foreground text-sm">até</span>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className={cn("w-44 justify-start text-left font-normal bg-secondary/50 border-border/50", !dateTo && "text-muted-foreground")}>
+                <Calendar className="w-4 h-4 mr-2" />
+                {dateTo ? format(dateTo, "dd/MM/yyyy") : "Data final"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <CalendarComponent mode="single" selected={dateTo} onSelect={setDateTo} locale={ptBR} initialFocus className={cn("p-3 pointer-events-auto")} />
+            </PopoverContent>
+          </Popover>
+          {(dateFrom || dateTo) && (
+            <Button variant="ghost" size="sm" onClick={() => { setDateFrom(undefined); setDateTo(undefined); }} className="text-muted-foreground hover:text-foreground">
+              <X className="w-4 h-4 mr-1" /> Limpar
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Task List grouped by status as accordion */}
       {filtered.length === 0 ? (
