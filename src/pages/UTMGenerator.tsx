@@ -69,6 +69,9 @@ export default function UTMGenerator() {
     if (p) {
       setUtmSource(p.defaults.utm_source);
       setUtmMedium(p.defaults.utm_medium);
+      setUtmCampaign(p.defaults.utm_campaign);
+      setUtmContent(p.defaults.utm_content);
+      setUtmTerm(p.defaults.utm_term);
     }
   };
 
