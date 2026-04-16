@@ -53,11 +53,11 @@ export default function NotificationBar() {
         if (t.status === 'concluída' || t.status === 'cancelada' || !t.end_date) return;
         const days = daysUntil(t.end_date);
         if (t.end_date < todayStr) {
-          notifs.push({ id: `task-overdue-${t.id}`, type: 'task_overdue', title: `Task vencida: ${t.title}`, description: `Venceu em ${new Date(t.end_date + 'T00:00:00').toLocaleDateString('pt-BR')}`, route: '/tasks', priority: 0 });
+          notifs.push({ id: `task-overdue-${t.id}`, type: 'task_overdue', title: `Task "${t.title}" está vencida`, description: `Venceu em ${new Date(t.end_date + 'T00:00:00').toLocaleDateString('pt-BR')}`, route: '/tasks', priority: 0 });
         } else if (t.end_date === todayStr) {
-          notifs.push({ id: `task-today-${t.id}`, type: 'task_due_today', title: `Task vence hoje: ${t.title}`, description: 'O prazo é hoje!', route: '/tasks', priority: 1 });
+          notifs.push({ id: `task-today-${t.id}`, type: 'task_due_today', title: `Task "${t.title}" vence hoje`, description: 'O prazo é hoje!', route: '/tasks', priority: 1 });
         } else if (t.end_date <= sevenDaysStr) {
-          notifs.push({ id: `task-soon-${t.id}`, type: 'task_due_soon', title: `Task vence em ${days} dia${days > 1 ? 's' : ''}: ${t.title}`, description: `Vence em ${new Date(t.end_date + 'T00:00:00').toLocaleDateString('pt-BR')}`, route: '/tasks', priority: 2 });
+          notifs.push({ id: `task-soon-${t.id}`, type: 'task_due_soon', title: `Task "${t.title}" vence em ${days} dia${days > 1 ? 's' : ''}`, description: `Vence em ${new Date(t.end_date + 'T00:00:00').toLocaleDateString('pt-BR')}`, route: '/tasks', priority: 2 });
         }
       });
 
@@ -65,9 +65,9 @@ export default function NotificationBar() {
         if (c.status === 'Cancelado' || c.status === 'Encerrado' || !c.expiry_date) return;
         const days = daysUntil(c.expiry_date);
         if (c.expiry_date < todayStr) {
-          notifs.push({ id: `contract-expired-${c.id}`, type: 'contract_expired', title: `Contrato vencido: ${c.title}`, description: `${c.client_name} — venceu em ${new Date(c.expiry_date + 'T00:00:00').toLocaleDateString('pt-BR')}`, route: '/contratos', priority: 0 });
+          notifs.push({ id: `contract-expired-${c.id}`, type: 'contract_expired', title: `Contrato "${c.title}" está vencido`, description: `Cliente: ${c.client_name} — venceu em ${new Date(c.expiry_date + 'T00:00:00').toLocaleDateString('pt-BR')}`, route: '/contratos', priority: 0 });
         } else if (c.expiry_date <= thirtyDaysStr) {
-          notifs.push({ id: `contract-expiring-${c.id}`, type: 'contract_expiring', title: `Contrato vence em ${days} dias: ${c.title}`, description: `${c.client_name} — vence em ${new Date(c.expiry_date + 'T00:00:00').toLocaleDateString('pt-BR')}`, route: '/contratos', priority: 2 });
+          notifs.push({ id: `contract-expiring-${c.id}`, type: 'contract_expiring', title: `Contrato "${c.title}" está vencendo`, description: `Cliente: ${c.client_name} — vence em ${days} dias (${new Date(c.expiry_date + 'T00:00:00').toLocaleDateString('pt-BR')})`, route: '/contratos', priority: 2 });
         }
       });
 
@@ -209,7 +209,7 @@ export default function NotificationBar() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className={`text-xs font-medium truncate flex-1 ${isRead ? 'text-muted-foreground' : 'text-foreground'}`}>{n.title}</p>
+                          <p className={`text-xs font-medium flex-1 ${isRead ? 'text-muted-foreground' : 'text-foreground'}`}>{n.title}</p>
                           <span className={`px-1.5 py-0.5 rounded font-bold shrink-0 ${getLabelColor(n.type)}`}>
                             {getLabel(n.type)}
                           </span>
