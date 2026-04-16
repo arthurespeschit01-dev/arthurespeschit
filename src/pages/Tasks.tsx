@@ -133,7 +133,6 @@ export default function Tasks() {
     await supabase.from('operational_tasks').update({ status: newStatus }).eq('id', t.id);
     load();
   };
-  };
 
   const handleFileUpload = async (taskId: string, file: File) => {
     if (!user) return;
