@@ -4,7 +4,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Calculator, ClipboardList,
   BookOpen, FileText, MessageSquare, ShieldAlert,
-  BarChart3, LogOut, Zap, Menu, X
+  BarChart3, LogOut, Zap, Menu, X, ListTodo
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -18,6 +18,7 @@ const navItems = [
   { to: '/scripts', label: 'Scripts', icon: MessageSquare },
   { to: '/objecoes', label: 'Objeções', icon: ShieldAlert },
   { to: '/planilha', label: 'Planilha', icon: BarChart3 },
+  { to: '/tasks', label: 'Tasks', icon: ListTodo },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
