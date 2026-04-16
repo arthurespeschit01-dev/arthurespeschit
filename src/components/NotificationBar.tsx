@@ -242,6 +242,8 @@ export default function NotificationBar() {
     if (type === 'task_due_soon') return 'EM BREVE';
     if (type === 'contract_expired') return 'VENCIDO';
     if (type === 'contract_expiring') return 'EXPIRANDO';
+    if (type === 'payment_today') return 'HOJE';
+    if (type === 'payment_soon') return 'EM BREVE';
     return '';
   };
 
