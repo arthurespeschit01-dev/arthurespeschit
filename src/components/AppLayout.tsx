@@ -5,7 +5,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Calculator, ClipboardList,
   BookOpen, FileText, MessageSquare, ShieldAlert,
-  BarChart3, LogOut, Zap, Menu, X, ListTodo, ChevronDown, FolderOpen
+  BarChart3, LogOut, Zap, Menu, X, ListTodo, ChevronDown, FolderOpen, Link2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -16,6 +16,7 @@ const mainNavItems = [
   { to: '/calculadora', label: 'Calculadora', icon: Calculator },
   { to: '/planilha', label: 'Planilha', icon: BarChart3 },
   { to: '/contratos', label: 'Contratos', icon: FileText },
+  { to: '/utm', label: 'Gerador de UTMs', icon: Link2 },
 ];
 
 const processosSubItems = [
