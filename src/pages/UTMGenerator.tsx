@@ -10,7 +10,7 @@ const PLATFORMS = [
   {
     id: 'google_ads',
     label: 'Google Ads',
-    defaults: { utm_source: 'google', utm_medium: 'cpc' },
+    defaults: { utm_source: 'google', utm_medium: 'cpc', utm_campaign: 'trafego_pesquisa_vendas', utm_content: 'anuncio_responsivo_01', utm_term: 'comprar_tenis_online' },
     dynamicParams: [
       '{campaignid}', '{adgroupid}', '{creative}', '{keyword}', '{matchtype}', '{network}', '{device}', '{placement}'
     ],
@@ -18,7 +18,7 @@ const PLATFORMS = [
   {
     id: 'meta_ads',
     label: 'Meta Ads (Facebook / Instagram)',
-    defaults: { utm_source: 'facebook', utm_medium: 'paid_social' },
+    defaults: { utm_source: 'facebook', utm_medium: 'paid_social', utm_campaign: 'trafego_vendas', utm_content: 'video_01', utm_term: 'interesse_moda' },
     dynamicParams: [
       '{{campaign.id}}', '{{adset.id}}', '{{ad.id}}', '{{campaign.name}}', '{{adset.name}}', '{{ad.name}}', '{{placement}}'
     ],
@@ -26,7 +26,7 @@ const PLATFORMS = [
   {
     id: 'tiktok_ads',
     label: 'TikTok Ads',
-    defaults: { utm_source: 'tiktok', utm_medium: 'paid_social' },
+    defaults: { utm_source: 'tiktok', utm_medium: 'paid_social', utm_campaign: 'trafego_vendas', utm_content: 'video_viral_01', utm_term: 'interesse_streetwear' },
     dynamicParams: [
       '__CAMPAIGN_ID__', '__AID__', '__CID__', '__CAMPAIGN_NAME__', '__AID_NAME__', '__CID_NAME__', '__PLACEMENT__'
     ],
@@ -34,19 +34,19 @@ const PLATFORMS = [
   {
     id: 'linkedin_ads',
     label: 'LinkedIn Ads',
-    defaults: { utm_source: 'linkedin', utm_medium: 'paid_social' },
+    defaults: { utm_source: 'linkedin', utm_medium: 'paid_social', utm_campaign: 'lead_b2b', utm_content: 'imagem_01', utm_term: 'gestores_empresas' },
     dynamicParams: [],
   },
   {
     id: 'taboola',
     label: 'Taboola',
-    defaults: { utm_source: 'taboola', utm_medium: 'native' },
+    defaults: { utm_source: 'taboola', utm_medium: 'native', utm_campaign: 'conteudo_descoberta', utm_content: 'artigo_01', utm_term: 'interesse_negocios' },
     dynamicParams: ['{campaign_id}', '{campaign_name}', '{site}', '{thumbnail}', '{title}'],
   },
   {
     id: 'custom',
     label: 'Personalizado',
-    defaults: { utm_source: '', utm_medium: '' },
+    defaults: { utm_source: 'facebook', utm_medium: 'paid_social', utm_campaign: 'vendas_tenis_blackfriday', utm_content: 'video_prova_social', utm_term: 'publico_semelhante_1%' },
     dynamicParams: [],
   },
 ];
@@ -69,6 +69,9 @@ export default function UTMGenerator() {
     if (p) {
       setUtmSource(p.defaults.utm_source);
       setUtmMedium(p.defaults.utm_medium);
+      setUtmCampaign(p.defaults.utm_campaign);
+      setUtmContent(p.defaults.utm_content);
+      setUtmTerm(p.defaults.utm_term);
     }
   };
 
