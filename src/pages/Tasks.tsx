@@ -194,33 +194,39 @@ export default function Tasks() {
 
   const filtered = useMemo(() => {
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
     return tasks.filter(t => {
       const matchSearch = t.title.toLowerCase().includes(search.toLowerCase()) ||
         (t.description || '').toLowerCase().includes(search.toLowerCase());
       const matchStatus = filterStatus === 'todos' || t.status === filterStatus;
 
-      // Period filter
+      // Period filter — compare as plain date strings (YYYY-MM-DD) to avoid timezone issues
       let matchPeriod = true;
+      const endDateStr = t.end_date || '';
+
       if (filterPeriod === 'custom') {
-        const endDate = t.end_date ? new Date(t.end_date + 'T00:00:00') : null;
-        if (dateFrom && endDate && endDate < dateFrom) matchPeriod = false;
-        if (dateTo && endDate && endDate > dateTo) matchPeriod = false;
-        if (!endDate) matchPeriod = false;
+        if (!endDateStr) { matchPeriod = false; }
+        else {
+          if (dateFrom) {
+            const fromStr = `${dateFrom.getFullYear()}-${String(dateFrom.getMonth() + 1).padStart(2, '0')}-${String(dateFrom.getDate()).padStart(2, '0')}`;
+            if (endDateStr < fromStr) matchPeriod = false;
+          }
+          if (dateTo) {
+            const toStr = `${dateTo.getFullYear()}-${String(dateTo.getMonth() + 1).padStart(2, '0')}-${String(dateTo.getDate()).padStart(2, '0')}`;
+            if (endDateStr > toStr) matchPeriod = false;
+          }
+        }
       } else if (filterPeriod === 'vencidas') {
-        const endDate = t.end_date ? new Date(t.end_date + 'T00:00:00') : null;
-        matchPeriod = !!endDate && endDate < today && t.status !== 'concluída' && t.status !== 'cancelada';
+        matchPeriod = !!endDateStr && endDateStr < todayStr && t.status !== 'concluída' && t.status !== 'cancelada';
       } else if (filterPeriod === 'hoje') {
-        const endDate = t.end_date ? new Date(t.end_date + 'T00:00:00') : null;
-        matchPeriod = !!endDate && endDate.getTime() === today.getTime();
+        matchPeriod = endDateStr === todayStr;
       } else if (filterPeriod === 'semana') {
-        const endDate = t.end_date ? new Date(t.end_date + 'T00:00:00') : null;
-        const weekEnd = new Date(today);
-        weekEnd.setDate(weekEnd.getDate() + 7);
-        matchPeriod = !!endDate && endDate >= today && endDate <= weekEnd;
+        const weekEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7);
+        const weekEndStr = `${weekEnd.getFullYear()}-${String(weekEnd.getMonth() + 1).padStart(2, '0')}-${String(weekEnd.getDate()).padStart(2, '0')}`;
+        matchPeriod = !!endDateStr && endDateStr >= todayStr && endDateStr <= weekEndStr;
       } else if (filterPeriod === 'sem_data') {
-        matchPeriod = !t.end_date;
+        matchPeriod = !endDateStr;
       }
 
       return matchSearch && matchStatus && matchPeriod;
