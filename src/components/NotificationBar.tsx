@@ -223,8 +223,9 @@ export default function NotificationBar() {
 
   const getIcon = (type: Notification['type']) => {
     if (type === 'task_overdue' || type === 'contract_expired') return <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />;
-    if (type === 'task_due_today') return <Clock className="w-4 h-4 text-amber-400 shrink-0" />;
+    if (type === 'task_due_today' || type === 'payment_today') return <Clock className="w-4 h-4 text-amber-400 shrink-0" />;
     if (type === 'contract_expiring') return <FileText className="w-4 h-4 text-amber-400 shrink-0" />;
+    if (type === 'payment_soon') return <Clock className="w-4 h-4 text-[hsl(var(--neon-blue))] shrink-0" />;
     return <Clock className="w-4 h-4 text-[hsl(var(--neon-blue))] shrink-0" />;
   };
 
