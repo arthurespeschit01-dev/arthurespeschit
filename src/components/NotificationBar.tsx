@@ -98,7 +98,7 @@ export default function NotificationBar() {
   const unreadCount = unreadList.length;
   const overdueCount = unreadList.filter(n => n.type === 'task_overdue' || n.type === 'contract_expired').length;
   const currentList = tab === 'unread' ? unreadList : readList;
-  const overdueCount = visible.filter(n => !read.has(n.id) && (n.type === 'task_overdue' || n.type === 'contract_expired')).length;
+  const overdueUnreadCount = unreadList.filter(n => n.type === 'task_overdue' || n.type === 'contract_expired').length;
 
   const toggleRead = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
