@@ -15,8 +15,13 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import {
   Plus, Search, Calendar, Paperclip, Trash2, Edit2,
   CheckCircle2, Clock, AlertCircle, Upload, X, FileText, XCircle,
-  MessageSquare, Send, Eye
+  MessageSquare, Send, Eye, CalendarIcon, Filter
 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 
