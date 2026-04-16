@@ -209,7 +209,7 @@ export default function NotificationBar() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className={`text-xs font-medium truncate flex-1 ${isRead ? 'text-muted-foreground' : 'text-foreground'}`}>{n.title}</p>
+                          <p className={`text-xs font-medium flex-1 ${isRead ? 'text-muted-foreground' : 'text-foreground'}`}>{n.title}</p>
                           <span className={`px-1.5 py-0.5 rounded font-bold shrink-0 ${getLabelColor(n.type)}`}>
                             {getLabel(n.type)}
                           </span>
