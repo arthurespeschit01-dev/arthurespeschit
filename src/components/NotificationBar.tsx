@@ -26,6 +26,19 @@ export default function NotificationBar() {
   const [tab, setTab] = useState<'unread' | 'read'>('unread');
   const toastShownRef = useRef(false);
   const statesLoadedRef = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
 
   // Load persisted states from DB
   const loadStates = useCallback(async () => {
