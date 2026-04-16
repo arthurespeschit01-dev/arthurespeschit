@@ -1,44 +1,49 @@
 import { useState, useMemo } from 'react';
 
 export default function Calculadora() {
-  const [preco, setPreco] = useState(100);
+  const [preco, setPreco] = useState(197);
   const [custo, setCusto] = useState(30);
-  const [taxas, setTaxas] = useState(10);
-  const [impostos, setImpostos] = useState(10);
+  const [taxasPct, setTaxasPct] = useState(7.9);
+  const [taxasFixa, setTaxasFixa] = useState(1);
+  const [impostos, setImpostos] = useState(6);
   const [margem, setMargem] = useState(20);
   const [orcamento, setOrcamento] = useState(100);
 
   const results = useMemo(() => {
-    const taxaTotal = (taxas + impostos) / 100;
-    const margemDesejada = margem / 100;
-    const lucroVenda = preco - custo - (preco * taxaTotal);
-    const margemLiquida = preco > 0 ? (lucroVenda / preco) * 100 : 0;
-    const cpaMax = lucroVenda * (1 - margemDesejada);
+    const taxasValor = preco * (taxasPct / 100) + taxasFixa;
+    const impostosValor = preco * (impostos / 100);
+    const faturamentoLiquido = preco - taxasValor - impostosValor;
+    const margemContribuicao = faturamentoLiquido - custo;
+    const cpaMax = margemContribuicao; // breakeven
+    const cpaAlvo = margemContribuicao - (preco * margem / 100);
     const roasMin = cpaMax > 0 ? preco / cpaMax : 0;
-    const vendasBreakeven = orcamento > 0 && lucroVenda > 0 ? Math.ceil(orcamento / lucroVenda) : 0;
-    const lucroMeta = lucroVenda * vendasBreakeven - orcamento;
+    const margemLiquida = preco > 0 ? (margemContribuicao / preco) * 100 : 0;
+    const vendasBreakeven = orcamento > 0 && margemContribuicao > 0 ? Math.ceil(orcamento / margemContribuicao) : 0;
+    const lucroMeta = cpaAlvo > 0 ? cpaAlvo * vendasBreakeven - orcamento + (vendasBreakeven * (preco * margem / 100)) : 0;
     const viabilidade = margemLiquida > 30 ? 'Excelente' : margemLiquida > 15 ? 'Boa' : margemLiquida > 5 ? 'Apertada' : 'Inviável';
     const viabilidadeColor = margemLiquida > 30 ? 'bg-emerald-500' : margemLiquida > 15 ? 'bg-neon-blue' : margemLiquida > 5 ? 'bg-amber-500' : 'bg-red-500';
     const viabilidadePct = Math.min(Math.max(margemLiquida, 0), 50) * 2;
 
-    return { cpaMax, roasMin, margemLiquida, vendasBreakeven, lucroMeta, viabilidade, viabilidadeColor, viabilidadePct };
-  }, [preco, custo, taxas, impostos, margem, orcamento]);
+    return { cpaMax, cpaAlvo, roasMin, margemLiquida, faturamentoLiquido, margemContribuicao, vendasBreakeven, viabilidade, viabilidadeColor, viabilidadePct, taxasValor, impostosValor };
+  }, [preco, custo, taxasPct, taxasFixa, impostos, margem, orcamento]);
 
   const fields = [
-    { label: 'Preço do Produto (R$)', value: preco, set: setPreco },
-    { label: 'Custo / COGS (R$)', value: custo, set: setCusto },
-    { label: 'Taxas da Plataforma (%)', value: taxas, set: setTaxas },
+    { label: 'Preço de Venda (R$)', value: preco, set: setPreco },
+    { label: 'Custo do Produto / COGS (R$)', value: custo, set: setCusto },
+    { label: 'Taxas da Plataforma (%)', value: taxasPct, set: setTaxasPct },
+    { label: 'Taxa Fixa da Plataforma (R$)', value: taxasFixa, set: setTaxasFixa },
     { label: 'Impostos (%)', value: impostos, set: setImpostos },
     { label: 'Margem de Lucro Desejada (%)', value: margem, set: setMargem },
     { label: 'Orçamento Diário (R$)', value: orcamento, set: setOrcamento },
   ];
 
   const outputs = [
-    { label: 'CPA Máximo', value: `R$ ${results.cpaMax.toFixed(2)}` },
+    { label: 'Faturamento Líquido', value: `R$ ${results.faturamentoLiquido.toFixed(2)}` },
+    { label: 'Margem de Contribuição', value: `R$ ${results.margemContribuicao.toFixed(2)}` },
+    { label: 'CPA Máximo (Breakeven)', value: `R$ ${results.cpaMax.toFixed(2)}` },
+    { label: 'CPA Alvo (c/ Lucro)', value: `R$ ${results.cpaAlvo.toFixed(2)}` },
     { label: 'ROAS Mínimo', value: results.roasMin.toFixed(2) + 'x' },
-    { label: 'Margem Líquida/Venda', value: results.margemLiquida.toFixed(1) + '%' },
     { label: 'Vendas/Dia p/ Breakeven', value: results.vendasBreakeven.toString() },
-    { label: 'Lucro Estimado (meta)', value: `R$ ${results.lucroMeta.toFixed(2)}` },
   ];
 
   return (
