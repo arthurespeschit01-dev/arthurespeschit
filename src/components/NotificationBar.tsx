@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Bell, X, AlertTriangle, Clock, FileText, ChevronDown, ChevronUp, CheckCheck } from 'lucide-react';
+import { Bell, X, AlertTriangle, Clock, FileText, ChevronDown, ChevronUp, CheckCheck, Eye, EyeOff, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
@@ -13,7 +13,7 @@ interface Notification {
   title: string;
   description: string;
   route: string;
-  priority: number; // lower = more urgent
+  priority: number;
 }
 
 export default function NotificationBar() {
@@ -21,6 +21,7 @@ export default function NotificationBar() {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
+  const [read, setRead] = useState<Set<string>>(new Set());
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const toastShownRef = useRef(false);
 
@@ -48,7 +49,6 @@ export default function NotificationBar() {
         return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       };
 
-      // Task notifications
       (tasks || []).forEach(t => {
         if (t.status === 'concluída' || t.status === 'cancelada' || !t.end_date) return;
         const days = daysUntil(t.end_date);
@@ -61,7 +61,6 @@ export default function NotificationBar() {
         }
       });
 
-      // Contract notifications
       (contracts || []).forEach(c => {
         if (c.status === 'Cancelado' || c.status === 'Encerrado' || !c.expiry_date) return;
         const days = daysUntil(c.expiry_date);
@@ -72,26 +71,17 @@ export default function NotificationBar() {
         }
       });
 
-      // Sort by priority (most urgent first)
       notifs.sort((a, b) => a.priority - b.priority);
       setNotifications(notifs);
 
-      // Show toast alerts on first load for urgent items
       if (!toastShownRef.current && notifs.length > 0) {
         toastShownRef.current = true;
         const overdueItems = notifs.filter(n => n.priority === 0);
         const todayItems = notifs.filter(n => n.priority === 1);
-
         if (overdueItems.length > 0) {
-          toast.error(`🚨 ${overdueItems.length} item(ns) vencido(s)!`, {
-            description: 'Verifique suas notificações para mais detalhes.',
-            duration: 6000,
-          });
+          toast.error(`🚨 ${overdueItems.length} item(ns) vencido(s)!`, { description: 'Verifique suas notificações.', duration: 6000 });
         } else if (todayItems.length > 0) {
-          toast.warning(`⏰ ${todayItems.length} item(ns) vencem hoje!`, {
-            description: 'Clique no sino para ver detalhes.',
-            duration: 5000,
-          });
+          toast.warning(`⏰ ${todayItems.length} item(ns) vencem hoje!`, { description: 'Clique no sino para ver.', duration: 5000 });
         }
       }
     };
@@ -102,8 +92,21 @@ export default function NotificationBar() {
   }, [user]);
 
   const visible = notifications.filter(n => !dismissed.has(n.id));
-  const overdueCount = visible.filter(n => n.type === 'task_overdue' || n.type === 'contract_expired').length;
-  const warningCount = visible.filter(n => n.type !== 'task_overdue' && n.type !== 'contract_expired').length;
+  const unreadCount = visible.filter(n => !read.has(n.id)).length;
+  const overdueCount = visible.filter(n => !read.has(n.id) && (n.type === 'task_overdue' || n.type === 'contract_expired')).length;
+
+  const toggleRead = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRead(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const markAllRead = () => setRead(new Set(visible.map(n => n.id)));
+  const markAllUnread = () => setRead(new Set());
+  const clearAll = () => { setDismissed(new Set(notifications.map(n => n.id))); setOpen(false); };
 
   const getIcon = (type: Notification['type']) => {
     if (type === 'task_overdue' || type === 'contract_expired') return <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />;
@@ -112,7 +115,8 @@ export default function NotificationBar() {
     return <Clock className="w-4 h-4 text-[hsl(var(--neon-blue))] shrink-0" />;
   };
 
-  const getBg = (type: Notification['type']) => {
+  const getBg = (type: Notification['type'], isRead: boolean) => {
+    if (isRead) return 'bg-muted/30 border-border/30 opacity-60';
     if (type === 'task_overdue' || type === 'contract_expired') return 'bg-destructive/10 border-destructive/20';
     if (type === 'task_due_today') return 'bg-amber-400/10 border-amber-400/20';
     return 'bg-[hsl(var(--neon-blue))]/10 border-[hsl(var(--neon-blue))]/20';
@@ -133,15 +137,6 @@ export default function NotificationBar() {
     return 'bg-primary/20 text-primary text-[9px]';
   };
 
-  if (visible.length === 0) return (
-    <div className="relative">
-      <button className="relative flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary/50 border border-border/50 text-muted-foreground cursor-default">
-        <Bell className="w-4 h-4" />
-        <CheckCheck className="w-3 h-3" />
-      </button>
-    </div>
-  );
-
   return (
     <div className="relative">
       <button
@@ -149,15 +144,18 @@ export default function NotificationBar() {
         className={`relative flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors ${
           overdueCount > 0
             ? 'bg-destructive/10 border-destructive/30 hover:bg-destructive/20 animate-pulse'
-            : 'bg-secondary/50 border-border/50 hover:bg-secondary'
+            : unreadCount > 0
+              ? 'bg-secondary/50 border-border/50 hover:bg-secondary'
+              : 'bg-secondary/50 border-border/50 hover:bg-secondary'
         }`}
       >
         <Bell className={`w-4 h-4 ${overdueCount > 0 ? 'text-destructive' : 'text-foreground'}`} />
-        {overdueCount > 0 && (
-          <Badge className="bg-destructive text-destructive-foreground text-[10px] px-1.5 py-0 h-4 min-w-4">{overdueCount}</Badge>
-        )}
-        {warningCount > 0 && (
-          <Badge className="bg-amber-500 text-background text-[10px] px-1.5 py-0 h-4 min-w-4">{warningCount}</Badge>
+        {unreadCount > 0 ? (
+          <Badge className={`${overdueCount > 0 ? 'bg-destructive' : 'bg-primary'} text-primary-foreground text-[10px] px-1.5 py-0 h-4 min-w-4`}>
+            {unreadCount}
+          </Badge>
+        ) : (
+          <CheckCheck className="w-3.5 h-3.5 text-muted-foreground" />
         )}
         {open ? <ChevronUp className="w-3 h-3 text-muted-foreground" /> : <ChevronDown className="w-3 h-3 text-muted-foreground" />}
       </button>
@@ -166,60 +164,79 @@ export default function NotificationBar() {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute right-0 top-full mt-2 z-50 w-80 sm:w-96 max-h-[70vh] overflow-hidden rounded-xl bg-card border border-border shadow-2xl flex flex-col">
-            <div className="p-3 border-b border-border flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2">
-                <Bell className="w-4 h-4 text-primary" />
-                <span className="text-sm font-semibold text-foreground">Notificações</span>
-                <Badge variant="outline" className="text-[10px] px-1.5 h-4">{visible.length}</Badge>
+            {/* Header */}
+            <div className="p-3 border-b border-border shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Bell className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-semibold text-foreground">Notificações</span>
+                  <Badge variant="outline" className="text-[10px] px-1.5 h-4">{visible.length}</Badge>
+                </div>
               </div>
-              <Button variant="ghost" size="sm" className="text-xs text-muted-foreground h-7" onClick={() => { setDismissed(new Set(notifications.map(n => n.id))); setOpen(false); }}>
-                Limpar tudo
-              </Button>
+              {/* Action buttons */}
+              <div className="flex items-center gap-1 mt-2">
+                <Button variant="ghost" size="sm" className="text-[11px] h-6 px-2 text-muted-foreground gap-1" onClick={markAllRead}>
+                  <Eye className="w-3 h-3" /> Marcar lidas
+                </Button>
+                <Button variant="ghost" size="sm" className="text-[11px] h-6 px-2 text-muted-foreground gap-1" onClick={markAllUnread}>
+                  <EyeOff className="w-3 h-3" /> Não lidas
+                </Button>
+                <Button variant="ghost" size="sm" className="text-[11px] h-6 px-2 text-muted-foreground gap-1 ml-auto hover:text-destructive" onClick={clearAll}>
+                  <Trash2 className="w-3 h-3" /> Limpar
+                </Button>
+              </div>
             </div>
 
-            {/* Summary bar */}
-            {(overdueCount > 0 || visible.some(n => n.type === 'task_due_today')) && (
-              <div className="px-3 py-2 border-b border-border bg-muted/30 flex items-center gap-2 text-[11px] shrink-0">
-                {overdueCount > 0 && (
-                  <span className="flex items-center gap-1 text-destructive font-medium">
-                    <AlertTriangle className="w-3 h-3" /> {overdueCount} vencido(s)
-                  </span>
-                )}
-                {overdueCount > 0 && visible.some(n => n.type === 'task_due_today') && <span className="text-border">•</span>}
-                {visible.some(n => n.type === 'task_due_today') && (
-                  <span className="flex items-center gap-1 text-amber-400 font-medium">
-                    <Clock className="w-3 h-3" /> {visible.filter(n => n.type === 'task_due_today').length} vence(m) hoje
-                  </span>
-                )}
+            {/* List */}
+            {visible.length === 0 ? (
+              <div className="p-6 text-center">
+                <CheckCheck className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
+                <p className="text-xs text-muted-foreground">Nenhuma notificação</p>
+              </div>
+            ) : (
+              <div className="p-2 space-y-1.5 overflow-y-auto flex-1">
+                {visible.map(n => {
+                  const isRead = read.has(n.id);
+                  return (
+                    <div
+                      key={n.id}
+                      className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all hover:scale-[1.01] hover:shadow-md ${getBg(n.type, isRead)}`}
+                      onClick={() => { navigate(n.route); setOpen(false); }}
+                    >
+                      <div className="relative shrink-0 mt-0.5">
+                        {!isRead && <span className="absolute -left-1 -top-1 w-2 h-2 rounded-full bg-primary" />}
+                        {getIcon(n.type)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className={`text-xs font-medium truncate flex-1 ${isRead ? 'text-muted-foreground' : 'text-foreground'}`}>{n.title}</p>
+                          <span className={`px-1.5 py-0.5 rounded font-bold shrink-0 ${getLabelColor(n.type)}`}>
+                            {getLabel(n.type)}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">{n.description}</p>
+                      </div>
+                      <div className="flex flex-col gap-1 shrink-0">
+                        <button
+                          onClick={(e) => toggleRead(n.id, e)}
+                          className="text-muted-foreground hover:text-foreground"
+                          title={isRead ? 'Marcar como não lida' : 'Marcar como lida'}
+                        >
+                          {isRead ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDismissed(prev => new Set([...prev, n.id])); }}
+                          className="text-muted-foreground hover:text-destructive"
+                          title="Remover"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
-
-            <div className="p-2 space-y-1.5 overflow-y-auto flex-1">
-              {visible.map(n => (
-                <div
-                  key={n.id}
-                  className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all hover:scale-[1.01] hover:shadow-md ${getBg(n.type)}`}
-                  onClick={() => { navigate(n.route); setOpen(false); }}
-                >
-                  {getIcon(n.type)}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs font-medium text-foreground truncate flex-1">{n.title}</p>
-                      <span className={`px-1.5 py-0.5 rounded font-bold shrink-0 ${getLabelColor(n.type)}`}>
-                        {getLabel(n.type)}
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{n.description}</p>
-                  </div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setDismissed(prev => new Set([...prev, n.id])); }}
-                    className="shrink-0 text-muted-foreground hover:text-foreground mt-0.5"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
           </div>
         </>
       )}
