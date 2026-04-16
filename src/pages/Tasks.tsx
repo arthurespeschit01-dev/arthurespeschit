@@ -129,11 +129,10 @@ export default function Tasks() {
     load();
   };
 
-  const toggleStatus = async (t: Task) => {
-    const order = ['pendente', 'em andamento', 'concluída'];
-    const next = order[(order.indexOf(t.status) + 1) % order.length];
-    await supabase.from('operational_tasks').update({ status: next }).eq('id', t.id);
+  const changeStatus = async (t: Task, newStatus: string) => {
+    await supabase.from('operational_tasks').update({ status: newStatus }).eq('id', t.id);
     load();
+  };
   };
 
   const handleFileUpload = async (taskId: string, file: File) => {
@@ -182,6 +181,7 @@ export default function Tasks() {
     pendente: tasks.filter(t => t.status === 'pendente').length,
     'em andamento': tasks.filter(t => t.status === 'em andamento').length,
     concluída: tasks.filter(t => t.status === 'concluída').length,
+    cancelada: tasks.filter(t => t.status === 'cancelada').length,
   }), [tasks]);
 
   return (
@@ -228,6 +228,7 @@ export default function Tasks() {
             <SelectItem value="pendente">Pendente</SelectItem>
             <SelectItem value="em andamento">Em Andamento</SelectItem>
             <SelectItem value="concluída">Concluída</SelectItem>
+            <SelectItem value="cancelada">Cancelada</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -244,9 +245,25 @@ export default function Tasks() {
           return (
             <div key={t.id} className="glass-surface rounded-xl p-5 border border-border/20 hover:border-primary/20 transition-all group">
               <div className="flex items-start gap-4">
-                {/* Status toggle */}
-                <button onClick={() => toggleStatus(t)} className="mt-0.5 shrink-0" title="Alterar status">
-                  <StatusIcon className={`w-5 h-5 ${sc.color.split(' ')[1]} transition-transform hover:scale-110`} />
+                {/* Status dropdown */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="mt-0.5 shrink-0" title="Alterar status">
+                      <StatusIcon className={`w-5 h-5 ${sc.color.split(' ')[1]} transition-transform hover:scale-110`} />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    {Object.entries(statusConfig).map(([key, cfg]) => {
+                      const Icon = cfg.icon;
+                      return (
+                        <DropdownMenuItem key={key} onClick={() => changeStatus(t, key)} className={t.status === key ? 'bg-secondary' : ''}>
+                          <Icon className={`w-4 h-4 mr-2 ${cfg.color.split(' ')[1]}`} />
+                          {cfg.label}
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 </button>
 
                 <div className="flex-1 min-w-0">
@@ -365,6 +382,7 @@ export default function Tasks() {
                     <SelectItem value="pendente">Pendente</SelectItem>
                     <SelectItem value="em andamento">Em Andamento</SelectItem>
                     <SelectItem value="concluída">Concluída</SelectItem>
+                    <SelectItem value="cancelada">Cancelada</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
