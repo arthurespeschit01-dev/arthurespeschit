@@ -184,34 +184,6 @@ const guideContent = [
 ];
 
 export default function Processos() {
-  const { user } = useAuth();
-  const [steps, setSteps] = useState<Step[]>([]);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editText, setEditText] = useState('');
-
-  const load = async () => {
-    if (!user) return;
-    const { data } = await supabase.from('onboarding_steps').select('*').eq('user_id', user.id).order('position');
-    if (data && data.length > 0) {
-      setSteps(data);
-    } else {
-      const inserts = defaultSteps.map((t, i) => ({ title: t, position: i, user_id: user.id }));
-      await supabase.from('onboarding_steps').insert(inserts);
-      load();
-    }
-  };
-
-  useEffect(() => { load(); }, [user]);
-
-  const startEdit = (s: Step) => { setEditingId(s.id); setEditText(s.title); };
-  const saveEdit = async () => {
-    if (!editingId) return;
-    await supabase.from('onboarding_steps').update({ title: editText }).eq('id', editingId);
-    setEditingId(null);
-    toast.success('Etapa atualizada!');
-    load();
-  };
-
   return (
     <div className="animate-fade-in space-y-8">
       <div>
