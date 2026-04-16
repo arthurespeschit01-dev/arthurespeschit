@@ -8,9 +8,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Plus, Search, Calendar, Paperclip, Trash2, Edit2,
-  CheckCircle2, Clock, AlertCircle, Upload, X, FileText, ExternalLink, XCircle
+  CheckCircle2, Clock, AlertCircle, Upload, X, FileText, XCircle,
+  MessageSquare, Send, Eye
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
@@ -39,6 +42,13 @@ interface Attachment {
   file_url: string;
 }
 
+interface Comment {
+  id: string;
+  task_id: string;
+  text: string;
+  created_at: string;
+}
+
 const statusConfig: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   pendente: { label: 'Pendente', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20', icon: Clock },
   'em andamento': { label: 'Em Andamento', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', icon: AlertCircle },
@@ -57,11 +67,14 @@ export default function Tasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('todos');
   const [uploading, setUploading] = useState(false);
+  const [detailTask, setDetailTask] = useState<Task | null>(null);
+  const [newComment, setNewComment] = useState('');
   const [form, setForm] = useState({
     title: '', description: '', status: 'pendente', priority: 'média',
     start_date: '', end_date: '', client_id: '',
@@ -69,14 +82,16 @@ export default function Tasks() {
 
   const load = async () => {
     if (!user) return;
-    const [tasksRes, clientsRes, attachRes] = await Promise.all([
+    const [tasksRes, clientsRes, attachRes, commentsRes] = await Promise.all([
       supabase.from('operational_tasks').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
       supabase.from('clients').select('id, name').eq('user_id', user.id).order('name'),
       supabase.from('task_attachments').select('*').eq('user_id', user.id),
+      supabase.from('task_comments').select('*').eq('user_id', user.id).order('created_at', { ascending: true }),
     ]);
     setTasks(tasksRes.data || []);
     setClients(clientsRes.data || []);
     setAttachments(attachRes.data || []);
+    setComments(commentsRes.data || []);
   };
 
   useEffect(() => { load(); }, [user]);
@@ -90,13 +105,8 @@ export default function Tasks() {
   const openEdit = (t: Task) => {
     setEditing(t);
     setForm({
-      title: t.title,
-      description: t.description || '',
-      status: t.status,
-      priority: t.priority,
-      start_date: t.start_date || '',
-      end_date: t.end_date || '',
-      client_id: t.client_id || '',
+      title: t.title, description: t.description || '', status: t.status, priority: t.priority,
+      start_date: t.start_date || '', end_date: t.end_date || '', client_id: t.client_id || '',
     });
     setOpen(true);
   };
@@ -104,12 +114,8 @@ export default function Tasks() {
   const save = async () => {
     if (!user || !form.title.trim()) { toast.error('Título é obrigatório'); return; }
     const payload = {
-      title: form.title.trim(),
-      description: form.description.trim(),
-      status: form.status,
-      priority: form.priority,
-      start_date: form.start_date || null,
-      end_date: form.end_date || null,
+      title: form.title.trim(), description: form.description.trim(), status: form.status,
+      priority: form.priority, start_date: form.start_date || null, end_date: form.end_date || null,
       client_id: form.client_id || null,
     };
     if (editing) {
@@ -147,7 +153,7 @@ export default function Tasks() {
       });
       toast.success('Anexo adicionado!');
       load();
-    } catch (err) {
+    } catch {
       toast.error('Erro ao enviar arquivo');
     } finally {
       setUploading(false);
@@ -157,6 +163,22 @@ export default function Tasks() {
   const removeAttachment = async (att: Attachment) => {
     await supabase.from('task_attachments').delete().eq('id', att.id);
     toast.success('Anexo removido!');
+    load();
+  };
+
+  const addComment = async (taskId: string) => {
+    if (!user || !newComment.trim()) return;
+    await supabase.from('task_comments').insert({
+      task_id: taskId, user_id: user.id, text: newComment.trim(),
+    });
+    setNewComment('');
+    toast.success('Comentário adicionado!');
+    load();
+  };
+
+  const removeComment = async (id: string) => {
+    await supabase.from('task_comments').delete().eq('id', id);
+    toast.success('Comentário removido!');
     load();
   };
 
@@ -175,6 +197,7 @@ export default function Tasks() {
   };
 
   const getTaskAttachments = (taskId: string) => attachments.filter(a => a.task_id === taskId);
+  const getTaskComments = (taskId: string) => comments.filter(c => c.task_id === taskId);
 
   const counts = useMemo(() => ({
     pendente: tasks.filter(t => t.status === 'pendente').length,
@@ -195,7 +218,7 @@ export default function Tasks() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-4 gap-3">
         {Object.entries(statusConfig).map(([key, cfg]) => {
           const Icon = cfg.icon;
           return (
@@ -240,6 +263,7 @@ export default function Tasks() {
           const StatusIcon = sc.icon;
           const clientName = getClientName(t.client_id);
           const taskAtts = getTaskAttachments(t.id);
+          const taskComments = getTaskComments(t.id);
 
           return (
             <div key={t.id} className="glass-surface rounded-xl p-5 border border-border/20 hover:border-primary/20 transition-all group">
@@ -264,9 +288,9 @@ export default function Tasks() {
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setDetailTask(t)}>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className={`font-semibold text-foreground ${t.status === 'concluída' ? 'line-through opacity-60' : ''}`}>{t.title}</h3>
+                    <h3 className={`font-semibold text-foreground ${t.status === 'concluída' || t.status === 'cancelada' ? 'line-through opacity-60' : ''}`}>{t.title}</h3>
                     <Badge variant="outline" className={`text-[10px] ${sc.color}`}>{sc.label}</Badge>
                     <Badge variant="outline" className={`text-[10px] ${pc.color}`}>{pc.label}</Badge>
                   </div>
@@ -292,34 +316,17 @@ export default function Tasks() {
                         <Paperclip className="w-3 h-3" /> {taskAtts.length} anexo{taskAtts.length > 1 ? 's' : ''}
                       </span>
                     )}
+                    {taskComments.length > 0 && (
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <MessageSquare className="w-3 h-3" /> {taskComments.length} comentário{taskComments.length > 1 ? 's' : ''}
+                      </span>
+                    )}
                   </div>
-
-                  {/* Attachments */}
-                  {taskAtts.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      {taskAtts.map(att => (
-                        <div key={att.id} className="flex items-center gap-1.5 bg-secondary/50 rounded-lg px-2.5 py-1.5 text-xs group/att">
-                          <FileText className="w-3 h-3 text-muted-foreground" />
-                          <a href={att.file_url} target="_blank" rel="noopener noreferrer" className="text-foreground hover:text-primary truncate max-w-[150px]">
-                            {att.file_name}
-                          </a>
-                          <button onClick={() => removeAttachment(att)} className="opacity-0 group-hover/att:opacity-100 text-muted-foreground hover:text-destructive">
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
 
                 {/* Actions */}
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                  <label className="cursor-pointer">
-                    <input type="file" className="hidden" onChange={(e) => { if (e.target.files?.[0]) handleFileUpload(t.id, e.target.files[0]); e.target.value = ''; }} disabled={uploading} />
-                    <div className="p-2 rounded-md hover:bg-secondary/50 text-muted-foreground hover:text-foreground transition-colors">
-                      <Upload className="w-4 h-4" />
-                    </div>
-                  </label>
+                  <Button variant="ghost" size="sm" onClick={() => setDetailTask(t)} title="Abrir detalhes"><Eye className="w-4 h-4" /></Button>
                   <Button variant="ghost" size="sm" onClick={() => openEdit(t)}><Edit2 className="w-4 h-4" /></Button>
                   <Button variant="ghost" size="sm" onClick={() => remove(t.id)} className="hover:text-destructive"><Trash2 className="w-4 h-4" /></Button>
                 </div>
@@ -337,6 +344,124 @@ export default function Tasks() {
         )}
       </div>
 
+      {/* Detail Dialog */}
+      <Dialog open={!!detailTask} onOpenChange={(o) => { if (!o) setDetailTask(null); }}>
+        <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          {detailTask && (() => {
+            const sc = statusConfig[detailTask.status] || statusConfig.pendente;
+            const pc = priorityConfig[detailTask.priority] || priorityConfig.média;
+            const clientName = getClientName(detailTask.client_id);
+            const taskAtts = getTaskAttachments(detailTask.id);
+            const taskComments = getTaskComments(detailTask.id);
+
+            return (
+              <>
+                <DialogHeader>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <DialogTitle className="text-lg">{detailTask.title}</DialogTitle>
+                    <Badge variant="outline" className={`text-[10px] ${sc.color}`}>{sc.label}</Badge>
+                    <Badge variant="outline" className={`text-[10px] ${pc.color}`}>{pc.label}</Badge>
+                  </div>
+                  {clientName && <p className="text-sm text-primary mt-1">{clientName}</p>}
+                  {(detailTask.start_date || detailTask.end_date) && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                      <Calendar className="w-3 h-3" />
+                      {detailTask.start_date && new Date(detailTask.start_date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                      {detailTask.start_date && detailTask.end_date && ' → '}
+                      {detailTask.end_date && new Date(detailTask.end_date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                    </p>
+                  )}
+                </DialogHeader>
+
+                {detailTask.description && (
+                  <p className="text-sm text-muted-foreground mt-2">{detailTask.description}</p>
+                )}
+
+                <Tabs defaultValue="comments" className="flex-1 flex flex-col mt-4 min-h-0">
+                  <TabsList className="w-full">
+                    <TabsTrigger value="comments" className="flex-1 gap-1.5">
+                      <MessageSquare className="w-3.5 h-3.5" /> Comentários ({taskComments.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="attachments" className="flex-1 gap-1.5">
+                      <Paperclip className="w-3.5 h-3.5" /> Anexos ({taskAtts.length})
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="comments" className="flex-1 flex flex-col min-h-0 mt-3">
+                    <ScrollArea className="flex-1 max-h-[300px] pr-2">
+                      {taskComments.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-8">Nenhum comentário ainda.</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {taskComments.map(c => (
+                            <div key={c.id} className="bg-secondary/50 rounded-lg p-3 group/comment">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-sm text-foreground whitespace-pre-wrap flex-1">{c.text}</p>
+                                <button onClick={() => removeComment(c.id)} className="opacity-0 group-hover/comment:opacity-100 text-muted-foreground hover:text-destructive shrink-0">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                              <p className="text-[10px] text-muted-foreground mt-1.5">
+                                {new Date(c.created_at).toLocaleDateString('pt-BR')} às {new Date(c.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </ScrollArea>
+
+                    <div className="flex gap-2 mt-3 pt-3 border-t border-border/30">
+                      <Input
+                        placeholder="Insira seu comentário aqui"
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addComment(detailTask.id); } }}
+                        className="bg-secondary/50 border-border/50"
+                      />
+                      <Button size="icon" onClick={() => addComment(detailTask.id)} disabled={!newComment.trim()} className="shrink-0">
+                        <Send className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="attachments" className="flex-1 flex flex-col min-h-0 mt-3">
+                    <ScrollArea className="flex-1 max-h-[300px] pr-2">
+                      {taskAtts.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-8">Nenhum anexo.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {taskAtts.map(att => (
+                            <div key={att.id} className="flex items-center gap-3 bg-secondary/50 rounded-lg px-3 py-2.5 group/att">
+                              <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                              <a href={att.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-foreground hover:text-primary flex-1 truncate">
+                                {att.file_name}
+                              </a>
+                              <button onClick={() => removeAttachment(att)} className="opacity-0 group-hover/att:opacity-100 text-muted-foreground hover:text-destructive shrink-0">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </ScrollArea>
+
+                    <div className="mt-3 pt-3 border-t border-border/30">
+                      <label className="cursor-pointer">
+                        <input type="file" className="hidden" onChange={(e) => { if (e.target.files?.[0]) handleFileUpload(detailTask.id, e.target.files[0]); e.target.value = ''; }} disabled={uploading} />
+                        <div className="flex items-center justify-center gap-2 border border-dashed border-border/50 rounded-lg p-3 hover:border-primary/50 hover:bg-secondary/30 transition-colors text-sm text-muted-foreground hover:text-foreground">
+                          <Upload className="w-4 h-4" />
+                          {uploading ? 'Enviando...' : 'Clique para adicionar anexo'}
+                        </div>
+                      </label>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
       {/* Create/Edit Dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="bg-card border-border max-h-[90vh] overflow-y-auto">
@@ -348,12 +473,10 @@ export default function Tasks() {
               <Label className="text-muted-foreground text-sm">Título *</Label>
               <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" placeholder="Ex: Criar campanha Black Friday" />
             </div>
-
             <div>
               <Label className="text-muted-foreground text-sm">Descrição</Label>
               <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" rows={3} placeholder="Detalhes da task..." />
             </div>
-
             <div>
               <Label className="text-muted-foreground text-sm">Cliente</Label>
               <Select value={form.client_id} onValueChange={(v) => setForm({ ...form, client_id: v })}>
@@ -368,14 +491,11 @@ export default function Tasks() {
                 </SelectContent>
               </Select>
             </div>
-
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-muted-foreground text-sm">Status</Label>
                 <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                  <SelectTrigger className="bg-secondary/50 border-border/50 mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger className="bg-secondary/50 border-border/50 mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="pendente">Pendente</SelectItem>
                     <SelectItem value="em andamento">Em Andamento</SelectItem>
@@ -387,9 +507,7 @@ export default function Tasks() {
               <div>
                 <Label className="text-muted-foreground text-sm">Prioridade</Label>
                 <Select value={form.priority} onValueChange={(v) => setForm({ ...form, priority: v })}>
-                  <SelectTrigger className="bg-secondary/50 border-border/50 mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger className="bg-secondary/50 border-border/50 mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="baixa">Baixa</SelectItem>
                     <SelectItem value="média">Média</SelectItem>
@@ -398,7 +516,6 @@ export default function Tasks() {
                 </Select>
               </div>
             </div>
-
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-muted-foreground text-sm">Data Início</Label>
@@ -409,7 +526,6 @@ export default function Tasks() {
                 <Input type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" />
               </div>
             </div>
-
             <Button onClick={save} className="w-full neon-glow">Salvar</Button>
           </div>
         </DialogContent>
