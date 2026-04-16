@@ -1,12 +1,47 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import Index from "./pages/Index.tsx";
-import NotFound from "./pages/NotFound.tsx";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import AuthPage from "./pages/AuthPage";
+import AppLayout from "./components/AppLayout";
+import Dashboard from "./pages/Dashboard";
+import Clientes from "./pages/Clientes";
+import ClientDetail from "./pages/ClientDetail";
+import Calculadora from "./pages/Calculadora";
+import Processos from "./pages/Processos";
+import Estudos from "./pages/Estudos";
+import Contratos from "./pages/Contratos";
+import Scripts from "./pages/Scripts";
+import Objecoes from "./pages/Objecoes";
+import Planilha from "./pages/Planilha";
+import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
+
+function ProtectedRoutes() {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-background"><div className="text-muted-foreground">Carregando...</div></div>;
+  if (!user) return <AuthPage />;
+  return (
+    <AppLayout>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/clientes" element={<Clientes />} />
+        <Route path="/clientes/:id" element={<ClientDetail />} />
+        <Route path="/calculadora" element={<Calculadora />} />
+        <Route path="/processos" element={<Processos />} />
+        <Route path="/estudos" element={<Estudos />} />
+        <Route path="/contratos" element={<Contratos />} />
+        <Route path="/scripts" element={<Scripts />} />
+        <Route path="/objecoes" element={<Objecoes />} />
+        <Route path="/planilha" element={<Planilha />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </AppLayout>
+  );
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -14,11 +49,11 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            <Route path="/*" element={<ProtectedRoutes />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
