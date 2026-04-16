@@ -14,7 +14,321 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      campaign_notes: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          id: string
+          text: string
+          user_id: string
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          id?: string
+          text: string
+          user_id: string
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          id?: string
+          text?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_notes_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaigns: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          name: string
+          objective: string | null
+          platform: string | null
+          start_date: string | null
+          status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          name: string
+          objective?: string | null
+          platform?: string | null
+          start_date?: string | null
+          status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          objective?: string | null
+          platform?: string | null
+          start_date?: string | null
+          status?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      case_studies: {
+        Row: {
+          challenge: string | null
+          client_name: string
+          created_at: string
+          id: string
+          learnings: string | null
+          niche: string | null
+          results: string | null
+          strategy: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          challenge?: string | null
+          client_name: string
+          created_at?: string
+          id?: string
+          learnings?: string | null
+          niche?: string | null
+          results?: string | null
+          strategy?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          challenge?: string | null
+          client_name?: string
+          created_at?: string
+          id?: string
+          learnings?: string | null
+          niche?: string | null
+          results?: string | null
+          strategy?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      clients: {
+        Row: {
+          contract_duration: string | null
+          created_at: string
+          id: string
+          monthly_fee: number | null
+          name: string
+          services: string | null
+          status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          contract_duration?: string | null
+          created_at?: string
+          id?: string
+          monthly_fee?: number | null
+          name: string
+          services?: string | null
+          status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          contract_duration?: string | null
+          created_at?: string
+          id?: string
+          monthly_fee?: number | null
+          name?: string
+          services?: string | null
+          status?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      closing_scripts: {
+        Row: {
+          content: string | null
+          created_at: string
+          id: string
+          scenario: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          scenario: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          scenario?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      contract_templates: {
+        Row: {
+          content: string | null
+          created_at: string
+          id: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      objections: {
+        Row: {
+          created_at: string
+          id: string
+          objection: string
+          response: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          objection: string
+          response?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          objection?: string
+          response?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      onboarding_steps: {
+        Row: {
+          created_at: string
+          id: string
+          position: number
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          position?: number
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          position?: number
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      result_rows: {
+        Row: {
+          client_id: string
+          cpa: number | null
+          created_at: string
+          id: string
+          investment: number | null
+          leads: number | null
+          notes: string | null
+          period: string | null
+          revenue: number | null
+          roas: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          cpa?: number | null
+          created_at?: string
+          id?: string
+          investment?: number | null
+          leads?: number | null
+          notes?: string | null
+          period?: string | null
+          revenue?: number | null
+          roas?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          cpa?: number | null
+          created_at?: string
+          id?: string
+          investment?: number | null
+          leads?: number | null
+          notes?: string | null
+          period?: string | null
+          revenue?: number | null
+          roas?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "result_rows_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
