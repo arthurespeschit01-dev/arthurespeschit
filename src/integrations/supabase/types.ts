@@ -292,6 +292,30 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_states: {
+        Row: {
+          created_at: string
+          id: string
+          notification_id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notification_id: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notification_id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       objections: {
         Row: {
           created_at: string
