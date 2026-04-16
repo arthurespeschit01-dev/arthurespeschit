@@ -106,9 +106,10 @@ export default function NotificationBar() {
       const thirtyDays = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30);
       const thirtyDaysStr = `${thirtyDays.getFullYear()}-${String(thirtyDays.getMonth() + 1).padStart(2, '0')}-${String(thirtyDays.getDate()).padStart(2, '0')}`;
 
-      const [{ data: tasks }, { data: contracts }] = await Promise.all([
+      const [{ data: tasks }, { data: contracts }, { data: clients }] = await Promise.all([
         supabase.from('operational_tasks').select('id, title, end_date, status').eq('user_id', user.id),
         supabase.from('signed_contracts').select('id, title, client_name, expiry_date, status').eq('user_id', user.id),
+        supabase.from('clients').select('id, name, payment_day, status').eq('user_id', user.id),
       ]);
 
       const notifs: Notification[] = [];
