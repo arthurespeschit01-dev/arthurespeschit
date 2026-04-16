@@ -10,8 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import {
   Plus, Search, Calendar, Paperclip, Trash2, Edit2,
-  CheckCircle2, Clock, AlertCircle, Upload, X, FileText, ExternalLink
+  CheckCircle2, Clock, AlertCircle, Upload, X, FileText, ExternalLink, XCircle
 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 
 interface Task {
@@ -42,6 +43,7 @@ const statusConfig: Record<string, { label: string; color: string; icon: React.E
   pendente: { label: 'Pendente', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20', icon: Clock },
   'em andamento': { label: 'Em Andamento', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', icon: AlertCircle },
   concluída: { label: 'Concluída', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', icon: CheckCircle2 },
+  cancelada: { label: 'Cancelada', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20', icon: XCircle },
 };
 
 const priorityConfig: Record<string, { label: string; color: string }> = {
