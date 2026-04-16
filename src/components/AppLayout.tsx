@@ -85,6 +85,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Menu className="w-5 h-5" />
           </button>
           <div className="ml-auto flex items-center gap-3">
+            <NotificationBar />
             <span className="text-sm text-muted-foreground">{user?.email}</span>
           </div>
         </header>
