@@ -347,7 +347,21 @@ export default function Tasks() {
                   </DropdownMenu>
                   <Button variant="ghost" size="sm" onClick={() => setDetailTask(t)} title="Abrir detalhes"><Eye className="w-4 h-4" /></Button>
                   <Button variant="ghost" size="sm" onClick={() => openEdit(t)}><Edit2 className="w-4 h-4" /></Button>
-                  <Button variant="ghost" size="sm" onClick={() => remove(t.id)} className="hover:text-destructive"><Trash2 className="w-4 h-4" /></Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="sm" className="hover:text-destructive"><Trash2 className="w-4 h-4" /></Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Excluir task?</AlertDialogTitle>
+                        <AlertDialogDescription>Essa ação não pode ser desfeita. A task "{t.title}" será removida permanentemente.</AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => remove(t.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Excluir</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
             </div>
