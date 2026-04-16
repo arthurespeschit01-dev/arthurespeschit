@@ -325,7 +325,25 @@ export default function Tasks() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                <div className="flex items-center gap-1 shrink-0">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" title="Alterar status">
+                        <StatusIcon className={`w-4 h-4 ${sc.color.split(' ')[1]}`} />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {Object.entries(statusConfig).map(([key, cfg]) => {
+                        const Icon = cfg.icon;
+                        return (
+                          <DropdownMenuItem key={key} onClick={() => changeStatus(t, key)} className={t.status === key ? 'bg-secondary' : ''}>
+                            <Icon className={`w-4 h-4 mr-2 ${cfg.color.split(' ')[1]}`} />
+                            {cfg.label}
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <Button variant="ghost" size="sm" onClick={() => setDetailTask(t)} title="Abrir detalhes"><Eye className="w-4 h-4" /></Button>
                   <Button variant="ghost" size="sm" onClick={() => openEdit(t)}><Edit2 className="w-4 h-4" /></Button>
                   <Button variant="ghost" size="sm" onClick={() => remove(t.id)} className="hover:text-destructive"><Trash2 className="w-4 h-4" /></Button>
