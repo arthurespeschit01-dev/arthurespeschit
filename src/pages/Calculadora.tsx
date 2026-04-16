@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
 
 export default function Calculadora() {
-  const [preco, setPreco] = useState(100);
+  const [preco, setPreco] = useState(197);
   const [custo, setCusto] = useState(30);
-  const [taxas, setTaxas] = useState(10);
-  const [impostos, setImpostos] = useState(10);
+  const [taxasPct, setTaxasPct] = useState(7.9);
+  const [taxasFixa, setTaxasFixa] = useState(1);
+  const [impostos, setImpostos] = useState(6);
   const [margem, setMargem] = useState(20);
   const [orcamento, setOrcamento] = useState(100);
 
