@@ -232,7 +232,7 @@ export default function NotificationBar() {
   const getBg = (type: Notification['type'], isRead: boolean) => {
     if (isRead) return 'bg-muted/30 border-border/30 opacity-60';
     if (type === 'task_overdue' || type === 'contract_expired') return 'bg-destructive/10 border-destructive/20';
-    if (type === 'task_due_today') return 'bg-amber-400/10 border-amber-400/20';
+    if (type === 'task_due_today' || type === 'payment_today') return 'bg-amber-400/10 border-amber-400/20';
     return 'bg-[hsl(var(--neon-blue))]/10 border-[hsl(var(--neon-blue))]/20';
   };
 
