@@ -23,6 +23,7 @@ export default function NotificationBar() {
   const [open, setOpen] = useState(false);
   const [read, setRead] = useState<Set<string>>(new Set());
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [tab, setTab] = useState<'unread' | 'read'>('unread');
   const toastShownRef = useRef(false);
 
   useEffect(() => {
@@ -92,8 +93,12 @@ export default function NotificationBar() {
   }, [user]);
 
   const visible = notifications.filter(n => !dismissed.has(n.id));
-  const unreadCount = visible.filter(n => !read.has(n.id)).length;
-  const overdueCount = visible.filter(n => !read.has(n.id) && (n.type === 'task_overdue' || n.type === 'contract_expired')).length;
+  const unreadList = visible.filter(n => !read.has(n.id));
+  const readList = visible.filter(n => read.has(n.id));
+  const unreadCount = unreadList.length;
+  const overdueCount = unreadList.filter(n => n.type === 'task_overdue' || n.type === 'contract_expired').length;
+  const currentList = tab === 'unread' ? unreadList : readList;
+  const overdueUnreadCount = unreadList.filter(n => n.type === 'task_overdue' || n.type === 'contract_expired').length;
 
   const toggleRead = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -142,16 +147,14 @@ export default function NotificationBar() {
       <button
         onClick={() => setOpen(!open)}
         className={`relative flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors ${
-          overdueCount > 0
+          overdueUnreadCount > 0
             ? 'bg-destructive/10 border-destructive/30 hover:bg-destructive/20 animate-pulse'
-            : unreadCount > 0
-              ? 'bg-secondary/50 border-border/50 hover:bg-secondary'
-              : 'bg-secondary/50 border-border/50 hover:bg-secondary'
+            : 'bg-secondary/50 border-border/50 hover:bg-secondary'
         }`}
       >
-        <Bell className={`w-4 h-4 ${overdueCount > 0 ? 'text-destructive' : 'text-foreground'}`} />
+        <Bell className={`w-4 h-4 ${overdueUnreadCount > 0 ? 'text-destructive' : 'text-foreground'}`} />
         {unreadCount > 0 ? (
-          <Badge className={`${overdueCount > 0 ? 'bg-destructive' : 'bg-primary'} text-primary-foreground text-[10px] px-1.5 py-0 h-4 min-w-4`}>
+          <Badge className={`${overdueUnreadCount > 0 ? 'bg-destructive' : 'bg-primary'} text-primary-foreground text-[10px] px-1.5 py-0 h-4 min-w-4`}>
             {unreadCount}
           </Badge>
         ) : (
@@ -170,32 +173,64 @@ export default function NotificationBar() {
                 <div className="flex items-center gap-2">
                   <Bell className="w-4 h-4 text-primary" />
                   <span className="text-sm font-semibold text-foreground">Notificações</span>
-                  <Badge variant="outline" className="text-[10px] px-1.5 h-4">{visible.length}</Badge>
                 </div>
+                <Button variant="ghost" size="sm" className="text-[11px] h-6 px-2 text-muted-foreground gap-1 hover:text-destructive" onClick={clearAll}>
+                  <Trash2 className="w-3 h-3" /> Limpar tudo
+                </Button>
               </div>
-              {/* Action buttons */}
+
+              {/* Tabs */}
+              <div className="flex items-center gap-1 mt-2 bg-muted/50 rounded-lg p-0.5">
+                <button
+                  onClick={() => setTab('unread')}
+                  className={`flex-1 text-[11px] font-medium px-3 py-1.5 rounded-md transition-colors flex items-center justify-center gap-1.5 ${
+                    tab === 'unread' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Não lidas
+                  {unreadCount > 0 && (
+                    <Badge className="bg-primary text-primary-foreground text-[9px] px-1 py-0 h-3.5 min-w-3.5">{unreadCount}</Badge>
+                  )}
+                </button>
+                <button
+                  onClick={() => setTab('read')}
+                  className={`flex-1 text-[11px] font-medium px-3 py-1.5 rounded-md transition-colors flex items-center justify-center gap-1.5 ${
+                    tab === 'read' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Lidas
+                  {readList.length > 0 && (
+                    <Badge variant="outline" className="text-[9px] px-1 py-0 h-3.5 min-w-3.5">{readList.length}</Badge>
+                  )}
+                </button>
+              </div>
+
+              {/* Bulk actions */}
               <div className="flex items-center gap-1 mt-2">
-                <Button variant="ghost" size="sm" className="text-[11px] h-6 px-2 text-muted-foreground gap-1" onClick={markAllRead}>
-                  <Eye className="w-3 h-3" /> Marcar lidas
-                </Button>
-                <Button variant="ghost" size="sm" className="text-[11px] h-6 px-2 text-muted-foreground gap-1" onClick={markAllUnread}>
-                  <EyeOff className="w-3 h-3" /> Não lidas
-                </Button>
-                <Button variant="ghost" size="sm" className="text-[11px] h-6 px-2 text-muted-foreground gap-1 ml-auto hover:text-destructive" onClick={clearAll}>
-                  <Trash2 className="w-3 h-3" /> Limpar
-                </Button>
+                {tab === 'unread' && unreadCount > 0 && (
+                  <Button variant="ghost" size="sm" className="text-[11px] h-6 px-2 text-muted-foreground gap-1" onClick={markAllRead}>
+                    <Eye className="w-3 h-3" /> Marcar todas como lidas
+                  </Button>
+                )}
+                {tab === 'read' && readList.length > 0 && (
+                  <Button variant="ghost" size="sm" className="text-[11px] h-6 px-2 text-muted-foreground gap-1" onClick={markAllUnread}>
+                    <EyeOff className="w-3 h-3" /> Marcar todas como não lidas
+                  </Button>
+                )}
               </div>
             </div>
 
             {/* List */}
-            {visible.length === 0 ? (
+            {currentList.length === 0 ? (
               <div className="p-6 text-center">
                 <CheckCheck className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
-                <p className="text-xs text-muted-foreground">Nenhuma notificação</p>
+                <p className="text-xs text-muted-foreground">
+                  {tab === 'unread' ? 'Nenhuma notificação não lida' : 'Nenhuma notificação lida'}
+                </p>
               </div>
             ) : (
               <div className="p-2 space-y-1.5 overflow-y-auto flex-1">
-                {visible.map(n => {
+                {currentList.map(n => {
                   const isRead = read.has(n.id);
                   return (
                     <div
