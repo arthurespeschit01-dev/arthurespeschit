@@ -249,7 +249,7 @@ export default function NotificationBar() {
 
   const getLabelColor = (type: Notification['type']) => {
     if (type === 'task_overdue' || type === 'contract_expired') return 'bg-destructive/20 text-destructive text-[9px]';
-    if (type === 'task_due_today') return 'bg-amber-500/20 text-amber-400 text-[9px]';
+    if (type === 'task_due_today' || type === 'payment_today') return 'bg-amber-500/20 text-amber-400 text-[9px]';
     return 'bg-primary/20 text-primary text-[9px]';
   };
 
