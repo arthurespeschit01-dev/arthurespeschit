@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Plus, Edit2, Trash2, Send, Upload, FileText, X, Paperclip, Image, BookOpen, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Plus, Edit2, Trash2, Send, Upload, FileText, X, Paperclip, Image, BookOpen, BarChart3, Film, Type as TypeIcon, ExternalLink, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface AccountIds {
@@ -21,10 +21,11 @@ interface AccountIds {
 
 interface Client {
   id: string; name: string; services: string; monthly_fee: number; contract_duration: string; status: string;
-  payment_day: number | null; account_ids: AccountIds;
+  payment_day: number | null; account_ids: AccountIds; verba_mensal: number; niche: string;
 }
 interface Campaign {
   id: string; name: string; platform: string; objective: string; status: string; start_date: string;
+  budget: number; notes: string;
 }
 interface Note {
   id: string; text: string; created_at: string;
@@ -32,12 +33,27 @@ interface Note {
 interface ClientAttachment {
   id: string; file_name: string; file_url: string; created_at: string; category: string;
 }
+interface Creative {
+  id: string; campaign_id: string; name: string; type: string; link: string; status: string; created_at: string;
+}
 
 const ATTACHMENT_CATEGORIES = [
   { value: 'criativos', label: 'Criativos', icon: Image, description: 'Peças, artes, vídeos' },
   { value: 'briefings', label: 'Briefings', icon: BookOpen, description: 'Briefings e estratégias' },
   { value: 'relatorios', label: 'Relatórios', icon: BarChart3, description: 'Relatórios enviados' },
   { value: 'outros', label: 'Outros', icon: FileText, description: 'Outros documentos' },
+] as const;
+
+const CREATIVE_TYPES = [
+  { value: 'video', label: 'Vídeo', icon: Film },
+  { value: 'imagem', label: 'Imagem', icon: Image },
+  { value: 'copy', label: 'Copy', icon: TypeIcon },
+] as const;
+
+const CREATIVE_STATUS = [
+  { value: 'teste', label: 'Teste', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
+  { value: 'escalando', label: 'Escalando', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
+  { value: 'morto', label: 'Morto', color: 'bg-red-500/20 text-red-400 border-red-500/30' },
 ] as const;
 
 export default function ClientDetail() {
@@ -50,25 +66,38 @@ export default function ClientDetail() {
   const [filter, setFilter] = useState('Todas');
   const [campOpen, setCampOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
-  const [campForm, setCampForm] = useState({ name: '', platform: 'Facebook Ads', objective: '', status: 'Ativa', start_date: '' });
+  const [campForm, setCampForm] = useState({ name: '', platform: 'Facebook Ads', objective: '', status: 'Ativa', start_date: '', budget: 0, notes: '' });
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
   const [noteText, setNoteText] = useState('');
   const [editClient, setEditClient] = useState(false);
-  const [clientForm, setClientForm] = useState({ name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo', payment_day: '' as string, account_ids: {} as AccountIds });
+  const [clientForm, setClientForm] = useState({ name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo', payment_day: '' as string, verba_mensal: 0, niche: '', account_ids: {} as AccountIds });
   const [attachments, setAttachments] = useState<ClientAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const [attachCategory, setAttachCategory] = useState('criativos');
   const [attachFilter, setAttachFilter] = useState('todos');
 
+  // Creatives
+  const [creatives, setCreatives] = useState<Creative[]>([]);
+  const [creativeFilter, setCreativeFilter] = useState<'todos' | 'teste' | 'escalando' | 'morto'>('todos');
+  const [creativeOpen, setCreativeOpen] = useState(false);
+  const [editingCreative, setEditingCreative] = useState<Creative | null>(null);
+  const [creativeForm, setCreativeForm] = useState({ name: '', type: 'video', link: '', status: 'teste' });
+
   const loadClient = async () => {
     const { data } = await supabase.from('clients').select('*').eq('id', id).single();
     if (data) {
-      const c = { ...data, account_ids: (data.account_ids as AccountIds) || {} };
+      const c: Client = {
+        ...(data as any),
+        account_ids: (data.account_ids as AccountIds) || {},
+        verba_mensal: (data as any).verba_mensal ?? 0,
+        niche: (data as any).niche ?? '',
+      };
       setClient(c);
       setClientForm({
         name: c.name, services: c.services, monthly_fee: c.monthly_fee, contract_duration: c.contract_duration, status: c.status,
         payment_day: c.payment_day ? String(c.payment_day) : '',
+        verba_mensal: c.verba_mensal || 0, niche: c.niche || '',
         account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '', ...c.account_ids },
       });
     }
@@ -76,7 +105,7 @@ export default function ClientDetail() {
 
   const loadCampaigns = async () => {
     const { data } = await supabase.from('campaigns').select('*').eq('client_id', id).order('created_at', { ascending: false });
-    setCampaigns(data || []);
+    setCampaigns((data || []).map((c: any) => ({ ...c, budget: c.budget ?? 0, notes: c.notes ?? '' })));
   };
 
   const loadNotes = async (campId: string) => {
@@ -90,6 +119,11 @@ export default function ClientDetail() {
     setAttachments((data || []) as ClientAttachment[]);
   };
 
+  const loadCreatives = async (campId: string) => {
+    const { data } = await supabase.from('creatives' as any).select('*').eq('campaign_id', campId).order('created_at', { ascending: false });
+    setCreatives((data || []) as unknown as Creative[]);
+  };
+
   useEffect(() => { loadClient(); loadCampaigns(); loadAttachments(); }, [id]);
 
   const saveClient = async () => {
@@ -98,7 +132,9 @@ export default function ClientDetail() {
       contract_duration: clientForm.contract_duration, status: clientForm.status,
       payment_day: clientForm.payment_day ? Number(clientForm.payment_day) : null,
       account_ids: clientForm.account_ids,
-    }).eq('id', id);
+      verba_mensal: clientForm.verba_mensal,
+      niche: clientForm.niche,
+    } as any).eq('id', id);
     toast.success('Cliente atualizado!');
     setEditClient(false);
     loadClient();
@@ -106,25 +142,25 @@ export default function ClientDetail() {
 
   const openNewCampaign = () => {
     setEditingCampaign(null);
-    setCampForm({ name: '', platform: 'Facebook Ads', objective: '', status: 'Ativa', start_date: '' });
+    setCampForm({ name: '', platform: 'Facebook Ads', objective: '', status: 'Ativa', start_date: '', budget: 0, notes: '' });
     setCampOpen(true);
   };
 
   const openEditCampaign = (c: Campaign, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setEditingCampaign(c);
-    setCampForm({ name: c.name, platform: c.platform, objective: c.objective, status: c.status, start_date: c.start_date });
+    setCampForm({ name: c.name, platform: c.platform, objective: c.objective, status: c.status, start_date: c.start_date, budget: c.budget || 0, notes: c.notes || '' });
     setCampOpen(true);
   };
 
   const saveCampaign = async () => {
     if (!user) return;
     if (editingCampaign) {
-      await supabase.from('campaigns').update(campForm).eq('id', editingCampaign.id);
+      await supabase.from('campaigns').update(campForm as any).eq('id', editingCampaign.id);
       toast.success('Campanha atualizada!');
       if (selectedCampaign?.id === editingCampaign.id) setSelectedCampaign({ ...selectedCampaign, ...campForm });
     } else {
-      await supabase.from('campaigns').insert({ ...campForm, client_id: id, user_id: user.id });
+      await supabase.from('campaigns').insert({ ...campForm, client_id: id, user_id: user.id } as any);
       toast.success('Campanha criada!');
     }
     setCampOpen(false);
@@ -139,6 +175,12 @@ export default function ClientDetail() {
     loadCampaigns();
   };
 
+  const openSelectedCampaign = (c: Campaign) => {
+    setSelectedCampaign(c);
+    loadNotes(c.id);
+    loadCreatives(c.id);
+  };
+
   const sendNote = async () => {
     if (!selectedCampaign || !noteText.trim() || !user) return;
     await supabase.from('campaign_notes').insert({ campaign_id: selectedCampaign.id, user_id: user.id, text: noteText });
@@ -149,6 +191,39 @@ export default function ClientDetail() {
   const deleteNote = async (noteId: string) => {
     await supabase.from('campaign_notes').delete().eq('id', noteId);
     if (selectedCampaign) loadNotes(selectedCampaign.id);
+  };
+
+  // Creatives CRUD
+  const openNewCreative = () => {
+    setEditingCreative(null);
+    setCreativeForm({ name: '', type: 'video', link: '', status: 'teste' });
+    setCreativeOpen(true);
+  };
+
+  const openEditCreative = (cr: Creative) => {
+    setEditingCreative(cr);
+    setCreativeForm({ name: cr.name, type: cr.type, link: cr.link || '', status: cr.status });
+    setCreativeOpen(true);
+  };
+
+  const saveCreative = async () => {
+    if (!user || !selectedCampaign) return;
+    if (!creativeForm.name.trim()) { toast.error('Informe o nome do criativo'); return; }
+    if (editingCreative) {
+      await supabase.from('creatives' as any).update(creativeForm as any).eq('id', editingCreative.id);
+      toast.success('Criativo atualizado!');
+    } else {
+      await supabase.from('creatives' as any).insert({ ...creativeForm, campaign_id: selectedCampaign.id, user_id: user.id } as any);
+      toast.success('Criativo adicionado!');
+    }
+    setCreativeOpen(false);
+    loadCreatives(selectedCampaign.id);
+  };
+
+  const deleteCreative = async (crId: string) => {
+    await supabase.from('creatives' as any).delete().eq('id', crId);
+    toast.success('Criativo removido!');
+    if (selectedCampaign) loadCreatives(selectedCampaign.id);
   };
 
   const handleFileUpload = async (file: File) => {
@@ -179,6 +254,7 @@ export default function ClientDetail() {
 
   const filtered = filter === 'Todas' ? campaigns : campaigns.filter(c => c.status === filter);
   const filteredAttachments = attachFilter === 'todos' ? attachments : attachments.filter(a => a.category === attachFilter);
+  const filteredCreatives = creativeFilter === 'todos' ? creatives : creatives.filter(c => c.status === creativeFilter);
 
   const statusColor = (s: string) => {
     if (s === 'Ativo' || s === 'Ativa') return 'bg-emerald-500/20 text-emerald-400';
@@ -196,6 +272,9 @@ export default function ClientDetail() {
     return found.icon;
   };
 
+  const getCreativeTypeIcon = (t: string) => CREATIVE_TYPES.find(c => c.value === t)?.icon || FileText;
+  const getCreativeStatusBadge = (s: string) => CREATIVE_STATUS.find(c => c.value === s);
+
   if (!client) return <div className="text-muted-foreground">Carregando...</div>;
 
   return (
@@ -204,7 +283,10 @@ export default function ClientDetail() {
         <Button variant="ghost" size="sm" onClick={() => navigate('/clientes')}><ArrowLeft className="w-4 h-4" /></Button>
         <div>
           <h1 className="text-2xl font-bold text-foreground">{client.name}</h1>
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(client.status)}`}>{client.status}</span>
+          <div className="flex items-center gap-2 mt-1">
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(client.status)}`}>{client.status}</span>
+            {client.niche && <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-primary/10 text-primary">{client.niche}</span>}
+          </div>
         </div>
       </div>
 
@@ -222,11 +304,28 @@ export default function ClientDetail() {
         <div className="glass-surface rounded-xl p-6 space-y-4">
           {!editClient ? (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div><span className="text-muted-foreground">Serviços:</span><p className="text-foreground mt-1">{client.services}</p></div>
-                <div><span className="text-muted-foreground">Valor mensal:</span><p className="text-foreground mt-1">R$ {client.monthly_fee?.toLocaleString('pt-BR')}</p></div>
-                <div><span className="text-muted-foreground">Duração:</span><p className="text-foreground mt-1">{client.contract_duration}</p></div>
-                <div><span className="text-muted-foreground">Dia de pagamento:</span><p className="text-foreground mt-1">{client.payment_day ? `Dia ${client.payment_day}` : '—'}</p></div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="bg-secondary/30 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground">Nicho</p>
+                  <p className="text-foreground font-semibold mt-1 text-sm">{client.niche || '—'}</p>
+                </div>
+                <div className="bg-primary/10 rounded-lg p-3 border border-primary/20">
+                  <p className="text-xs text-muted-foreground">Verba mensal</p>
+                  <p className="text-primary font-bold mt-1">R$ {(client.verba_mensal || 0).toLocaleString('pt-BR')}</p>
+                </div>
+                <div className="bg-secondary/30 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground">Fee mensal</p>
+                  <p className="text-foreground font-semibold mt-1">R$ {client.monthly_fee?.toLocaleString('pt-BR')}</p>
+                </div>
+                <div className="bg-secondary/30 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground">Pagamento</p>
+                  <p className="text-foreground font-semibold mt-1 text-sm">{client.payment_day ? `Dia ${client.payment_day}` : '—'}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm pt-2">
+                <div><span className="text-muted-foreground">Serviços:</span><p className="text-foreground mt-1">{client.services || '—'}</p></div>
+                <div><span className="text-muted-foreground">Duração:</span><p className="text-foreground mt-1">{client.contract_duration || '—'}</p></div>
               </div>
 
               {/* Account IDs display */}
@@ -247,9 +346,13 @@ export default function ClientDetail() {
           ) : (
             <div className="space-y-3">
               <div><Label className="text-muted-foreground text-sm">Nome</Label><Input value={clientForm.name} onChange={(e) => setClientForm({ ...clientForm, name: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label className="text-muted-foreground text-sm">Nicho</Label><Input value={clientForm.niche} onChange={(e) => setClientForm({ ...clientForm, niche: e.target.value })} placeholder="Ex: Estética" className="bg-secondary/50 border-border/50 mt-1" /></div>
+                <div><Label className="text-muted-foreground text-sm">Verba mensal (R$)</Label><Input type="number" value={clientForm.verba_mensal} onChange={(e) => setClientForm({ ...clientForm, verba_mensal: Number(e.target.value) })} className="bg-secondary/50 border-border/50 mt-1" /></div>
+              </div>
               <div><Label className="text-muted-foreground text-sm">Serviços</Label><Textarea value={clientForm.services} onChange={(e) => setClientForm({ ...clientForm, services: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" /></div>
               <div className="grid grid-cols-2 gap-3">
-                <div><Label className="text-muted-foreground text-sm">Valor (R$)</Label><Input type="number" value={clientForm.monthly_fee} onChange={(e) => setClientForm({ ...clientForm, monthly_fee: Number(e.target.value) })} className="bg-secondary/50 border-border/50 mt-1" /></div>
+                <div><Label className="text-muted-foreground text-sm">Fee mensal (R$)</Label><Input type="number" value={clientForm.monthly_fee} onChange={(e) => setClientForm({ ...clientForm, monthly_fee: Number(e.target.value) })} className="bg-secondary/50 border-border/50 mt-1" /></div>
                 <div><Label className="text-muted-foreground text-sm">Duração</Label><Input value={clientForm.contract_duration} onChange={(e) => setClientForm({ ...clientForm, contract_duration: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" /></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -297,7 +400,7 @@ export default function ClientDetail() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filtered.map(c => (
-              <div key={c.id} onClick={() => { setSelectedCampaign(c); loadNotes(c.id); }} className="glass-surface rounded-xl p-4 cursor-pointer hover:border-primary/30 transition-all group">
+              <div key={c.id} onClick={() => openSelectedCampaign(c)} className="glass-surface rounded-xl p-4 cursor-pointer hover:border-primary/30 transition-all group">
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="font-semibold text-foreground text-sm">{c.name}</h3>
                   <div className="flex items-center gap-2">
@@ -309,7 +412,10 @@ export default function ClientDetail() {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">{c.platform} • {c.objective}</p>
-                <p className="text-xs text-muted-foreground mt-1">{c.start_date}</p>
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
+                  <span className="text-xs text-muted-foreground">{c.start_date || 'Sem data'}</span>
+                  {c.budget > 0 && <span className="text-xs font-semibold text-primary">R$ {c.budget.toLocaleString('pt-BR')}</span>}
+                </div>
               </div>
             ))}
             {filtered.length === 0 && <p className="text-muted-foreground text-sm col-span-full text-center py-8">Nenhuma campanha encontrada.</p>}
@@ -326,12 +432,82 @@ export default function ClientDetail() {
           </div>
           <div className="glass-surface rounded-xl p-5">
             <h3 className="font-semibold text-foreground mb-2">{selectedCampaign.name}</h3>
-            <div className="flex gap-4 text-sm text-muted-foreground">
+            <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-3">
               <span>{selectedCampaign.platform}</span>
               <span>{selectedCampaign.objective}</span>
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(selectedCampaign.status)}`}>{selectedCampaign.status}</span>
             </div>
+            {selectedCampaign.budget > 0 && (
+              <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 mb-3">
+                <p className="text-xs text-muted-foreground">Orçamento</p>
+                <p className="text-primary font-bold text-lg">R$ {selectedCampaign.budget.toLocaleString('pt-BR')}</p>
+              </div>
+            )}
+            {selectedCampaign.notes && (
+              <div className="bg-secondary/30 rounded-lg p-3">
+                <p className="text-xs text-muted-foreground mb-1">Observação / Estratégia</p>
+                <p className="text-sm text-foreground whitespace-pre-wrap">{selectedCampaign.notes}</p>
+              </div>
+            )}
           </div>
+
+          {/* Criativos */}
+          <div className="glass-surface rounded-xl p-5">
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <h4 className="font-medium text-foreground text-sm flex items-center gap-2"><Sparkles className="w-4 h-4 text-primary" /> Criativos</h4>
+              <Button onClick={openNewCreative} size="sm" className="neon-glow gap-1"><Plus className="w-3 h-3" /> Novo Criativo</Button>
+            </div>
+
+            <div className="flex gap-1 p-1 bg-secondary/50 rounded-lg mb-3 w-fit flex-wrap">
+              <button onClick={() => setCreativeFilter('todos')} className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${creativeFilter === 'todos' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
+                Todos ({creatives.length})
+              </button>
+              {CREATIVE_STATUS.map(s => {
+                const count = creatives.filter(c => c.status === s.value).length;
+                return (
+                  <button key={s.value} onClick={() => setCreativeFilter(s.value as any)} className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${creativeFilter === s.value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
+                    {s.label} ({count})
+                  </button>
+                );
+              })}
+            </div>
+
+            {filteredCreatives.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {filteredCreatives.map(cr => {
+                  const TypeIco = getCreativeTypeIcon(cr.type);
+                  const stBadge = getCreativeStatusBadge(cr.status);
+                  return (
+                    <div key={cr.id} className="bg-secondary/30 border border-border/50 rounded-lg p-3 group hover:border-primary/30 transition-colors">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <TypeIco className="w-4 h-4 text-primary shrink-0" />
+                          <p className="text-sm font-medium text-foreground truncate">{cr.name}</p>
+                        </div>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${stBadge?.color}`}>{stBadge?.label}</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground capitalize">{cr.type}</p>
+                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
+                        {cr.link ? (
+                          <a href={cr.link} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1 truncate">
+                            <ExternalLink className="w-3 h-3 shrink-0" /> Abrir link
+                          </a>
+                        ) : <span className="text-xs text-muted-foreground">Sem link</span>}
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => openEditCreative(cr)}><Edit2 className="w-3 h-3" /></Button>
+                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:text-destructive" onClick={() => deleteCreative(cr.id)}><Trash2 className="w-3 h-3" /></Button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-xs text-center py-6">Nenhum criativo {creativeFilter !== 'todos' ? `em "${getCreativeStatusBadge(creativeFilter)?.label}"` : 'cadastrado'}.</p>
+            )}
+          </div>
+
+          {/* Anotações */}
           <div className="glass-surface rounded-xl p-5">
             <h4 className="font-medium text-foreground mb-3 text-sm">Anotações</h4>
             <div className="space-y-2 max-h-64 overflow-y-auto mb-3">
@@ -357,13 +533,11 @@ export default function ClientDetail() {
       {/* Anexos Tab */}
       {tab === 'anexos' && (
         <div className="space-y-4">
-          {/* Upload section */}
           <div className="glass-surface rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-foreground flex items-center gap-2"><Paperclip className="w-4 h-4 text-primary" /> Anexos do Cliente</h3>
             </div>
 
-            {/* Upload with category */}
             <div className="flex flex-wrap items-end gap-3 mb-6 p-4 bg-secondary/30 rounded-lg border border-border/50">
               <div className="flex-1 min-w-[200px]">
                 <Label className="text-muted-foreground text-xs mb-1 block">Categoria do arquivo</Label>
@@ -387,7 +561,6 @@ export default function ClientDetail() {
               </label>
             </div>
 
-            {/* Category filter tabs */}
             <div className="flex gap-1 p-1 bg-secondary/50 rounded-lg mb-4 flex-wrap">
               <button onClick={() => setAttachFilter('todos')} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${attachFilter === 'todos' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
                 Todos ({attachments.length})
@@ -402,7 +575,6 @@ export default function ClientDetail() {
               })}
             </div>
 
-            {/* Attachment list */}
             {filteredAttachments.length > 0 ? (
               <div className="space-y-2">
                 {filteredAttachments.map(att => {
@@ -440,33 +612,74 @@ export default function ClientDetail() {
 
       {/* Campaign Create/Edit Dialog */}
       <Dialog open={campOpen} onOpenChange={setCampOpen}>
-        <DialogContent className="bg-card border-border">
+        <DialogContent className="bg-card border-border max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editingCampaign ? 'Editar Campanha' : 'Nova Campanha'}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label className="text-muted-foreground text-sm">Nome</Label><Input value={campForm.name} onChange={(e) => setCampForm({ ...campForm, name: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" /></div>
-            <div>
-              <Label className="text-muted-foreground text-sm">Plataforma</Label>
-              <Select value={campForm.platform} onValueChange={(v) => setCampForm({ ...campForm, platform: v })}>
-                <SelectTrigger className="bg-secondary/50 border-border/50 mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent className="bg-card border-border">
-                  {['Facebook Ads', 'Google Ads', 'TikTok Ads', 'LinkedIn Ads'].map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-muted-foreground text-sm">Plataforma</Label>
+                <Select value={campForm.platform} onValueChange={(v) => setCampForm({ ...campForm, platform: v })}>
+                  <SelectTrigger className="bg-secondary/50 border-border/50 mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-card border-border">
+                    {['Facebook Ads', 'Google Ads', 'TikTok Ads', 'LinkedIn Ads'].map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-muted-foreground text-sm">Status</Label>
+                <Select value={campForm.status} onValueChange={(v) => setCampForm({ ...campForm, status: v })}>
+                  <SelectTrigger className="bg-secondary/50 border-border/50 mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-card border-border">
+                    <SelectItem value="Ativa">Ativa</SelectItem>
+                    <SelectItem value="Pausada">Pausada</SelectItem>
+                    <SelectItem value="Encerrada">Encerrada</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div><Label className="text-muted-foreground text-sm">Objetivo</Label><Input value={campForm.objective} onChange={(e) => setCampForm({ ...campForm, objective: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" /></div>
-            <div>
-              <Label className="text-muted-foreground text-sm">Status</Label>
-              <Select value={campForm.status} onValueChange={(v) => setCampForm({ ...campForm, status: v })}>
-                <SelectTrigger className="bg-secondary/50 border-border/50 mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent className="bg-card border-border">
-                  <SelectItem value="Ativa">Ativa</SelectItem>
-                  <SelectItem value="Pausada">Pausada</SelectItem>
-                  <SelectItem value="Encerrada">Encerrada</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label className="text-muted-foreground text-sm">Orçamento (R$)</Label><Input type="number" value={campForm.budget} onChange={(e) => setCampForm({ ...campForm, budget: Number(e.target.value) })} placeholder="Ex: 3000" className="bg-secondary/50 border-border/50 mt-1" /></div>
+              <div><Label className="text-muted-foreground text-sm">Data de início</Label><Input type="date" value={campForm.start_date} onChange={(e) => setCampForm({ ...campForm, start_date: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" /></div>
             </div>
-            <div><Label className="text-muted-foreground text-sm">Data de início</Label><Input type="date" value={campForm.start_date} onChange={(e) => setCampForm({ ...campForm, start_date: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" /></div>
+            <div>
+              <Label className="text-muted-foreground text-sm">Observação / Estratégia</Label>
+              <Textarea value={campForm.notes} onChange={(e) => setCampForm({ ...campForm, notes: e.target.value })} placeholder="Estratégia, anotações, decisões..." rows={4} className="bg-secondary/50 border-border/50 mt-1" />
+            </div>
             <Button onClick={saveCampaign} className="w-full neon-glow">{editingCampaign ? 'Salvar Alterações' : 'Criar Campanha'}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Creative Create/Edit Dialog */}
+      <Dialog open={creativeOpen} onOpenChange={setCreativeOpen}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader><DialogTitle>{editingCreative ? 'Editar Criativo' : 'Novo Criativo'}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label className="text-muted-foreground text-sm">Nome do criativo</Label><Input value={creativeForm.name} onChange={(e) => setCreativeForm({ ...creativeForm, name: e.target.value })} placeholder="Ex: VSL_v3_dor_cabeça" className="bg-secondary/50 border-border/50 mt-1" /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-muted-foreground text-sm">Tipo</Label>
+                <Select value={creativeForm.type} onValueChange={(v) => setCreativeForm({ ...creativeForm, type: v })}>
+                  <SelectTrigger className="bg-secondary/50 border-border/50 mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-card border-border">
+                    {CREATIVE_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-muted-foreground text-sm">Status</Label>
+                <Select value={creativeForm.status} onValueChange={(v) => setCreativeForm({ ...creativeForm, status: v })}>
+                  <SelectTrigger className="bg-secondary/50 border-border/50 mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-card border-border">
+                    {CREATIVE_STATUS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div><Label className="text-muted-foreground text-sm">Link (Drive, URL...)</Label><Input value={creativeForm.link} onChange={(e) => setCreativeForm({ ...creativeForm, link: e.target.value })} placeholder="https://drive.google.com/..." className="bg-secondary/50 border-border/50 mt-1" /></div>
+            <Button onClick={saveCreative} className="w-full neon-glow">{editingCreative ? 'Salvar Alterações' : 'Adicionar Criativo'}</Button>
           </div>
         </DialogContent>
       </Dialog>
