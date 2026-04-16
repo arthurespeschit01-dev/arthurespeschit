@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/clientes', label: 'Clientes', icon: Users },
+  { to: '/tasks', label: 'Tasks', icon: ListTodo },
   { to: '/calculadora', label: 'Calculadora', icon: Calculator },
   { to: '/processos', label: 'Processos', icon: ClipboardList },
   { to: '/estudos', label: 'Estudos de Caso', icon: BookOpen },
@@ -18,7 +19,6 @@ const navItems = [
   { to: '/scripts', label: 'Scripts', icon: MessageSquare },
   { to: '/objecoes', label: 'Objeções', icon: ShieldAlert },
   { to: '/planilha', label: 'Planilha', icon: BarChart3 },
-  { to: '/tasks', label: 'Tasks', icon: ListTodo },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
