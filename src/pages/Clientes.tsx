@@ -28,6 +28,8 @@ interface Client {
   status: string;
   payment_day: number | null;
   account_ids: AccountIds;
+  verba_mensal: number;
+  niche: string;
 }
 
 export default function Clientes() {
@@ -38,20 +40,26 @@ export default function Clientes() {
   const [editing, setEditing] = useState<Client | null>(null);
   const [form, setForm] = useState({
     name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo',
-    payment_day: '' as string, account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '' } as AccountIds,
+    payment_day: '' as string, verba_mensal: 0, niche: '',
+    account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '' } as AccountIds,
   });
 
   const load = async () => {
     if (!user) return;
     const { data } = await supabase.from('clients').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
-    setClients((data || []).map(d => ({ ...d, account_ids: (d.account_ids as AccountIds) || {} })));
+    setClients((data || []).map(d => ({
+      ...d,
+      account_ids: (d.account_ids as AccountIds) || {},
+      verba_mensal: (d as any).verba_mensal ?? 0,
+      niche: (d as any).niche ?? '',
+    })));
   };
 
   useEffect(() => { load(); }, [user]);
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo', payment_day: '', account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '' } });
+    setForm({ name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo', payment_day: '', verba_mensal: 0, niche: '', account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '' } });
     setOpen(true);
   };
 
@@ -61,6 +69,7 @@ export default function Clientes() {
     setForm({
       name: c.name, services: c.services, monthly_fee: c.monthly_fee, contract_duration: c.contract_duration, status: c.status,
       payment_day: c.payment_day ? String(c.payment_day) : '',
+      verba_mensal: c.verba_mensal || 0, niche: c.niche || '',
       account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '', ...c.account_ids },
     });
     setOpen(true);
@@ -68,11 +77,16 @@ export default function Clientes() {
 
   const save = async () => {
     if (!user) return;
+    if (!form.name.trim()) { toast.error('Informe o nome do cliente'); return; }
+    if (!form.niche.trim()) { toast.error('Informe o nicho do cliente'); return; }
+    if (!form.verba_mensal || form.verba_mensal <= 0) { toast.error('Informe a verba mensal'); return; }
     const payload = {
       name: form.name, services: form.services, monthly_fee: form.monthly_fee,
       contract_duration: form.contract_duration, status: form.status,
       payment_day: form.payment_day ? Number(form.payment_day) : null,
       account_ids: form.account_ids,
+      verba_mensal: form.verba_mensal,
+      niche: form.niche,
     };
     if (editing) {
       await supabase.from('clients').update(payload).eq('id', editing.id);
@@ -115,14 +129,27 @@ export default function Clientes() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {clients.map((c) => (
           <div key={c.id} onClick={() => navigate(`/clientes/${c.id}`)} className="glass-surface rounded-xl p-5 cursor-pointer hover:border-primary/30 transition-all group">
-            <div className="flex items-start justify-between mb-3">
+            <div className="flex items-start justify-between mb-2">
               <h3 className="font-semibold text-foreground">{c.name}</h3>
               <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor(c.status)}`}>{c.status}</span>
             </div>
+            {c.niche && (
+              <span className="inline-block text-[11px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium mb-2">{c.niche}</span>
+            )}
             <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{c.services}</p>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-primary font-medium">R$ {c.monthly_fee?.toLocaleString('pt-BR')}/mês</span>
-              <span className="text-muted-foreground">{c.contract_duration}</span>
+            <div className="space-y-1.5 text-sm border-t border-border/50 pt-3">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground text-xs">Fee mensal</span>
+                <span className="text-foreground font-medium">R$ {c.monthly_fee?.toLocaleString('pt-BR')}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground text-xs">Verba mensal</span>
+                <span className="text-primary font-semibold">R$ {(c.verba_mensal || 0).toLocaleString('pt-BR')}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground text-xs">Duração</span>
+                <span className="text-foreground">{c.contract_duration || '—'}</span>
+              </div>
             </div>
             {c.payment_day && (
               <p className="text-xs text-muted-foreground mt-2">📅 Pagamento dia {c.payment_day}</p>
@@ -146,10 +173,14 @@ export default function Clientes() {
             <DialogTitle>{editing ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div><Label className="text-muted-foreground text-sm">Nome do cliente</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" /></div>
+            <div><Label className="text-muted-foreground text-sm">Nome do cliente *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" /></div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><Label className="text-muted-foreground text-sm">Nicho *</Label><Input value={form.niche} onChange={(e) => setForm({ ...form, niche: e.target.value })} placeholder="Ex: Estética, E-commerce, SaaS" className="bg-secondary/50 border-border/50 mt-1" /></div>
+              <div><Label className="text-muted-foreground text-sm">Verba mensal (R$) *</Label><Input type="number" value={form.verba_mensal} onChange={(e) => setForm({ ...form, verba_mensal: Number(e.target.value) })} placeholder="Ex: 5000" className="bg-secondary/50 border-border/50 mt-1" /></div>
+            </div>
             <div><Label className="text-muted-foreground text-sm">Serviços</Label><Textarea value={form.services} onChange={(e) => setForm({ ...form, services: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" /></div>
             <div className="grid grid-cols-2 gap-4">
-              <div><Label className="text-muted-foreground text-sm">Valor mensal (R$)</Label><Input type="number" value={form.monthly_fee} onChange={(e) => setForm({ ...form, monthly_fee: Number(e.target.value) })} className="bg-secondary/50 border-border/50 mt-1" /></div>
+              <div><Label className="text-muted-foreground text-sm">Fee mensal (R$)</Label><Input type="number" value={form.monthly_fee} onChange={(e) => setForm({ ...form, monthly_fee: Number(e.target.value) })} className="bg-secondary/50 border-border/50 mt-1" /></div>
               <div><Label className="text-muted-foreground text-sm">Duração</Label><Input value={form.contract_duration} onChange={(e) => setForm({ ...form, contract_duration: e.target.value })} placeholder="6 meses" className="bg-secondary/50 border-border/50 mt-1" /></div>
             </div>
             <div className="grid grid-cols-2 gap-4">

@@ -48,10 +48,12 @@ export type Database = {
       }
       campaigns: {
         Row: {
+          budget: number | null
           client_id: string
           created_at: string
           id: string
           name: string
+          notes: string | null
           objective: string | null
           platform: string | null
           start_date: string | null
@@ -60,10 +62,12 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          budget?: number | null
           client_id: string
           created_at?: string
           id?: string
           name: string
+          notes?: string | null
           objective?: string | null
           platform?: string | null
           start_date?: string | null
@@ -72,10 +76,12 @@ export type Database = {
           user_id: string
         }
         Update: {
+          budget?: number | null
           client_id?: string
           created_at?: string
           id?: string
           name?: string
+          notes?: string | null
           objective?: string | null
           platform?: string | null
           start_date?: string | null
@@ -178,11 +184,13 @@ export type Database = {
           id: string
           monthly_fee: number | null
           name: string
+          niche: string | null
           payment_day: number | null
           services: string | null
           status: string | null
           updated_at: string
           user_id: string
+          verba_mensal: number | null
         }
         Insert: {
           account_ids?: Json | null
@@ -191,11 +199,13 @@ export type Database = {
           id?: string
           monthly_fee?: number | null
           name: string
+          niche?: string | null
           payment_day?: number | null
           services?: string | null
           status?: string | null
           updated_at?: string
           user_id: string
+          verba_mensal?: number | null
         }
         Update: {
           account_ids?: Json | null
@@ -204,11 +214,13 @@ export type Database = {
           id?: string
           monthly_fee?: number | null
           name?: string
+          niche?: string | null
           payment_day?: number | null
           services?: string | null
           status?: string | null
           updated_at?: string
           user_id?: string
+          verba_mensal?: number | null
         }
         Relationships: []
       }
@@ -300,6 +312,50 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      creatives: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          id: string
+          link: string | null
+          name: string
+          status: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          id?: string
+          link?: string | null
+          name: string
+          status?: string
+          type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          id?: string
+          link?: string | null
+          name?: string
+          status?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creatives_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notification_states: {
         Row: {
