@@ -104,6 +104,103 @@ Este script cobre todas as etapas essenciais do fechamento, utilizando táticas 
       },
     ],
   },
+  {
+    id: 2,
+    title: 'Script de Fechamento — Modelo 02',
+    subtitle: 'A Maleta do Gestor',
+    sections: [
+      {
+        heading: 'Introdução',
+        content: `"Olá [Nome do Cliente], tudo bem? Quero agradecer pela oportunidade de conversar sobre como podemos alavancar os resultados da [Nome da Empresa] através de uma estratégia de tráfego pago cuidadosamente elaborada. Estou entusiasmado para mostrar como podemos transformar seus objetivos em realidade."`,
+      },
+      {
+        heading: '1. Iniciando a Conexão',
+        content: `"Antes de começarmos, gostaria de expressar minha admiração pela [Nome da Empresa]. O compromisso de vocês com [algo positivo sobre a empresa, como atendimento ao cliente, inovação, qualidade, etc.] é inspirador e torna nossa potencial parceria ainda mais interessante."`,
+      },
+      {
+        heading: '2. Diagnóstico Personalizado',
+        content: `"Para fornecer a melhor solução possível, preciso entender mais sobre suas metas e desafios atuais. Quais são os principais objetivos que você espera alcançar com uma campanha de tráfego pago? E quais são os maiores desafios que você está enfrentando atualmente?"
+
+(Aguardar a resposta e anotar os pontos principais)`,
+      },
+      {
+        heading: '3. Confirmando a Compreensão',
+        content: `"Obrigado por compartilhar, [Nome do Cliente]. Para garantir que estamos alinhados, você mencionou que seus objetivos principais são [resumo dos objetivos, como aumentar as vendas online, gerar leads qualificados, expandir a visibilidade da marca, etc.], e os desafios incluem [resumo dos desafios, como alta concorrência, baixa taxa de conversão, etc.]. Correto?"
+
+(Aguardar confirmação)`,
+      },
+      {
+        heading: '4. Proposta Detalhada',
+        content: `"Com base nas suas necessidades, desenvolvi uma estratégia personalizada que inclui:
+
+● Análise de Mercado: Investigação aprofundada do mercado e concorrentes para identificar oportunidades e ameaças.
+● Desenvolvimento de Campanhas: Criação de campanhas personalizadas focadas em seus objetivos específicos.
+● Segmentação Precisa: Uso de dados detalhados para segmentar seu público-alvo com precisão cirúrgica.
+● Otimização Contínua: Ajustes e melhorias constantes para maximizar o retorno sobre o investimento.
+● Relatórios Detalhados: Transparência total com relatórios claros que destacam os resultados e insights das campanhas."`,
+      },
+      {
+        heading: '5. Benefícios Exclusivos',
+        content: `"Nosso diferencial está na nossa dedicação aos resultados tangíveis e à total transparência. Ao trabalhar conosco, você obterá:
+
+● ROI Elevado: Campanhas otimizadas para maximizar o retorno sobre o investimento.
+● Eficiência Operacional: Gestão completa de todas as etapas, liberando seu tempo para focar em outras áreas.
+● Tecnologia Avançada: Ferramentas de última geração para garantir campanhas eficientes.
+● Suporte Personalizado: Atendimento dedicado para resolver qualquer necessidade rapidamente.
+● Flexibilidade: Adaptamos nossas estratégias conforme necessário para manter a eficácia diante das mudanças do mercado."`,
+      },
+      {
+        heading: '6. Detalhamento do Investimento',
+        content: `"O investimento necessário para atingir esses resultados é de [valor do investimento]. Esse valor cobre todas as etapas, desde a criação até a otimização contínua das campanhas. Considerando os benefícios esperados, como [resultados esperados, como aumento de X% nas vendas, Y número de leads qualificados, etc.], estou confiante de que este é um investimento estratégico para a [Nome da Empresa]."`,
+      },
+      {
+        heading: '7. Garantia e Casos de Sucesso',
+        content: `"Para reforçar sua confiança, oferecemos uma garantia de [detalhar garantia, como satisfação, resultados mínimos, etc.]. Além disso, temos inúmeros casos de sucesso, como o da [Nome do Cliente/Caso de Sucesso], que conseguiu [detalhar resultados específicos, como aumento significativo em vendas ou redução no custo por lead]. Posso compartilhar detalhes adicionais desses casos para demonstrar nossa capacidade de gerar resultados semelhantes para você."`,
+      },
+      {
+        heading: '8. Técnicas Avançadas de Persuasão',
+        content: `● Escassez: "Estamos limitando nossa capacidade de novos clientes para garantir um serviço de alta qualidade. Isso significa que temos poucas vagas disponíveis para novos projetos este mês."
+
+● Urgência: "Para começarmos a ver resultados o quanto antes, é essencial iniciarmos o processo ainda esta semana. Assim, podemos aproveitar as atuais oportunidades de mercado."
+
+● Reciprocidade: "Para assegurar que você se sinta confortável com nossa parceria, estou oferecendo [oferta especial, como um período de serviço gratuito ou um desconto inicial] para você experimentar nossos serviços sem compromisso."
+
+● Autoridade: "Com [anos de experiência, certificações, cases de sucesso], minha equipe e eu temos a expertise necessária para gerar resultados excepcionais com tráfego pago."`,
+      },
+      {
+        heading: '9. Chamado à Ação',
+        content: `"Estou realmente empolgado com a possibilidade de trabalharmos juntos e ajudar a [Nome da Empresa] a crescer ainda mais. Podemos começar imediatamente, e para isso, só precisamos formalizar nosso acordo. Você está pronto para dar esse próximo passo e começar a ver os resultados que discutimos?"
+
+(Aguardar resposta)`,
+      },
+      {
+        heading: '10. Lidando com Objeções',
+        content: `● Objeção Comum 1 — Custo: "Entendo que o custo possa ser uma preocupação. O que posso garantir é que o valor investido será retornado através do aumento de [vendas/conversões/etc.]. Além disso, oferecemos a possibilidade de parcelamento, facilitando o pagamento para sua empresa."
+
+● Objeção Comum 2 — Tempo: "Sei que você pode estar preocupado com o tempo necessário para ver os resultados. O que posso assegurar é que nossa abordagem focada em otimização contínua garante que você comece a ver melhorias significativas em [tempo esperado, como 1 a 2 meses]. Além disso, cuidamos de todas as etapas, economizando seu tempo."
+
+● Objeção Comum 3 — Resultados Anteriores: "É natural querer garantir que essa estratégia funcione. Temos vários casos de sucesso, como o da [Nome do Cliente], que conseguiu [resultado específico]. Posso compartilhar mais detalhes e estudos de caso que demonstram nossa capacidade de alcançar resultados semelhantes para a [Nome da Empresa]."
+
+● Objeção Comum 4 — Comprometimento: "Entendo que você possa estar preocupado com um compromisso de longo prazo. Oferecemos um período de teste de [duração do teste, como 3 meses], durante o qual você pode avaliar nossos serviços sem compromissos de longo prazo."
+
+● Objeção Comum 5 — Adequação da Estratégia: "Posso garantir que nossa estratégia será adaptada especificamente para as necessidades da [Nome da Empresa]. Cada plano é personalizado para maximizar os resultados com base nas suas metas e desafios."
+
+● Objeção Comum 6 — Capacidade de Atendimento: "Sei que pode haver preocupações sobre nossa capacidade de atender às suas necessidades de forma eficiente. Posso garantir que temos uma equipe dedicada e especializada que trabalhará exclusivamente no seu projeto para garantir os melhores resultados."`,
+      },
+      {
+        heading: '11. Finalizando',
+        content: `"Perfeito, [Nome do Cliente]. Vou preparar o contrato e enviar para seu e-mail. Podemos agendar nossa primeira reunião de alinhamento para [sugerir data e horário]. Agradeço novamente pela confiança e estou ansioso para começarmos essa jornada de sucesso juntos."`,
+      },
+      {
+        heading: '12. Follow-up',
+        content: `(Se o cliente precisar de mais tempo para pensar)
+
+"Compreendo que você queira pensar mais um pouco sobre essa decisão. Vamos fazer o seguinte: vou enviar um resumo do que discutimos e o contrato para seu e-mail. Podemos agendar uma ligação rápida em [sugerir data e horário] para revisarmos juntos e esclarecer qualquer dúvida adicional que possa surgir. Pode ser?"
+
+Este script cobre todas as etapas essenciais do fechamento, utilizando táticas avançadas de persuasão e convencimento, além de oferecer soluções para diversas objeções comuns, garantindo um processo estruturado e altamente persuasivo para fechar contratos de tráfego pago.`,
+      },
+    ],
+  },
 ];
 
 export default function Scripts() {
