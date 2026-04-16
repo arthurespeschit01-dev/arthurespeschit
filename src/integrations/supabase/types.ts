@@ -414,6 +414,51 @@ export type Database = {
           },
         ]
       }
+      signed_contracts: {
+        Row: {
+          client_name: string
+          created_at: string
+          expiry_date: string | null
+          file_name: string | null
+          file_url: string | null
+          id: string
+          notes: string | null
+          signed_date: string | null
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_name: string
+          created_at?: string
+          expiry_date?: string | null
+          file_name?: string | null
+          file_url?: string | null
+          id?: string
+          notes?: string | null
+          signed_date?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_name?: string
+          created_at?: string
+          expiry_date?: string | null
+          file_name?: string | null
+          file_url?: string | null
+          id?: string
+          notes?: string | null
+          signed_date?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       task_attachments: {
         Row: {
           created_at: string
