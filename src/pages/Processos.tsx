@@ -300,8 +300,6 @@ export default function Processos() {
           Garantir a eficiência do tráfego pago depende diretamente de um processo bem estruturado, desde o onboarding até a escala. A consistência na execução, análise de dados e comunicação com o cliente são os pilares para resultados sustentáveis.
         </p>
       </div>
-
-      </div>
     </div>
   );
 }
