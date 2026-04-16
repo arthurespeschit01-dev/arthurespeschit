@@ -8,11 +8,20 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Plus, Edit2, Trash2, Send, Upload, FileText, X, Paperclip } from 'lucide-react';
+import { ArrowLeft, Plus, Edit2, Trash2, Send, Upload, FileText, X, Paperclip, Image, BookOpen, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
+
+interface AccountIds {
+  bm?: string;
+  google_ads?: string;
+  tiktok_ads?: string;
+  linkedin_ads?: string;
+  [key: string]: string | undefined;
+}
 
 interface Client {
   id: string; name: string; services: string; monthly_fee: number; contract_duration: string; status: string;
+  payment_day: number | null; account_ids: AccountIds;
 }
 interface Campaign {
   id: string; name: string; platform: string; objective: string; status: string; start_date: string;
@@ -21,8 +30,15 @@ interface Note {
   id: string; text: string; created_at: string;
 }
 interface ClientAttachment {
-  id: string; file_name: string; file_url: string; created_at: string;
+  id: string; file_name: string; file_url: string; created_at: string; category: string;
 }
+
+const ATTACHMENT_CATEGORIES = [
+  { value: 'criativos', label: 'Criativos', icon: Image, description: 'Peças, artes, vídeos' },
+  { value: 'briefings', label: 'Briefings', icon: BookOpen, description: 'Briefings e estratégias' },
+  { value: 'relatorios', label: 'Relatórios', icon: BarChart3, description: 'Relatórios enviados' },
+  { value: 'outros', label: 'Outros', icon: FileText, description: 'Outros documentos' },
+] as const;
 
 export default function ClientDetail() {
   const { id } = useParams();
@@ -39,14 +55,23 @@ export default function ClientDetail() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [noteText, setNoteText] = useState('');
   const [editClient, setEditClient] = useState(false);
-  const [clientForm, setClientForm] = useState({ name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo' });
+  const [clientForm, setClientForm] = useState({ name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo', payment_day: '' as string, account_ids: {} as AccountIds });
   const [attachments, setAttachments] = useState<ClientAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [attachCategory, setAttachCategory] = useState('criativos');
+  const [attachFilter, setAttachFilter] = useState('todos');
 
   const loadClient = async () => {
     const { data } = await supabase.from('clients').select('*').eq('id', id).single();
-    setClient(data);
-    if (data) setClientForm({ name: data.name, services: data.services, monthly_fee: data.monthly_fee, contract_duration: data.contract_duration, status: data.status });
+    if (data) {
+      const c = { ...data, account_ids: (data.account_ids as AccountIds) || {} };
+      setClient(c);
+      setClientForm({
+        name: c.name, services: c.services, monthly_fee: c.monthly_fee, contract_duration: c.contract_duration, status: c.status,
+        payment_day: c.payment_day ? String(c.payment_day) : '',
+        account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '', ...c.account_ids },
+      });
+    }
   };
 
   const loadCampaigns = async () => {
@@ -62,19 +87,23 @@ export default function ClientDetail() {
   const loadAttachments = async () => {
     if (!user) return;
     const { data } = await supabase.from('client_attachments').select('*').eq('client_id', id).eq('user_id', user.id).order('created_at', { ascending: false });
-    setAttachments(data || []);
+    setAttachments((data || []) as ClientAttachment[]);
   };
 
   useEffect(() => { loadClient(); loadCampaigns(); loadAttachments(); }, [id]);
 
   const saveClient = async () => {
-    await supabase.from('clients').update(clientForm).eq('id', id);
+    await supabase.from('clients').update({
+      name: clientForm.name, services: clientForm.services, monthly_fee: clientForm.monthly_fee,
+      contract_duration: clientForm.contract_duration, status: clientForm.status,
+      payment_day: clientForm.payment_day ? Number(clientForm.payment_day) : null,
+      account_ids: clientForm.account_ids,
+    }).eq('id', id);
     toast.success('Cliente atualizado!');
     setEditClient(false);
     loadClient();
   };
 
-  // Campaign create or edit
   const openNewCampaign = () => {
     setEditingCampaign(null);
     setCampForm({ name: '', platform: 'Facebook Ads', objective: '', status: 'Ativa', start_date: '' });
@@ -93,10 +122,7 @@ export default function ClientDetail() {
     if (editingCampaign) {
       await supabase.from('campaigns').update(campForm).eq('id', editingCampaign.id);
       toast.success('Campanha atualizada!');
-      // Update selectedCampaign if it was the one being edited
-      if (selectedCampaign?.id === editingCampaign.id) {
-        setSelectedCampaign({ ...selectedCampaign, ...campForm });
-      }
+      if (selectedCampaign?.id === editingCampaign.id) setSelectedCampaign({ ...selectedCampaign, ...campForm });
     } else {
       await supabase.from('campaigns').insert({ ...campForm, client_id: id, user_id: user.id });
       toast.success('Campanha criada!');
@@ -125,7 +151,6 @@ export default function ClientDetail() {
     if (selectedCampaign) loadNotes(selectedCampaign.id);
   };
 
-  // File upload
   const handleFileUpload = async (file: File) => {
     if (!user || !id) return;
     setUploading(true);
@@ -135,7 +160,7 @@ export default function ClientDetail() {
       if (uploadError) throw uploadError;
       const { data: urlData } = supabase.storage.from('client-attachments').getPublicUrl(filePath);
       await supabase.from('client_attachments').insert({
-        client_id: id, user_id: user.id, file_name: file.name, file_url: urlData.publicUrl,
+        client_id: id, user_id: user.id, file_name: file.name, file_url: urlData.publicUrl, category: attachCategory,
       });
       toast.success('Arquivo anexado!');
       loadAttachments();
@@ -153,11 +178,22 @@ export default function ClientDetail() {
   };
 
   const filtered = filter === 'Todas' ? campaigns : campaigns.filter(c => c.status === filter);
+  const filteredAttachments = attachFilter === 'todos' ? attachments : attachments.filter(a => a.category === attachFilter);
 
   const statusColor = (s: string) => {
     if (s === 'Ativo' || s === 'Ativa') return 'bg-emerald-500/20 text-emerald-400';
     if (s === 'Pausado' || s === 'Pausada') return 'bg-amber-500/20 text-amber-400';
     return 'bg-red-500/20 text-red-400';
+  };
+
+  const updateAccountId = (key: string, value: string) => {
+    setClientForm(prev => ({ ...prev, account_ids: { ...prev.account_ids, [key]: value } }));
+  };
+
+  const getCategoryIcon = (cat: string) => {
+    const found = ATTACHMENT_CATEGORIES.find(c => c.value === cat);
+    if (!found) return FileText;
+    return found.icon;
   };
 
   if (!client) return <div className="text-muted-foreground">Carregando...</div>;
@@ -190,7 +226,22 @@ export default function ClientDetail() {
                 <div><span className="text-muted-foreground">Serviços:</span><p className="text-foreground mt-1">{client.services}</p></div>
                 <div><span className="text-muted-foreground">Valor mensal:</span><p className="text-foreground mt-1">R$ {client.monthly_fee?.toLocaleString('pt-BR')}</p></div>
                 <div><span className="text-muted-foreground">Duração:</span><p className="text-foreground mt-1">{client.contract_duration}</p></div>
+                <div><span className="text-muted-foreground">Dia de pagamento:</span><p className="text-foreground mt-1">{client.payment_day ? `Dia ${client.payment_day}` : '—'}</p></div>
               </div>
+
+              {/* Account IDs display */}
+              {Object.entries(client.account_ids || {}).some(([, v]) => v) && (
+                <div className="pt-3 border-t border-border">
+                  <h4 className="text-sm font-semibold text-foreground mb-2">IDs das Contas</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {client.account_ids.bm && <div className="bg-secondary/30 rounded-lg px-3 py-2 text-sm"><span className="text-muted-foreground text-xs">BM:</span><p className="text-foreground font-mono text-xs mt-0.5">{client.account_ids.bm}</p></div>}
+                    {client.account_ids.google_ads && <div className="bg-secondary/30 rounded-lg px-3 py-2 text-sm"><span className="text-muted-foreground text-xs">Google Ads:</span><p className="text-foreground font-mono text-xs mt-0.5">{client.account_ids.google_ads}</p></div>}
+                    {client.account_ids.tiktok_ads && <div className="bg-secondary/30 rounded-lg px-3 py-2 text-sm"><span className="text-muted-foreground text-xs">TikTok Ads:</span><p className="text-foreground font-mono text-xs mt-0.5">{client.account_ids.tiktok_ads}</p></div>}
+                    {client.account_ids.linkedin_ads && <div className="bg-secondary/30 rounded-lg px-3 py-2 text-sm"><span className="text-muted-foreground text-xs">LinkedIn Ads:</span><p className="text-foreground font-mono text-xs mt-0.5">{client.account_ids.linkedin_ads}</p></div>}
+                  </div>
+                </div>
+              )}
+
               <Button variant="outline" onClick={() => setEditClient(true)} className="gap-2"><Edit2 className="w-3 h-3" /> Editar</Button>
             </>
           ) : (
@@ -200,6 +251,29 @@ export default function ClientDetail() {
               <div className="grid grid-cols-2 gap-3">
                 <div><Label className="text-muted-foreground text-sm">Valor (R$)</Label><Input type="number" value={clientForm.monthly_fee} onChange={(e) => setClientForm({ ...clientForm, monthly_fee: Number(e.target.value) })} className="bg-secondary/50 border-border/50 mt-1" /></div>
                 <div><Label className="text-muted-foreground text-sm">Duração</Label><Input value={clientForm.contract_duration} onChange={(e) => setClientForm({ ...clientForm, contract_duration: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label className="text-muted-foreground text-sm">Dia de pagamento</Label><Input type="number" min={1} max={31} value={clientForm.payment_day} onChange={(e) => setClientForm({ ...clientForm, payment_day: e.target.value })} placeholder="Ex: 10" className="bg-secondary/50 border-border/50 mt-1" /></div>
+                <div>
+                  <Label className="text-muted-foreground text-sm">Status</Label>
+                  <Select value={clientForm.status} onValueChange={(v) => setClientForm({ ...clientForm, status: v })}>
+                    <SelectTrigger className="bg-secondary/50 border-border/50 mt-1"><SelectValue /></SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                      <SelectItem value="Ativo">Ativo</SelectItem>
+                      <SelectItem value="Pausado">Pausado</SelectItem>
+                      <SelectItem value="Encerrado">Encerrado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-3 pt-2 border-t border-border">
+                <Label className="text-foreground text-sm font-semibold">IDs das Contas</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label className="text-muted-foreground text-xs">BM</Label><Input value={clientForm.account_ids.bm || ''} onChange={(e) => updateAccountId('bm', e.target.value)} placeholder="ID da BM" className="bg-secondary/50 border-border/50 mt-1 text-sm" /></div>
+                  <div><Label className="text-muted-foreground text-xs">Google Ads</Label><Input value={clientForm.account_ids.google_ads || ''} onChange={(e) => updateAccountId('google_ads', e.target.value)} placeholder="ID Google Ads" className="bg-secondary/50 border-border/50 mt-1 text-sm" /></div>
+                  <div><Label className="text-muted-foreground text-xs">TikTok Ads</Label><Input value={clientForm.account_ids.tiktok_ads || ''} onChange={(e) => updateAccountId('tiktok_ads', e.target.value)} placeholder="ID TikTok Ads" className="bg-secondary/50 border-border/50 mt-1 text-sm" /></div>
+                  <div><Label className="text-muted-foreground text-xs">LinkedIn Ads</Label><Input value={clientForm.account_ids.linkedin_ads || ''} onChange={(e) => updateAccountId('linkedin_ads', e.target.value)} placeholder="ID LinkedIn Ads" className="bg-secondary/50 border-border/50 mt-1 text-sm" /></div>
+                </div>
               </div>
               <div className="flex gap-2">
                 <Button onClick={saveClient} className="neon-glow">Salvar</Button>
@@ -283,9 +357,27 @@ export default function ClientDetail() {
       {/* Anexos Tab */}
       {tab === 'anexos' && (
         <div className="space-y-4">
+          {/* Upload section */}
           <div className="glass-surface rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-foreground flex items-center gap-2"><Paperclip className="w-4 h-4 text-primary" /> Arquivos Anexados</h3>
+              <h3 className="font-semibold text-foreground flex items-center gap-2"><Paperclip className="w-4 h-4 text-primary" /> Anexos do Cliente</h3>
+            </div>
+
+            {/* Upload with category */}
+            <div className="flex flex-wrap items-end gap-3 mb-6 p-4 bg-secondary/30 rounded-lg border border-border/50">
+              <div className="flex-1 min-w-[200px]">
+                <Label className="text-muted-foreground text-xs mb-1 block">Categoria do arquivo</Label>
+                <Select value={attachCategory} onValueChange={setAttachCategory}>
+                  <SelectTrigger className="bg-secondary/50 border-border/50"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-card border-border">
+                    {ATTACHMENT_CATEGORIES.map(cat => (
+                      <SelectItem key={cat.value} value={cat.value}>
+                        <span className="flex items-center gap-2"><cat.icon className="w-3 h-3" /> {cat.label}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <label className="cursor-pointer">
                 <input type="file" className="hidden" onChange={(e) => { if (e.target.files?.[0]) handleFileUpload(e.target.files[0]); e.target.value = ''; }} disabled={uploading} />
                 <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity cursor-pointer">
@@ -295,26 +387,51 @@ export default function ClientDetail() {
               </label>
             </div>
 
-            {attachments.length > 0 ? (
+            {/* Category filter tabs */}
+            <div className="flex gap-1 p-1 bg-secondary/50 rounded-lg mb-4 flex-wrap">
+              <button onClick={() => setAttachFilter('todos')} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${attachFilter === 'todos' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+                Todos ({attachments.length})
+              </button>
+              {ATTACHMENT_CATEGORIES.map(cat => {
+                const count = attachments.filter(a => a.category === cat.value).length;
+                return (
+                  <button key={cat.value} onClick={() => setAttachFilter(cat.value)} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${attachFilter === cat.value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+                    <cat.icon className="w-3 h-3" /> {cat.label} {count > 0 && `(${count})`}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Attachment list */}
+            {filteredAttachments.length > 0 ? (
               <div className="space-y-2">
-                {attachments.map(att => (
-                  <div key={att.id} className="flex items-center justify-between bg-secondary/30 rounded-lg p-3 group">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <FileText className="w-5 h-5 text-primary shrink-0" />
-                      <div className="min-w-0">
-                        <a href={att.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-foreground hover:text-primary truncate block">{att.file_name}</a>
-                        <p className="text-xs text-muted-foreground">{new Date(att.created_at).toLocaleDateString('pt-BR')}</p>
+                {filteredAttachments.map(att => {
+                  const CatIcon = getCategoryIcon(att.category);
+                  return (
+                    <div key={att.id} className="flex items-center justify-between bg-secondary/30 rounded-lg p-3 group">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <CatIcon className="w-5 h-5 text-primary shrink-0" />
+                        <div className="min-w-0">
+                          <a href={att.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-foreground hover:text-primary truncate block">{att.file_name}</a>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">
+                              {ATTACHMENT_CATEGORIES.find(c => c.value === att.category)?.label || 'Outros'}
+                            </span>
+                            <span className="text-xs text-muted-foreground">{new Date(att.created_at).toLocaleDateString('pt-BR')}</span>
+                          </div>
+                        </div>
                       </div>
+                      <button onClick={() => removeAttachment(att)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"><X className="w-4 h-4" /></button>
                     </div>
-                    <button onClick={() => removeAttachment(att)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"><X className="w-4 h-4" /></button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-8">
                 <FileText className="w-10 h-10 text-muted-foreground/30 mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">Nenhum arquivo anexado.</p>
-                <p className="text-xs text-muted-foreground mt-1">Clique em "Enviar Arquivo" para adicionar contratos, briefings, etc.</p>
+                <p className="text-sm text-muted-foreground">
+                  {attachFilter === 'todos' ? 'Nenhum arquivo anexado.' : `Nenhum arquivo em "${ATTACHMENT_CATEGORIES.find(c => c.value === attachFilter)?.label}".`}
+                </p>
               </div>
             )}
           </div>
