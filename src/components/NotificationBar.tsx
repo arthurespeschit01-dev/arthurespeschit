@@ -1,7 +1,7 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Bell, X, AlertTriangle, Clock, FileText, ChevronDown, ChevronUp, CheckCheck, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { Bell, X, AlertTriangle, Clock, FileText, ChevronUp, CheckCheck, Eye, EyeOff, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
@@ -21,10 +21,66 @@ export default function NotificationBar() {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
-  const [read, setRead] = useState<Set<string>>(new Set());
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [tab, setTab] = useState<'unread' | 'read'>('unread');
   const toastShownRef = useRef(false);
+  const statesLoadedRef = useRef(false);
+
+  // Load persisted states from DB
+  const loadStates = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('notification_states')
+      .select('notification_id, status')
+      .eq('user_id', user.id);
+    if (data) {
+      const r = new Set<string>();
+      const d = new Set<string>();
+      data.forEach(row => {
+        if (row.status === 'read') r.add(row.notification_id);
+        if (row.status === 'dismissed') d.add(row.notification_id);
+      });
+      setReadIds(r);
+      setDismissedIds(d);
+    }
+    statesLoadedRef.current = true;
+  }, [user]);
+
+  // Persist a state change
+  const persistState = useCallback(async (notificationId: string, status: 'read' | 'dismissed') => {
+    if (!user) return;
+    await supabase.from('notification_states').upsert(
+      { user_id: user.id, notification_id: notificationId, status },
+      { onConflict: 'user_id,notification_id' }
+    );
+  }, [user]);
+
+  // Remove a persisted state (mark as unread)
+  const removeState = useCallback(async (notificationId: string) => {
+    if (!user) return;
+    await supabase.from('notification_states')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('notification_id', notificationId);
+  }, [user]);
+
+  // Bulk persist
+  const persistBulk = useCallback(async (ids: string[], status: 'read' | 'dismissed') => {
+    if (!user || ids.length === 0) return;
+    const rows = ids.map(nid => ({ user_id: user.id, notification_id: nid, status }));
+    await supabase.from('notification_states').upsert(rows, { onConflict: 'user_id,notification_id' });
+  }, [user]);
+
+  const removeBulk = useCallback(async (ids: string[]) => {
+    if (!user || ids.length === 0) return;
+    await supabase.from('notification_states')
+      .delete()
+      .eq('user_id', user.id)
+      .in('notification_id', ids);
+  }, [user]);
+
+  useEffect(() => { loadStates(); }, [loadStates]);
 
   useEffect(() => {
     if (!user) return;
@@ -43,7 +99,6 @@ export default function NotificationBar() {
       ]);
 
       const notifs: Notification[] = [];
-
       const daysUntil = (dateStr: string) => {
         const target = new Date(dateStr + 'T00:00:00');
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -75,14 +130,15 @@ export default function NotificationBar() {
       notifs.sort((a, b) => a.priority - b.priority);
       setNotifications(notifs);
 
-      if (!toastShownRef.current && notifs.length > 0) {
+      if (!toastShownRef.current && statesLoadedRef.current && notifs.length > 0) {
         toastShownRef.current = true;
-        const overdueItems = notifs.filter(n => n.priority === 0);
-        const todayItems = notifs.filter(n => n.priority === 1);
-        if (overdueItems.length > 0) {
-          toast.error(`🚨 ${overdueItems.length} item(ns) vencido(s)!`, { description: 'Verifique suas notificações.', duration: 6000 });
-        } else if (todayItems.length > 0) {
-          toast.warning(`⏰ ${todayItems.length} item(ns) vencem hoje!`, { description: 'Clique no sino para ver.', duration: 5000 });
+        const unread = notifs.filter(n => !readIds.has(n.id) && !dismissedIds.has(n.id));
+        const overdueUnread = unread.filter(n => n.priority === 0);
+        const todayUnread = unread.filter(n => n.priority === 1);
+        if (overdueUnread.length > 0) {
+          toast.error(`🚨 ${overdueUnread.length} item(ns) vencido(s)!`, { description: 'Verifique suas notificações.', duration: 6000 });
+        } else if (todayUnread.length > 0) {
+          toast.warning(`⏰ ${todayUnread.length} item(ns) vencem hoje!`, { description: 'Clique no sino para ver.', duration: 5000 });
         }
       }
     };
@@ -90,28 +146,50 @@ export default function NotificationBar() {
     load();
     const interval = setInterval(load, 60000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, readIds, dismissedIds]);
 
-  const visible = notifications.filter(n => !dismissed.has(n.id));
-  const unreadList = visible.filter(n => !read.has(n.id));
-  const readList = visible.filter(n => read.has(n.id));
+  const visible = notifications.filter(n => !dismissedIds.has(n.id));
+  const unreadList = visible.filter(n => !readIds.has(n.id));
+  const readList = visible.filter(n => readIds.has(n.id));
   const unreadCount = unreadList.length;
-  const overdueCount = unreadList.filter(n => n.type === 'task_overdue' || n.type === 'contract_expired').length;
-  const currentList = tab === 'unread' ? unreadList : readList;
   const overdueUnreadCount = unreadList.filter(n => n.type === 'task_overdue' || n.type === 'contract_expired').length;
+  const currentList = tab === 'unread' ? unreadList : readList;
 
   const toggleRead = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setRead(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
+    if (readIds.has(id)) {
+      setReadIds(prev => { const next = new Set(prev); next.delete(id); return next; });
+      removeState(id);
+    } else {
+      setReadIds(prev => new Set([...prev, id]));
+      persistState(id, 'read');
+    }
   };
 
-  const markAllRead = () => setRead(new Set(visible.map(n => n.id)));
-  const markAllUnread = () => setRead(new Set());
-  const clearAll = () => { setDismissed(new Set(notifications.map(n => n.id))); setOpen(false); };
+  const markAllRead = () => {
+    const ids = unreadList.map(n => n.id);
+    setReadIds(prev => new Set([...prev, ...ids]));
+    persistBulk(ids, 'read');
+  };
+
+  const markAllUnread = () => {
+    const ids = readList.map(n => n.id);
+    setReadIds(prev => { const next = new Set(prev); ids.forEach(id => next.delete(id)); return next; });
+    removeBulk(ids);
+  };
+
+  const clearAll = () => {
+    const ids = visible.map(n => n.id);
+    setDismissedIds(prev => new Set([...prev, ...ids]));
+    persistBulk(ids, 'dismissed');
+    setOpen(false);
+  };
+
+  const dismissOne = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDismissedIds(prev => new Set([...prev, id]));
+    persistState(id, 'dismissed');
+  };
 
   const getIcon = (type: Notification['type']) => {
     if (type === 'task_overdue' || type === 'contract_expired') return <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />;
@@ -160,14 +238,13 @@ export default function NotificationBar() {
         ) : (
           <CheckCheck className="w-3.5 h-3.5 text-muted-foreground" />
         )}
-        {open ? <ChevronUp className="w-3 h-3 text-muted-foreground" /> : <ChevronDown className="w-3 h-3 text-muted-foreground" />}
+        {open ? <ChevronUp className="w-3 h-3 text-muted-foreground" /> : <Bell className="w-0 h-0" />}
       </button>
 
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute right-0 top-full mt-2 z-50 w-80 sm:w-96 max-h-[70vh] overflow-hidden rounded-xl bg-card border border-border shadow-2xl flex flex-col">
-            {/* Header */}
             <div className="p-3 border-b border-border shrink-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -179,7 +256,6 @@ export default function NotificationBar() {
                 </Button>
               </div>
 
-              {/* Tabs */}
               <div className="flex items-center gap-1 mt-2 bg-muted/50 rounded-lg p-0.5">
                 <button
                   onClick={() => setTab('unread')}
@@ -188,9 +264,7 @@ export default function NotificationBar() {
                   }`}
                 >
                   Não lidas
-                  {unreadCount > 0 && (
-                    <Badge className="bg-primary text-primary-foreground text-[9px] px-1 py-0 h-3.5 min-w-3.5">{unreadCount}</Badge>
-                  )}
+                  {unreadCount > 0 && <Badge className="bg-primary text-primary-foreground text-[9px] px-1 py-0 h-3.5 min-w-3.5">{unreadCount}</Badge>}
                 </button>
                 <button
                   onClick={() => setTab('read')}
@@ -199,13 +273,10 @@ export default function NotificationBar() {
                   }`}
                 >
                   Lidas
-                  {readList.length > 0 && (
-                    <Badge variant="outline" className="text-[9px] px-1 py-0 h-3.5 min-w-3.5">{readList.length}</Badge>
-                  )}
+                  {readList.length > 0 && <Badge variant="outline" className="text-[9px] px-1 py-0 h-3.5 min-w-3.5">{readList.length}</Badge>}
                 </button>
               </div>
 
-              {/* Bulk actions */}
               <div className="flex items-center gap-1 mt-2">
                 {tab === 'unread' && unreadCount > 0 && (
                   <Button variant="ghost" size="sm" className="text-[11px] h-6 px-2 text-muted-foreground gap-1" onClick={markAllRead}>
@@ -220,7 +291,6 @@ export default function NotificationBar() {
               </div>
             </div>
 
-            {/* List */}
             {currentList.length === 0 ? (
               <div className="p-6 text-center">
                 <CheckCheck className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
@@ -231,7 +301,7 @@ export default function NotificationBar() {
             ) : (
               <div className="p-2 space-y-1.5 overflow-y-auto flex-1">
                 {currentList.map(n => {
-                  const isRead = read.has(n.id);
+                  const isRead = readIds.has(n.id);
                   return (
                     <div
                       key={n.id}
@@ -260,7 +330,7 @@ export default function NotificationBar() {
                           {isRead ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                         </button>
                         <button
-                          onClick={(e) => { e.stopPropagation(); setDismissed(prev => new Set([...prev, n.id])); }}
+                          onClick={(e) => dismissOne(n.id, e)}
                           className="text-muted-foreground hover:text-destructive"
                           title="Remover"
                         >
