@@ -141,6 +141,22 @@ export default function NotificationBar() {
         }
       });
 
+      // Payment day notifications
+      const currentDay = now.getDate();
+      (clients || []).forEach(cl => {
+        if (cl.status !== 'Ativo' || !cl.payment_day) return;
+        const payDay = cl.payment_day;
+        if (payDay === currentDay) {
+          notifs.push({ id: `payment-today-${cl.id}`, type: 'payment_today', title: `Pagamento de "${cl.name}" é hoje`, description: `Dia ${payDay} — verifique o recebimento.`, route: `/clientes/${cl.id}`, priority: 1 });
+        } else {
+          // Check if payment is in the next 3 days
+          const daysUntilPay = ((payDay - currentDay) + 31) % 31 || 31;
+          if (daysUntilPay <= 3 && daysUntilPay > 0) {
+            notifs.push({ id: `payment-soon-${cl.id}`, type: 'payment_soon', title: `Pagamento de "${cl.name}" em ${daysUntilPay} dia${daysUntilPay > 1 ? 's' : ''}`, description: `Dia ${payDay} de cada mês.`, route: `/clientes/${cl.id}`, priority: 2 });
+          }
+        }
+      });
+
       notifs.sort((a, b) => a.priority - b.priority);
       setNotifications(notifs);
 
