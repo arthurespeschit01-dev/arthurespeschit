@@ -17,6 +17,7 @@ import Scripts from "./pages/Scripts";
 import Objecoes from "./pages/Objecoes";
 import Planilha from "./pages/Planilha";
 import Tasks from "./pages/Tasks";
+import UTMGenerator from "./pages/UTMGenerator";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,6 +40,7 @@ function ProtectedRoutes() {
         <Route path="/objecoes" element={<Objecoes />} />
         <Route path="/planilha" element={<Planilha />} />
         <Route path="/tasks" element={<Tasks />} />
+        <Route path="/utm" element={<UTMGenerator />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>
