@@ -62,7 +62,13 @@ export default function Planilha() {
 
   return (
     <div className="animate-fade-in space-y-6">
-      <div><h1 className="text-2xl font-bold text-foreground">Planilha de Resultados</h1><p className="text-muted-foreground text-sm mt-1">Acompanhamento de performance por cliente</p></div>
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Planilha de Acompanhamento</h1>
+        <p className="text-muted-foreground text-sm mt-1">Acompanhamento de performance por cliente</p>
+        <a href="https://docs.google.com/spreadsheets/d/1xeOxh4KHEcMjkZ5qynEQ7wWqGx53xHVuvH_9lZgoyiY/edit?usp=sharing" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 mt-3 px-4 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-sm font-medium">
+          📊 Acessar Planilha no Google Sheets
+        </a>
+      </div>
 
       <div className="flex items-center gap-3 flex-wrap">
         <Select value={selectedClient} onValueChange={setSelectedClient}>
