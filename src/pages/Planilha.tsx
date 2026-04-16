@@ -41,7 +41,7 @@ export default function Planilha() {
   };
 
   const updateRow = async (id: string, field: string, value: string | number) => {
-    await supabase.from('result_rows').update({ [field]: value }).eq('id', id);
+    await supabase.from('result_rows').update({ [field]: value } as any).eq('id', id);
     setRows(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
   };
 
