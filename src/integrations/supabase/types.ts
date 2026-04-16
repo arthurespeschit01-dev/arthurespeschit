@@ -134,6 +134,7 @@ export type Database = {
       }
       client_attachments: {
         Row: {
+          category: string
           client_id: string
           created_at: string
           file_name: string
@@ -142,6 +143,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          category?: string
           client_id: string
           created_at?: string
           file_name: string
@@ -150,6 +152,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          category?: string
           client_id?: string
           created_at?: string
           file_name?: string
@@ -169,33 +172,39 @@ export type Database = {
       }
       clients: {
         Row: {
+          account_ids: Json | null
           contract_duration: string | null
           created_at: string
           id: string
           monthly_fee: number | null
           name: string
+          payment_day: number | null
           services: string | null
           status: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          account_ids?: Json | null
           contract_duration?: string | null
           created_at?: string
           id?: string
           monthly_fee?: number | null
           name: string
+          payment_day?: number | null
           services?: string | null
           status?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          account_ids?: Json | null
           contract_duration?: string | null
           created_at?: string
           id?: string
           monthly_fee?: number | null
           name?: string
+          payment_day?: number | null
           services?: string | null
           status?: string | null
           updated_at?: string
