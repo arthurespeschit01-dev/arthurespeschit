@@ -234,7 +234,7 @@ export default function NotificationBar() {
   };
 
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       <button
         onClick={() => setOpen(!open)}
         className={`relative flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors ${
@@ -255,9 +255,7 @@ export default function NotificationBar() {
       </button>
 
       {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-2 z-50 w-80 sm:w-96 max-h-[70vh] overflow-hidden rounded-xl bg-card border border-border shadow-2xl flex flex-col">
+        <div className="absolute right-0 top-full mt-2 z-50 w-80 sm:w-96 max-h-[70vh] overflow-hidden rounded-xl bg-card border border-border shadow-2xl flex flex-col">
             <div className="p-3 border-b border-border shrink-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
