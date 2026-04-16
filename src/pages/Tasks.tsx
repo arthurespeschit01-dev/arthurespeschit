@@ -257,126 +257,131 @@ export default function Tasks() {
         </Select>
       </div>
 
-      {/* Task List */}
-      <div className="space-y-3">
-        {filtered.map(t => {
-          const sc = statusConfig[t.status] || statusConfig.pendente;
-          const pc = priorityConfig[t.priority] || priorityConfig.média;
-          const StatusIcon = sc.icon;
-          const clientName = getClientName(t.client_id);
-          const taskAtts = getTaskAttachments(t.id);
-          const taskComments = getTaskComments(t.id);
+      {/* Task List grouped by status as accordion */}
+      {filtered.length === 0 ? (
+        <div className="text-center py-16">
+          <CheckCircle2 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-muted-foreground">Nenhuma task encontrada.</p>
+          <Button onClick={openNew} variant="outline" className="mt-4 gap-2"><Plus className="w-4 h-4" /> Criar primeira task</Button>
+        </div>
+      ) : (
+        <Accordion type="multiple" defaultValue={['pendente', 'em andamento']} className="space-y-3">
+          {(['pendente', 'em andamento', 'concluída', 'cancelada'] as const).map(statusKey => {
+            const tasksInStatus = filtered.filter(t => t.status === statusKey);
+            if (tasksInStatus.length === 0) return null;
+            const cfg = statusConfig[statusKey];
+            const Icon = cfg.icon;
 
-          return (
-            <div key={t.id} className="glass-surface rounded-xl p-5 border border-border/20 hover:border-primary/20 transition-all group">
-              <div className="flex items-start gap-4">
-                {/* Status dropdown */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="mt-0.5 shrink-0" title="Alterar status">
-                      <StatusIcon className={`w-5 h-5 ${sc.color.split(' ')[1]} transition-transform hover:scale-110`} />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    {Object.entries(statusConfig).map(([key, cfg]) => {
-                      const Icon = cfg.icon;
+            return (
+              <AccordionItem key={statusKey} value={statusKey} className="glass-surface rounded-xl border border-border/20 overflow-hidden">
+                <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-secondary/30 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-1.5 rounded-lg ${cfg.color.split(' ')[0]}`}>
+                      <Icon className={`w-4 h-4 ${cfg.color.split(' ')[1]}`} />
+                    </div>
+                    <span className="font-semibold text-foreground">{cfg.label}</span>
+                    <Badge variant="outline" className={`text-[10px] ${cfg.color}`}>{tasksInStatus.length}</Badge>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-2 pb-2">
+                  <div className="space-y-2">
+                    {tasksInStatus.map(t => {
+                      const sc = statusConfig[t.status] || statusConfig.pendente;
+                      const pc = priorityConfig[t.priority] || priorityConfig.média;
+                      const StatusIcon = sc.icon;
+                      const clientName = getClientName(t.client_id);
+                      const taskAtts = getTaskAttachments(t.id);
+                      const taskComments = getTaskComments(t.id);
+
                       return (
-                        <DropdownMenuItem key={key} onClick={() => changeStatus(t, key)} className={t.status === key ? 'bg-secondary' : ''}>
-                          <Icon className={`w-4 h-4 mr-2 ${cfg.color.split(' ')[1]}`} />
-                          {cfg.label}
-                        </DropdownMenuItem>
+                        <div key={t.id} className="rounded-lg p-4 bg-secondary/20 hover:bg-secondary/40 transition-all group border border-border/10">
+                          <div className="flex items-start gap-4">
+                            {/* Status dropdown */}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button className="mt-0.5 shrink-0" title="Alterar status">
+                                  <StatusIcon className={`w-5 h-5 ${sc.color.split(' ')[1]} transition-transform hover:scale-110`} />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="start">
+                                {Object.entries(statusConfig).map(([key, cfgItem]) => {
+                                  const DdIcon = cfgItem.icon;
+                                  return (
+                                    <DropdownMenuItem key={key} onClick={() => changeStatus(t, key)} className={t.status === key ? 'bg-secondary' : ''}>
+                                      <DdIcon className={`w-4 h-4 mr-2 ${cfgItem.color.split(' ')[1]}`} />
+                                      {cfgItem.label}
+                                    </DropdownMenuItem>
+                                  );
+                                })}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+
+                            <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setDetailTask(t)}>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className={`font-semibold text-foreground ${t.status === 'concluída' || t.status === 'cancelada' ? 'line-through opacity-60' : ''}`}>{t.title}</h3>
+                                <Badge variant="outline" className={`text-[10px] ${pc.color}`}>{pc.label}</Badge>
+                              </div>
+
+                              {t.description && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{t.description}</p>}
+
+                              <div className="flex items-center gap-4 mt-2 flex-wrap">
+                                {clientName && (
+                                  <span className="text-xs text-primary flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-primary" /> {clientName}
+                                  </span>
+                                )}
+                                {(t.start_date || t.end_date) && (
+                                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <Calendar className="w-3 h-3" />
+                                    {t.start_date && new Date(t.start_date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                                    {t.start_date && t.end_date && ' → '}
+                                    {t.end_date && new Date(t.end_date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                                  </span>
+                                )}
+                                {taskAtts.length > 0 && (
+                                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <Paperclip className="w-3 h-3" /> {taskAtts.length} anexo{taskAtts.length > 1 ? 's' : ''}
+                                  </span>
+                                )}
+                                {taskComments.length > 0 && (
+                                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <MessageSquare className="w-3 h-3" /> {taskComments.length} comentário{taskComments.length > 1 ? 's' : ''}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Button variant="ghost" size="sm" onClick={() => setDetailTask(t)} title="Abrir detalhes"><Eye className="w-4 h-4" /></Button>
+                              <Button variant="ghost" size="sm" onClick={() => openEdit(t)}><Edit2 className="w-4 h-4" /></Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="hover:text-destructive"><Trash2 className="w-4 h-4" /></Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Excluir task?</AlertDialogTitle>
+                                    <AlertDialogDescription>Essa ação não pode ser desfeita. A task "{t.title}" será removida permanentemente.</AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => remove(t.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Excluir</AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </div>
+                        </div>
                       );
                     })}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
-                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setDetailTask(t)}>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className={`font-semibold text-foreground ${t.status === 'concluída' || t.status === 'cancelada' ? 'line-through opacity-60' : ''}`}>{t.title}</h3>
-                    <Badge variant="outline" className={`text-[10px] ${sc.color}`}>{sc.label}</Badge>
-                    <Badge variant="outline" className={`text-[10px] ${pc.color}`}>{pc.label}</Badge>
                   </div>
-
-                  {t.description && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{t.description}</p>}
-
-                  <div className="flex items-center gap-4 mt-2 flex-wrap">
-                    {clientName && (
-                      <span className="text-xs text-primary flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-primary" /> {clientName}
-                      </span>
-                    )}
-                    {(t.start_date || t.end_date) && (
-                      <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
-                        {t.start_date && new Date(t.start_date + 'T00:00:00').toLocaleDateString('pt-BR')}
-                        {t.start_date && t.end_date && ' → '}
-                        {t.end_date && new Date(t.end_date + 'T00:00:00').toLocaleDateString('pt-BR')}
-                      </span>
-                    )}
-                    {taskAtts.length > 0 && (
-                      <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Paperclip className="w-3 h-3" /> {taskAtts.length} anexo{taskAtts.length > 1 ? 's' : ''}
-                      </span>
-                    )}
-                    {taskComments.length > 0 && (
-                      <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <MessageSquare className="w-3 h-3" /> {taskComments.length} comentário{taskComments.length > 1 ? 's' : ''}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-1 shrink-0">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" title="Alterar status">
-                        <StatusIcon className={`w-4 h-4 ${sc.color.split(' ')[1]}`} />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {Object.entries(statusConfig).map(([key, cfg]) => {
-                        const Icon = cfg.icon;
-                        return (
-                          <DropdownMenuItem key={key} onClick={() => changeStatus(t, key)} className={t.status === key ? 'bg-secondary' : ''}>
-                            <Icon className={`w-4 h-4 mr-2 ${cfg.color.split(' ')[1]}`} />
-                            {cfg.label}
-                          </DropdownMenuItem>
-                        );
-                      })}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  <Button variant="ghost" size="sm" onClick={() => setDetailTask(t)} title="Abrir detalhes"><Eye className="w-4 h-4" /></Button>
-                  <Button variant="ghost" size="sm" onClick={() => openEdit(t)}><Edit2 className="w-4 h-4" /></Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="sm" className="hover:text-destructive"><Trash2 className="w-4 h-4" /></Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Excluir task?</AlertDialogTitle>
-                        <AlertDialogDescription>Essa ação não pode ser desfeita. A task "{t.title}" será removida permanentemente.</AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => remove(t.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Excluir</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-
-        {filtered.length === 0 && (
-          <div className="text-center py-16">
-            <CheckCircle2 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-muted-foreground">Nenhuma task encontrada.</p>
-            <Button onClick={openNew} variant="outline" className="mt-4 gap-2"><Plus className="w-4 h-4" /> Criar primeira task</Button>
-          </div>
-        )}
-      </div>
+                </AccordionContent>
+              </AccordionItem>
+            );
+          })}
+        </Accordion>
+      )}
 
       {/* Detail Dialog */}
       <Dialog open={!!detailTask} onOpenChange={(o) => { if (!o) setDetailTask(null); }}>
