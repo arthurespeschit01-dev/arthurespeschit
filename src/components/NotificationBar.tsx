@@ -27,8 +27,10 @@ export default function NotificationBar() {
     const load = async () => {
       const now = new Date();
       const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      const threeDays = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 3);
-      const threeDaysStr = `${threeDays.getFullYear()}-${String(threeDays.getMonth() + 1).padStart(2, '0')}-${String(threeDays.getDate()).padStart(2, '0')}`;
+      const sevenDays = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7);
+      const sevenDaysStr = `${sevenDays.getFullYear()}-${String(sevenDays.getMonth() + 1).padStart(2, '0')}-${String(sevenDays.getDate()).padStart(2, '0')}`;
+      const thirtyDays = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30);
+      const thirtyDaysStr = `${thirtyDays.getFullYear()}-${String(thirtyDays.getMonth() + 1).padStart(2, '0')}-${String(thirtyDays.getDate()).padStart(2, '0')}`;
 
       const [{ data: tasks }, { data: contracts }] = await Promise.all([
         supabase.from('operational_tasks').select('id, title, end_date, status').eq('user_id', user.id),
@@ -37,25 +39,33 @@ export default function NotificationBar() {
 
       const notifs: Notification[] = [];
 
+      const daysUntil = (dateStr: string) => {
+        const target = new Date(dateStr + 'T00:00:00');
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      };
+
       // Task notifications
       (tasks || []).forEach(t => {
         if (t.status === 'concluída' || t.status === 'cancelada' || !t.end_date) return;
+        const days = daysUntil(t.end_date);
         if (t.end_date < todayStr) {
           notifs.push({ id: `task-overdue-${t.id}`, type: 'task_overdue', title: `Task vencida: ${t.title}`, description: `Venceu em ${new Date(t.end_date + 'T00:00:00').toLocaleDateString('pt-BR')}`, route: '/tasks' });
         } else if (t.end_date === todayStr) {
           notifs.push({ id: `task-today-${t.id}`, type: 'task_due_today', title: `Task vence hoje: ${t.title}`, description: 'O prazo é hoje!', route: '/tasks' });
-        } else if (t.end_date <= threeDaysStr) {
-          notifs.push({ id: `task-soon-${t.id}`, type: 'task_due_soon', title: `Task vence em breve: ${t.title}`, description: `Vence em ${new Date(t.end_date + 'T00:00:00').toLocaleDateString('pt-BR')}`, route: '/tasks' });
+        } else if (t.end_date <= sevenDaysStr) {
+          notifs.push({ id: `task-soon-${t.id}`, type: 'task_due_soon', title: `Task vence em ${days} dia${days > 1 ? 's' : ''}: ${t.title}`, description: `Vence em ${new Date(t.end_date + 'T00:00:00').toLocaleDateString('pt-BR')}`, route: '/tasks' });
         }
       });
 
       // Contract notifications
       (contracts || []).forEach(c => {
         if (c.status === 'Cancelado' || c.status === 'Encerrado' || !c.expiry_date) return;
+        const days = daysUntil(c.expiry_date);
         if (c.expiry_date < todayStr) {
           notifs.push({ id: `contract-expired-${c.id}`, type: 'contract_expired', title: `Contrato vencido: ${c.title}`, description: `${c.client_name} — venceu em ${new Date(c.expiry_date + 'T00:00:00').toLocaleDateString('pt-BR')}`, route: '/contratos' });
-        } else if (c.expiry_date <= threeDaysStr) {
-          notifs.push({ id: `contract-expiring-${c.id}`, type: 'contract_expiring', title: `Contrato vencendo: ${c.title}`, description: `${c.client_name} — vence em ${new Date(c.expiry_date + 'T00:00:00').toLocaleDateString('pt-BR')}`, route: '/contratos' });
+        } else if (c.expiry_date <= thirtyDaysStr) {
+          notifs.push({ id: `contract-expiring-${c.id}`, type: 'contract_expiring', title: `Contrato vence em ${days} dias: ${c.title}`, description: `${c.client_name} — vence em ${new Date(c.expiry_date + 'T00:00:00').toLocaleDateString('pt-BR')}`, route: '/contratos' });
         }
       });
 
