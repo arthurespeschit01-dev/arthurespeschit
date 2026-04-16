@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import NotificationBar from '@/components/NotificationBar';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Calculator, ClipboardList,
