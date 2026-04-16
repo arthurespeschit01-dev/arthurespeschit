@@ -1,57 +1,133 @@
 import { useState, useMemo } from 'react';
-import { Link2, Copy, Check, RotateCcw, Globe, ChevronDown } from 'lucide-react';
+import { Link2, Copy, Check, RotateCcw, HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 
-const PLATFORMS = [
+interface Platform {
+  id: string;
+  label: string;
+  defaults: { utm_source: string; utm_medium: string };
+  dynamicParams: { label: string; value: string }[];
+}
+
+const PLATFORMS: Platform[] = [
   {
     id: 'google_ads',
     label: 'Google Ads',
-    defaults: { utm_source: 'google', utm_medium: 'cpc', utm_campaign: 'trafego_pesquisa_vendas', utm_content: 'anuncio_responsivo_01', utm_term: 'comprar_tenis_online' },
+    defaults: { utm_source: 'google', utm_medium: 'cpc' },
     dynamicParams: [
-      '{campaignid}', '{adgroupid}', '{creative}', '{keyword}', '{matchtype}', '{network}', '{device}', '{placement}'
+      { label: '{keyword}', value: '{keyword}' },
+      { label: '{matchtype}', value: '{matchtype}' },
+      { label: '{adgroupid}', value: '{adgroupid}' },
+      { label: '{campaignid}', value: '{campaignid}' },
+      { label: '{creative}', value: '{creative}' },
+      { label: '{placement}', value: '{placement}' },
+      { label: '{network}', value: '{network}' },
     ],
   },
   {
     id: 'meta_ads',
     label: 'Meta Ads (Facebook / Instagram)',
-    defaults: { utm_source: 'facebook', utm_medium: 'paid_social', utm_campaign: 'trafego_vendas', utm_content: 'video_01', utm_term: 'interesse_moda' },
+    defaults: { utm_source: 'facebook', utm_medium: 'paid_social' },
     dynamicParams: [
-      '{{campaign.id}}', '{{adset.id}}', '{{ad.id}}', '{{campaign.name}}', '{{adset.name}}', '{{ad.name}}', '{{placement}}'
+      { label: '{{ad.name}}', value: '{{ad.name}}' },
+      { label: '{{adset.name}}', value: '{{adset.name}}' },
+      { label: '{{campaign.name}}', value: '{{campaign.name}}' },
+      { label: '{{site_source_name}}', value: '{{site_source_name}}' },
+      { label: '{{placement}}', value: '{{placement}}' },
     ],
   },
   {
     id: 'tiktok_ads',
     label: 'TikTok Ads',
-    defaults: { utm_source: 'tiktok', utm_medium: 'paid_social', utm_campaign: 'trafego_vendas', utm_content: 'video_viral_01', utm_term: 'interesse_streetwear' },
+    defaults: { utm_source: 'tiktok', utm_medium: 'paid_social' },
     dynamicParams: [
-      '__CAMPAIGN_ID__', '__AID__', '__CID__', '__CAMPAIGN_NAME__', '__AID_NAME__', '__CID_NAME__', '__PLACEMENT__'
+      { label: '__CAMPAIGN_ID__', value: '__CAMPAIGN_ID__' },
+      { label: '__AID__', value: '__AID__' },
+      { label: '__CID__', value: '__CID__' },
+      { label: '__CAMPAIGN_NAME__', value: '__CAMPAIGN_NAME__' },
+      { label: '__AID_NAME__', value: '__AID_NAME__' },
+      { label: '__CID_NAME__', value: '__CID_NAME__' },
+      { label: '__PLACEMENT__', value: '__PLACEMENT__' },
     ],
   },
   {
     id: 'linkedin_ads',
     label: 'LinkedIn Ads',
-    defaults: { utm_source: 'linkedin', utm_medium: 'paid_social', utm_campaign: 'lead_b2b', utm_content: 'imagem_01', utm_term: 'gestores_empresas' },
+    defaults: { utm_source: 'linkedin', utm_medium: 'paid_social' },
+    dynamicParams: [
+      { label: '{campaignId}', value: '{campaignId}' },
+      { label: '{creative}', value: '{creative}' },
+      { label: '{placement}', value: '{placement}' },
+      { label: '{member}', value: '{member}' },
+    ],
+  },
+  {
+    id: 'youtube_ads',
+    label: 'YouTube Ads',
+    defaults: { utm_source: 'youtube', utm_medium: 'paid_social' },
     dynamicParams: [],
   },
   {
-    id: 'taboola',
-    label: 'Taboola',
-    defaults: { utm_source: 'taboola', utm_medium: 'native', utm_campaign: 'conteudo_descoberta', utm_content: 'artigo_01', utm_term: 'interesse_negocios' },
-    dynamicParams: ['{campaign_id}', '{campaign_name}', '{site}', '{thumbnail}', '{title}'],
+    id: 'pinterest_ads',
+    label: 'Pinterest Ads',
+    defaults: { utm_source: 'pinterest', utm_medium: 'paid_social' },
+    dynamicParams: [],
   },
   {
-    id: 'custom',
-    label: 'Personalizado',
-    defaults: { utm_source: 'facebook', utm_medium: 'paid_social', utm_campaign: 'vendas_tenis_blackfriday', utm_content: 'video_prova_social', utm_term: 'publico_semelhante_1%' },
+    id: 'email_marketing',
+    label: 'Email Marketing',
+    defaults: { utm_source: 'email', utm_medium: 'email' },
+    dynamicParams: [],
+  },
+  {
+    id: 'organic_social',
+    label: 'Orgânico / Redes Sociais',
+    defaults: { utm_source: 'instagram', utm_medium: 'organic_social' },
     dynamicParams: [],
   },
 ];
 
+const FIELD_TOOLTIPS: Record<string, string> = {
+  utm_source: 'De onde vem o tráfego. Ex: google, facebook, tiktok, newsletter',
+  utm_medium: 'O tipo de mídia usada. Ex: cpc, paid_social, email, organic',
+  utm_campaign: 'O nome da sua campanha. Ex: black_friday_2024, lancamento_produto',
+  utm_term: 'Palavra-chave ou segmentação de público. Ex: tenis_corrida, interesse_moda',
+  utm_content: 'Variação do criativo ou anúncio. Ex: video_01, banner_azul, cta_compre_agora',
+};
+
+type UtmField = 'campaign' | 'term' | 'content';
+
+function FieldLabel({ label, tooltip, optional }: { label: string; tooltip: string; optional?: boolean }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <Label>{label}</Label>
+      {optional && <span className="text-muted-foreground text-xs">(opcional)</span>}
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs text-xs">
+            {tooltip}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </div>
+  );
+}
+
+function sanitize(val: string) {
+  return val.replace(/\s+/g, '_');
+}
+
 export default function UTMGenerator() {
+  const [mode, setMode] = useState<'platform' | 'custom'>('platform');
   const [platformId, setPlatformId] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
   const [utmSource, setUtmSource] = useState('');
@@ -60,6 +136,7 @@ export default function UTMGenerator() {
   const [utmTerm, setUtmTerm] = useState('');
   const [utmContent, setUtmContent] = useState('');
   const [copied, setCopied] = useState(false);
+  const [activeInsertField, setActiveInsertField] = useState<UtmField>('campaign');
 
   const platform = PLATFORMS.find((p) => p.id === platformId);
 
@@ -69,21 +146,24 @@ export default function UTMGenerator() {
     if (p) {
       setUtmSource(p.defaults.utm_source);
       setUtmMedium(p.defaults.utm_medium);
-      setUtmCampaign(p.defaults.utm_campaign);
-      setUtmContent(p.defaults.utm_content);
-      setUtmTerm(p.defaults.utm_term);
     }
   };
 
   const generatedUrl = useMemo(() => {
     if (!baseUrl) return '';
     try {
-      const url = new URL(baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`);
-      if (utmSource) url.searchParams.set('utm_source', utmSource);
-      if (utmMedium) url.searchParams.set('utm_medium', utmMedium);
-      if (utmCampaign) url.searchParams.set('utm_campaign', utmCampaign);
-      if (utmTerm) url.searchParams.set('utm_term', utmTerm);
-      if (utmContent) url.searchParams.set('utm_content', utmContent);
+      const raw = baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`;
+      const url = new URL(raw);
+      const src = sanitize(utmSource);
+      const med = sanitize(utmMedium);
+      const camp = sanitize(utmCampaign);
+      const term = sanitize(utmTerm);
+      const content = sanitize(utmContent);
+      if (src) url.searchParams.set('utm_source', src);
+      if (med) url.searchParams.set('utm_medium', med);
+      if (camp) url.searchParams.set('utm_campaign', camp);
+      if (term) url.searchParams.set('utm_term', term);
+      if (content) url.searchParams.set('utm_content', content);
       return url.toString();
     } catch {
       return '';
@@ -108,130 +188,169 @@ export default function UTMGenerator() {
     setUtmContent('');
   };
 
-  const insertDynamic = (param: string, field: 'campaign' | 'term' | 'content') => {
-    if (field === 'campaign') setUtmCampaign((v) => (v ? `${v}_${param}` : param));
-    if (field === 'term') setUtmTerm((v) => (v ? `${v}_${param}` : param));
-    if (field === 'content') setUtmContent((v) => (v ? `${v}_${param}` : param));
+  const insertDynamic = (param: string) => {
+    const setter =
+      activeInsertField === 'campaign' ? setUtmCampaign :
+      activeInsertField === 'term' ? setUtmTerm : setUtmContent;
+    setter((v) => (v ? `${v}_${param}` : param));
   };
 
-  return (
-    <div className="animate-fade-in space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Gerador de UTMs</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Crie URLs com parâmetros UTM para rastrear suas campanhas de anúncios
-        </p>
+  const isUrlValid = baseUrl.length === 0 || (() => {
+    try {
+      new URL(baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`);
+      return true;
+    } catch { return false; }
+  })();
+
+  const utmFields = (
+    <>
+      <div className="space-y-2">
+        <FieldLabel label="URL Base" tooltip="A URL da página de destino, sem parâmetros. Ex: https://seusite.com.br/oferta" />
+        <Input
+          placeholder="https://seusite.com.br"
+          value={baseUrl}
+          onChange={(e) => setBaseUrl(e.target.value)}
+          className={!isUrlValid ? 'border-destructive' : ''}
+        />
+        {!isUrlValid && <p className="text-destructive text-xs">URL inválida. Verifique o formato.</p>}
       </div>
 
-      {/* Platform selector */}
-      <div className="glass-surface rounded-xl p-6 border border-border/30 space-y-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label>Plataforma de Anúncio</Label>
-          <Select value={platformId} onValueChange={handlePlatformChange}>
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione a plataforma" />
-            </SelectTrigger>
-            <SelectContent>
-              {PLATFORMS.map((p) => (
-                <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <FieldLabel label="utm_source" tooltip={FIELD_TOOLTIPS.utm_source} />
+          <Input value={utmSource} onChange={(e) => setUtmSource(e.target.value)} placeholder="google, facebook..." />
         </div>
-
         <div className="space-y-2">
-          <Label>URL Base</Label>
-          <Input
-            placeholder="https://seusite.com.br/pagina"
-            value={baseUrl}
-            onChange={(e) => setBaseUrl(e.target.value)}
-          />
+          <FieldLabel label="utm_medium" tooltip={FIELD_TOOLTIPS.utm_medium} />
+          <Input value={utmMedium} onChange={(e) => setUtmMedium(e.target.value)} placeholder="cpc, paid_social..." />
+        </div>
+        <div className="space-y-2">
+          <FieldLabel label="utm_campaign" tooltip={FIELD_TOOLTIPS.utm_campaign} />
+          <Input value={utmCampaign} onChange={(e) => setUtmCampaign(e.target.value)} placeholder="nome_campanha" />
+        </div>
+        <div className="space-y-2">
+          <FieldLabel label="utm_term" tooltip={FIELD_TOOLTIPS.utm_term} optional />
+          <Input value={utmTerm} onChange={(e) => setUtmTerm(e.target.value)} placeholder="palavra-chave" />
+        </div>
+        <div className="space-y-2 sm:col-span-2">
+          <FieldLabel label="utm_content" tooltip={FIELD_TOOLTIPS.utm_content} optional />
+          <Input value={utmContent} onChange={(e) => setUtmContent(e.target.value)} placeholder="variação do anúncio" />
+        </div>
+      </div>
+    </>
+  );
+
+  return (
+    <TooltipProvider delayDuration={200}>
+      <div className="animate-fade-in space-y-6 max-w-3xl">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Gerador de UTMs</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Crie URLs com parâmetros UTM para rastrear suas campanhas de marketing e anúncios
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>utm_source</Label>
-            <Input value={utmSource} onChange={(e) => setUtmSource(e.target.value)} placeholder="google, facebook..." />
-          </div>
-          <div className="space-y-2">
-            <Label>utm_medium</Label>
-            <Input value={utmMedium} onChange={(e) => setUtmMedium(e.target.value)} placeholder="cpc, paid_social..." />
-          </div>
-          <div className="space-y-2">
-            <Label>utm_campaign</Label>
-            <Input value={utmCampaign} onChange={(e) => setUtmCampaign(e.target.value)} placeholder="nome_campanha" />
-          </div>
-          <div className="space-y-2">
-            <Label>utm_term <span className="text-muted-foreground text-xs">(opcional)</span></Label>
-            <Input value={utmTerm} onChange={(e) => setUtmTerm(e.target.value)} placeholder="palavra-chave" />
-          </div>
-          <div className="space-y-2 sm:col-span-2">
-            <Label>utm_content <span className="text-muted-foreground text-xs">(opcional)</span></Label>
-            <Input value={utmContent} onChange={(e) => setUtmContent(e.target.value)} placeholder="variação do anúncio" />
-          </div>
-        </div>
+        <Tabs value={mode} onValueChange={(v) => { setMode(v as 'platform' | 'custom'); handleReset(); }}>
+          <TabsList className="w-full max-w-xs">
+            <TabsTrigger value="platform" className="flex-1">Por Plataforma</TabsTrigger>
+            <TabsTrigger value="custom" className="flex-1">Personalizado</TabsTrigger>
+          </TabsList>
 
-        {/* Dynamic params */}
-        {platform && platform.dynamicParams.length > 0 && (
-          <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Parâmetros dinâmicos ({platform.label})</Label>
-            <p className="text-xs text-muted-foreground">Clique para inserir em campaign, term ou content:</p>
-            <div className="flex flex-wrap gap-1.5">
-              {platform.dynamicParams.map((param) => (
-                <div key={param} className="flex items-center gap-0.5">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="text-xs h-7 px-2"
-                    onClick={() => insertDynamic(param, 'campaign')}
-                    title="Inserir em utm_campaign"
-                  >
-                    {param}
-                  </Button>
+          {/* ====== POR PLATAFORMA ====== */}
+          <TabsContent value="platform">
+            <div className="glass-surface rounded-xl p-6 border border-border/30 space-y-5">
+              <div className="space-y-2">
+                <FieldLabel label="Plataforma de Anúncio" tooltip="Selecione a plataforma para preencher automaticamente source e medium." />
+                <Select value={platformId} onValueChange={handlePlatformChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a plataforma" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PLATFORMS.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {utmFields}
+
+              {/* Dynamic params */}
+              {platform && platform.dynamicParams.length > 0 && (
+                <div className="space-y-3 rounded-lg bg-secondary/50 p-4 border border-border/20">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Parâmetros dinâmicos — {platform.label}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Clique em um parâmetro para inseri-lo no campo selecionado abaixo. A plataforma substituirá automaticamente pelo valor real.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">Inserir em:</span>
+                    {(['campaign', 'term', 'content'] as const).map((f) => (
+                      <Button
+                        key={f}
+                        type="button"
+                        size="sm"
+                        variant={activeInsertField === f ? 'default' : 'outline'}
+                        className="text-xs h-7 px-3"
+                        onClick={() => setActiveInsertField(f)}
+                      >
+                        utm_{f}
+                      </Button>
+                    ))}
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {platform.dynamicParams.map((param) => (
+                      <Button
+                        key={param.value}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-7 px-2 font-mono bg-background/40 hover:bg-primary/20 hover:text-primary hover:border-primary/40 transition-colors"
+                        onClick={() => insertDynamic(param.value)}
+                      >
+                        {param.label}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
-              ))}
+              )}
             </div>
-            <div className="flex gap-2 mt-1">
-              <span className="text-[10px] text-muted-foreground">Inserir em:</span>
-              {(['campaign', 'term', 'content'] as const).map((f) => (
-                <button
-                  key={f}
-                  className="text-[10px] text-primary underline"
-                  onClick={() => {
-                    if (platform.dynamicParams[0]) insertDynamic(platform.dynamicParams[0], f);
-                  }}
-                >
-                  utm_{f}
-                </button>
-              ))}
+          </TabsContent>
+
+          {/* ====== PERSONALIZADO ====== */}
+          <TabsContent value="custom">
+            <div className="glass-surface rounded-xl p-6 border border-border/30 space-y-5">
+              {utmFields}
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        {/* Result */}
+        {generatedUrl && (
+          <div className="glass-surface rounded-xl p-6 border border-primary/20 space-y-3">
+            <div className="flex items-center gap-2">
+              <Link2 className="w-4 h-4 text-primary" />
+              <Label className="text-primary font-semibold">URL Gerada</Label>
+            </div>
+            <div className="bg-background/60 rounded-lg p-4 break-all text-sm text-foreground font-mono border border-border/40 select-all">
+              {generatedUrl}
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handleCopy} className="gap-2">
+                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                {copied ? 'Copiada!' : 'Copiar URL'}
+              </Button>
+              <Button variant="outline" onClick={handleReset} className="gap-2">
+                <RotateCcw className="w-4 h-4" />
+                Limpar
+              </Button>
             </div>
           </div>
         )}
       </div>
-
-      {/* Result */}
-      {generatedUrl && (
-        <div className="glass-surface rounded-xl p-6 border border-primary/20 space-y-3">
-          <div className="flex items-center gap-2">
-            <Link2 className="w-4 h-4 text-primary" />
-            <Label className="text-primary font-semibold">URL Gerada</Label>
-          </div>
-          <div className="bg-background/60 rounded-lg p-4 break-all text-sm text-foreground font-mono border border-border/40">
-            {generatedUrl}
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={handleCopy} className="gap-2">
-              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-              {copied ? 'Copiada!' : 'Copiar URL'}
-            </Button>
-            <Button variant="outline" onClick={handleReset} className="gap-2">
-              <RotateCcw className="w-4 h-4" />
-              Limpar
-            </Button>
-          </div>
-        </div>
-      )}
-    </div>
+    </TooltipProvider>
   );
 }
