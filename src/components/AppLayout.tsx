@@ -42,7 +42,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
             <Zap className="w-4 h-4 text-primary" />
           </div>
-          <span className="text-lg font-bold gradient-text">Gestor Pro</span>
+          <span className="text-lg font-bold gradient-text">Central do gestor</span>
           <button onClick={() => setSidebarOpen(false)} className="ml-auto lg:hidden text-muted-foreground">
             <X className="w-5 h-5" />
           </button>
