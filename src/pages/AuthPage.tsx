@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Zap } from 'lucide-react';
+import logoCentralGestor from '@/assets/logo-central-gestor.png';
 
 export default function AuthPage() {
   const { signIn, signUp } = useAuth();
@@ -35,12 +35,7 @@ export default function AuthPage() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md animate-fade-in">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center neon-glow">
-              <Zap className="w-5 h-5 text-primary" />
-            </div>
-            <h1 className="text-3xl font-bold gradient-text">Gestor Pro</h1>
-          </div>
+          <img src={logoCentralGestor} alt="Central do Gestor" className="h-32 w-auto mx-auto mb-4 object-contain" />
           <p className="text-muted-foreground text-sm">Gerencie seus clientes e campanhas de marketing digital</p>
         </div>
 

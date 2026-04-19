@@ -8,6 +8,7 @@ import {
   BarChart3, LogOut, Zap, Menu, X, ListTodo, ChevronDown, FolderOpen, Link2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import logoCentralGestor from '@/assets/logo-central-gestor.png';
 
 const mainNavItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -38,12 +39,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       )}
 
       <aside className={`fixed lg:sticky top-0 left-0 z-50 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
-        <div className="p-5 flex items-center gap-2 border-b border-sidebar-border">
-          <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-            <Zap className="w-4 h-4 text-primary" />
-          </div>
-          <span className="text-lg font-bold gradient-text">Central do gestor</span>
-          <button onClick={() => setSidebarOpen(false)} className="ml-auto lg:hidden text-muted-foreground">
+        <div className="p-4 flex items-center justify-center border-b border-sidebar-border relative">
+          <img src={logoCentralGestor} alt="Central do Gestor" className="h-20 w-auto object-contain" />
+          <button onClick={() => setSidebarOpen(false)} className="absolute right-3 top-3 lg:hidden text-muted-foreground">
             <X className="w-5 h-5" />
           </button>
         </div>
