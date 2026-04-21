@@ -227,39 +227,48 @@ export default function Financeiro() {
     return <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30">Aguardando</Badge>;
   };
 
-  // ===== WhatsApp cobrança =====
-  const sanitizePhone = (raw?: string | null) => (raw || '').replace(/\D/g, '');
-  const buildBrazilPhone = (raw?: string | null) => {
-    const digits = sanitizePhone(raw);
-    if (!digits) return '';
-    return digits.startsWith('55') ? digits : `55${digits}`;
-  };
+  // ===== Cobrança (modal) =====
+  const [cobrancaOpen, setCobrancaOpen] = useState(false);
+  const [cobrancaTitulo, setCobrancaTitulo] = useState('');
+  const [cobrancaTexto, setCobrancaTexto] = useState('');
+
   const cobrancaMessage = (clienteName: string, valor: number, vencimento: string) => {
     const venc = new Date(vencimento + 'T00:00:00').toLocaleDateString('pt-BR');
-    return `Olá, ${clienteName}! Tudo bem? 👋\n\nPassando para lembrar que a mensalidade no valor de ${fmt(valor)}, com vencimento em ${venc}, está em aberto.\n\nAssim que possível, poderia confirmar o pagamento? Se já realizou, é só nos enviar o comprovante.\n\nObrigado! 🙏`;
+    const primeiroNome = (clienteName || '').split(' ')[0] || clienteName;
+    return `Olá, ${primeiroNome}! Tudo bem? 👋\n\nPassando para lembrar, de forma carinhosa, que a sua mensalidade no valor de ${fmt(valor)}, com vencimento em ${venc}, está em aberto por aqui.\n\nQuando puder, poderia confirmar o pagamento? Se já realizou, é só me enviar o comprovante que dou baixa imediatamente. 😉\n\nQualquer dúvida sobre boleto, PIX ou nota fiscal, é só me chamar que resolvo rapidinho.\n\nObrigado pela parceria! 🙏`;
   };
-  const openWhatsApp = (m: Mensalidade) => {
+
+  const abrirCobranca = (m: Mensalidade) => {
     const c = clients.find(x => x.id === m.cliente_id);
     if (!c) return;
-    const phone = buildBrazilPhone(c.phone);
-    const text = encodeURIComponent(cobrancaMessage(c.name, Number(m.valor), m.vencimento));
-    const base = phone ? `https://wa.me/${phone}` : 'https://wa.me/';
-    const url = `${base}?text=${text}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
-    if (!phone) {
-      toast.info('Cliente sem telefone cadastrado — abrimos o WhatsApp Web com a mensagem pronta para você escolher o contato.');
-    }
+    setCobrancaTitulo(`Cobrança — ${c.name}`);
+    setCobrancaTexto(cobrancaMessage(c.name, Number(m.valor), m.vencimento));
+    setCobrancaOpen(true);
   };
-  const cobrarTodos = () => {
+
+  const abrirCobrancaResumo = () => {
     if (atrasados.length === 0) return;
     const linhas = atrasados.map(m => {
       const c = clients.find(x => x.id === m.cliente_id);
       const venc = new Date(m.vencimento + 'T00:00:00').toLocaleDateString('pt-BR');
       return `• ${c?.name || '-'} — ${fmt(Number(m.valor))} (venc. ${venc})`;
     }).join('\n');
-    const text = encodeURIComponent(`Lembretes de cobrança em aberto:\n\n${linhas}`);
-    window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
+    setCobrancaTitulo(`Resumo de cobranças em aberto (${atrasados.length})`);
+    setCobrancaTexto(
+      `Resumo das mensalidades em aberto até o momento:\n\n${linhas}\n\nTotal: ${fmt(totalAtrasado)}\n\nUse este resumo como base para o seu acompanhamento ou para encaminhar internamente.`
+    );
+    setCobrancaOpen(true);
   };
+
+  const copiarCobranca = async () => {
+    try {
+      await navigator.clipboard.writeText(cobrancaTexto);
+      toast.success('Mensagem copiada! Cole no WhatsApp do cliente.');
+    } catch {
+      toast.error('Não foi possível copiar. Selecione e copie manualmente.');
+    }
+  };
+
 
   return (
     <div className="space-y-6">
