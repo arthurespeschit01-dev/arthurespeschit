@@ -147,19 +147,21 @@ export default function ClientDetail() {
     setCreatives((data || []) as unknown as Creative[]);
   };
 
-  const loadAdSets = async (campId: string) => {
+  const loadAdSets = async (campId: string, autoImportFor?: Campaign) => {
     setLoadingAdSets(true);
     const { data } = await supabase.from('ad_sets' as any).select('*').eq('campaign_id', campId).order('created_at', { ascending: false });
     setAdSets((data || []) as any[]);
     setLoadingAdSets(false);
+    if ((!data || data.length === 0) && autoImportFor?.source === 'meta') {
+      await importAdSetsFor(autoImportFor);
+    }
   };
 
-  const importAdSets = async () => {
-    if (!selectedCampaign) return;
+  const importAdSetsFor = async (camp: Campaign) => {
     setImportingAdSets(true);
     toast.loading('Carregando conjuntos de anúncios...', { id: 'adsets' });
     const { data, error } = await supabase.functions.invoke('meta-import-adsets', {
-      body: { client_id: id, campaign_id: selectedCampaign.id },
+      body: { client_id: id, campaign_id: camp.id },
     });
     setImportingAdSets(false);
     if (error || data?.error) {
@@ -167,7 +169,13 @@ export default function ClientDetail() {
       return;
     }
     toast.success(`${data?.imported ?? 0} conjuntos importados`, { id: 'adsets' });
-    loadAdSets(selectedCampaign.id);
+    const { data: refreshed } = await supabase.from('ad_sets' as any).select('*').eq('campaign_id', camp.id).order('created_at', { ascending: false });
+    setAdSets((refreshed || []) as any[]);
+  };
+
+  const importAdSets = async () => {
+    if (!selectedCampaign) return;
+    await importAdSetsFor(selectedCampaign);
   };
 
   useEffect(() => { loadClient(); loadCampaigns(); loadAttachments(); }, [id]);
