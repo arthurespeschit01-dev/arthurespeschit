@@ -103,6 +103,7 @@ export default function ClientDetail() {
   const [previewFormat, setPreviewFormat] = useState<string>('DESKTOP_FEED_STANDARD');
   const [previewHtml, setPreviewHtml] = useState<string>('');
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState<ClientAttachment | null>(null);
 
   useEffect(() => {
     if (!previewCreative?.meta_ad_id || !id) { setPreviewHtml(''); return; }
