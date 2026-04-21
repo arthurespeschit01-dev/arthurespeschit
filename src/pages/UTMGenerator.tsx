@@ -102,25 +102,25 @@ const PLATFORMS: Platform[] = [
     id: 'youtube_ads',
     label: 'YouTube Ads',
     defaults: { utm_source: 'youtube', utm_medium: 'paid_social' },
-    dynamicParams: [],
+    paramsByField: { campaign: [], term: [], content: [] },
   },
   {
     id: 'pinterest_ads',
     label: 'Pinterest Ads',
     defaults: { utm_source: 'pinterest', utm_medium: 'paid_social' },
-    dynamicParams: [],
+    paramsByField: { campaign: [], term: [], content: [] },
   },
   {
     id: 'email_marketing',
     label: 'Email Marketing',
     defaults: { utm_source: 'email', utm_medium: 'email' },
-    dynamicParams: [],
+    paramsByField: { campaign: [], term: [], content: [] },
   },
   {
     id: 'organic_social',
     label: 'Orgânico / Redes Sociais',
     defaults: { utm_source: 'instagram', utm_medium: 'organic_social' },
-    dynamicParams: [],
+    paramsByField: { campaign: [], term: [], content: [] },
   },
 ];
 
