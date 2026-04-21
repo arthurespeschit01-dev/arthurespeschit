@@ -961,16 +961,6 @@ export default function ClientDetail() {
               {previewCreative.body && (
                 <p className="text-sm text-muted-foreground whitespace-pre-wrap">{previewCreative.body}</p>
               )}
-              {previewCreative.link && (
-                <a
-                  href={previewCreative.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
-                >
-                  <ExternalLink className="w-4 h-4" /> Abrir no Facebook / Meta
-                </a>
-              )}
             </div>
           )}
         </DialogContent>
