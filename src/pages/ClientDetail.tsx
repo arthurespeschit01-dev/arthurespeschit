@@ -529,7 +529,49 @@ export default function ClientDetail() {
             )}
           </div>
 
-          {/* Criativos */}
+          {/* Conjuntos de Anúncio (Ad Sets) */}
+          {selectedCampaign.source === 'meta' && (
+            <div className="glass-surface rounded-xl p-5">
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <h4 className="font-medium text-foreground text-sm flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-primary" /> Conjuntos de Anúncio ({adSets.length})
+                </h4>
+                <Button onClick={importAdSets} size="sm" variant="outline" disabled={importingAdSets} className="gap-1">
+                  {importingAdSets ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                  {adSets.length > 0 ? 'Atualizar' : 'Buscar da Meta'}
+                </Button>
+              </div>
+              {loadingAdSets ? (
+                <div className="flex items-center justify-center py-6"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div>
+              ) : adSets.length === 0 ? (
+                <p className="text-muted-foreground text-xs text-center py-6">
+                  Nenhum conjunto carregado. Clique em "Buscar da Meta" para importar.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {adSets.map(a => {
+                    const budget = a.daily_budget > 0 ? `R$ ${Number(a.daily_budget).toLocaleString('pt-BR')}/dia` :
+                                   a.lifetime_budget > 0 ? `R$ ${Number(a.lifetime_budget).toLocaleString('pt-BR')} total` : '—';
+                    return (
+                      <div key={a.id} className="bg-secondary/30 border border-border/50 rounded-lg p-3 hover:border-primary/30 transition-colors">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <p className="text-sm font-medium text-foreground line-clamp-2 flex-1">{a.name}</p>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border shrink-0 ${statusColor(a.status)}`}>{a.status}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+                          <div><span className="text-foreground/60">Orçamento:</span> <span className="text-foreground">{budget}</span></div>
+                          <div><span className="text-foreground/60">Otimização:</span> <span className="text-foreground">{a.optimization_goal || '—'}</span></div>
+                          <div><span className="text-foreground/60">Lance:</span> <span className="text-foreground">{a.bid_strategy || '—'}</span></div>
+                          <div><span className="text-foreground/60">Início:</span> <span className="text-foreground">{a.start_time ? new Date(a.start_time).toLocaleDateString('pt-BR') : '—'}</span></div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="glass-surface rounded-xl p-5">
             <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
               <h4 className="font-medium text-foreground text-sm flex items-center gap-2"><Sparkles className="w-4 h-4 text-primary" /> Criativos</h4>
