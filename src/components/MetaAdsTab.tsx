@@ -178,11 +178,20 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
                   {isSelected ? (
                     <span className="text-xs px-2 py-1 rounded-full bg-primary/20 text-primary font-medium flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Ativa</span>
                   ) : (
-                    <Button size="sm" variant="outline" onClick={() => selectAccount(a.id)} disabled={!!selecting}>
-                      {selecting === a.id ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Selecionar'}
+                    <Button size="sm" variant="outline" onClick={() => selectAccount(a.id)} disabled={!!selecting || importing}>
+                      {(selecting === a.id || (importing && connection.selected_ad_account_id === a.id)) ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Selecionar'}
                     </Button>
                   )}
                 </div>
+              );
+            })}
+          </div>
+        )}
+        {importing && (
+          <p className="text-xs text-muted-foreground text-center mt-3 flex items-center justify-center gap-2">
+            <Loader2 className="w-3 h-3 animate-spin" /> Carregando campanhas da Meta...
+          </p>
+        )}
               );
             })}
           </div>
