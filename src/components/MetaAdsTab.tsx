@@ -61,11 +61,6 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
 
   const connect = async () => {
     setConnecting(true);
-    const { data, error } = await supabase.functions.invoke('meta-auth', {
-      method: 'GET',
-      // edge function lê da query string — usa fetch direto para suportar query
-    } as any);
-    // workaround: invoke não passa query, então construir URL manual
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-auth?client_id=${clientId}`;
