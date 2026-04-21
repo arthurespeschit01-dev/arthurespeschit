@@ -7,14 +7,7 @@ import { Button } from "@/components/ui/button";
 installFetchMonitor();
 
 function useDebugSnapshot() {
-  return useSyncExternalStore(
-    (cb) => {
-      const unsub = subscribeDebug(cb);
-      return () => { unsub; };
-    },
-    getDebugSnapshot,
-    getDebugSnapshot,
-  );
+  return useSyncExternalStore(subscribeDebug, getDebugSnapshot, getDebugSnapshot);
 }
 
 function shortEndpoint(ep: string) {
