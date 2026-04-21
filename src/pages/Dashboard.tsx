@@ -381,6 +381,14 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      <CobrancaDialog
+        open={cobrancaOpen}
+        onOpenChange={setCobrancaOpen}
+        clienteName={cobrancaData.name}
+        valor={cobrancaData.valor}
+        vencimento={cobrancaData.vencimento}
+      />
     </div>
   );
 }
