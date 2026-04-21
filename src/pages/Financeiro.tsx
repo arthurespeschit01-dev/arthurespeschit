@@ -245,7 +245,7 @@ export default function Financeiro() {
     const venc = new Date(vencimento + 'T00:00:00').toLocaleDateString('pt-BR');
     const primeiroNome = (clienteName || '').split(' ')[0] || clienteName;
     if (tom === 'amigavel') {
-      return `Olá, ${primeiroNome}! Tudo bem? 👋\n\nPassando para lembrar, de forma carinhosa, que a sua mensalidade no valor de ${fmt(valor)}, com vencimento em ${venc}, está em aberto por aqui.\n\nQuando puder, poderia confirmar o pagamento? Se já realizou, é só me enviar o comprovante que dou baixa imediatamente. 😉\n\nQualquer dúvida sobre boleto, PIX ou nota fiscal, é só me chamar que resolvo rapidinho.\n\nObrigado pela parceria! 🙏`;
+      return `Olá, ${primeiroNome}! Tudo bem? 👋\n\nPassando para lembrar que a sua mensalidade no valor de ${fmt(valor)}, com vencimento em ${venc}, está em aberto por aqui.\n\nQuando puder, poderia confirmar o pagamento? Se já realizou, é só me enviar o comprovante que dou baixa imediatamente. 😉\n\nQualquer dúvida sobre boleto, PIX ou nota fiscal, é só me chamar que resolvo rapidinho.\n\nObrigado pela parceria! 🙏`;
     }
     if (tom === 'formal') {
       return `Prezado(a) ${clienteName},\n\nEspero que esteja bem. Entro em contato para informar que identificamos em nosso sistema a mensalidade no valor de ${fmt(valor)}, com vencimento em ${venc}, ainda em aberto.\n\nSolicito a gentileza de regularizar o pagamento ou, caso já tenha sido efetuado, encaminhar o respectivo comprovante para baixa em nosso controle.\n\nPermaneço à disposição para esclarecimentos sobre boleto, PIX ou emissão de nota fiscal.\n\nAtenciosamente.`;
