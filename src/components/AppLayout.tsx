@@ -5,7 +5,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Calculator, ClipboardList,
   BookOpen, FileText, MessageSquare, ShieldAlert,
-  BarChart3, LogOut, Zap, Menu, X, ListTodo, ChevronDown, FolderOpen, Link2
+  BarChart3, LogOut, Zap, Menu, X, ListTodo, ChevronDown, FolderOpen, Link2, Sparkles
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import logoCentralGestor from '@/assets/logo-central-gestor.png';
@@ -17,6 +17,7 @@ const mainNavItems = [
   { to: '/calculadora', label: 'Calculadora', icon: Calculator },
   { to: '/planilha', label: 'Planilha', icon: BarChart3 },
   { to: '/contratos', label: 'Contratos', icon: FileText },
+  { to: '/estrategias', label: 'Geração de Estratégia', icon: Sparkles },
   { to: '/utm', label: 'Gerador de UTMs', icon: Link2 },
 ];
 
