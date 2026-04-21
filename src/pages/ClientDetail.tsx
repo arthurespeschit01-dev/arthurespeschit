@@ -468,7 +468,8 @@ export default function ClientDetail() {
                 <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${filter === f ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>{f}</button>
               ))}
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center flex-wrap">
+              <DateRangePicker value={dateRange} onChange={setDateRange} />
               <Button
                 onClick={async () => {
                   setImportingMeta(true);
