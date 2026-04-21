@@ -120,8 +120,15 @@ export default function ClientDetail() {
   };
 
   const loadCampaigns = async () => {
+    // Buscar conta Meta ativa para filtrar campanhas Meta de outras contas
+    const { data: conn } = await supabase.from('meta_connections')
+      .select('selected_ad_account_id').eq('client_id', id).maybeSingle();
+    const activeAccount = conn?.selected_ad_account_id || null;
     const { data } = await supabase.from('campaigns').select('*').eq('client_id', id).order('created_at', { ascending: false });
-    setCampaigns((data || []).map((c: any) => ({ ...c, budget: c.budget ?? 0, notes: c.notes ?? '' })));
+    const filtered = (data || []).filter((c: any) =>
+      c.source !== 'meta' || !activeAccount || c.meta_ad_account_id === activeAccount
+    );
+    setCampaigns(filtered.map((c: any) => ({ ...c, budget: c.budget ?? 0, notes: c.notes ?? '' })));
   };
 
   const loadNotes = async (campId: string) => {
