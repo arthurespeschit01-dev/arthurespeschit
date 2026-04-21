@@ -11,6 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ArrowLeft, Plus, Edit2, Trash2, Send, Upload, FileText, X, Paperclip, Image, BookOpen, BarChart3, Film, Type as TypeIcon, ExternalLink, Sparkles, Link2, Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import MetaAdsTab from '@/components/MetaAdsTab';
+import { DateRangePicker, type DateRangeValue } from '@/components/DateRangePicker';
+import { metricsForObjective, type CampaignInsights } from '@/lib/campaignMetrics';
 
 interface AccountIds {
   bm?: string;
