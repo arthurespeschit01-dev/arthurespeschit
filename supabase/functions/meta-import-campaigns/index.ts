@@ -40,19 +40,35 @@ Deno.serve(async (req) => {
     const accountId = conn.selected_ad_account_id;
     const accessToken = conn.access_token;
 
-    // 1) Listar campanhas
-    const fields = 'id,name,status,objective,daily_budget,lifetime_budget,start_time,created_time';
-    const campRes = await fetch(`https://graph.facebook.com/v21.0/${accountId}/campaigns?fields=${fields}&limit=200&access_token=${accessToken}`);
-    const campData = await campRes.json();
-    if (!campRes.ok) throw new Error(`Meta campaigns: ${JSON.stringify(campData)}`);
-    const campaigns = (campData.data || []) as any[];
+    // 1) Listar campanhas (paginado, limite menor)
+    async function fetchAllPages(url: string): Promise<any[]> {
+      const out: any[] = [];
+      let next: string | null = url;
+      let safety = 0;
+      while (next && safety < 20) {
+        const r = await fetch(next);
+        const j = await r.json();
+        if (!r.ok) throw new Error(`Meta: ${JSON.stringify(j)}`);
+        out.push(...(j.data || []));
+        next = j.paging?.next || null;
+        safety++;
+      }
+      return out;
+    }
 
-    // 2) Insights por campanha (últimos 30 dias)
-    const insightsRes = await fetch(`https://graph.facebook.com/v21.0/${accountId}/insights?level=campaign&fields=campaign_id,spend,impressions,clicks,actions,action_values&date_preset=last_30d&limit=500&access_token=${accessToken}`);
-    const insightsData = await insightsRes.json();
+    const fields = 'id,name,status,objective,daily_budget,lifetime_budget,start_time';
+    const campsUrl = `https://graph.facebook.com/v21.0/${accountId}/campaigns?fields=${fields}&limit=50&access_token=${accessToken}`;
+    const campaigns = await fetchAllPages(campsUrl);
+    console.log(`Found ${campaigns.length} campaigns for account ${accountId}`);
+
+    // 2) Insights por campanha (últimos 30 dias) - paginado, opcional
+    const insightsUrl = `https://graph.facebook.com/v21.0/${accountId}/insights?level=campaign&fields=campaign_id,spend,impressions,clicks,actions,action_values&date_preset=last_30d&limit=100&access_token=${accessToken}`;
     const insightsMap = new Map<string, any>();
-    if (insightsRes.ok && Array.isArray(insightsData.data)) {
-      for (const row of insightsData.data) insightsMap.set(row.campaign_id, row);
+    try {
+      const insights = await fetchAllPages(insightsUrl);
+      for (const row of insights) insightsMap.set(row.campaign_id, row);
+    } catch (e) {
+      console.warn('insights failed (continuing without metrics):', String(e));
     }
 
     const statusMap: Record<string, string> = {
