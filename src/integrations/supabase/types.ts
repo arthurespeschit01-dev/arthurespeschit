@@ -281,6 +281,7 @@ export type Database = {
           name: string
           niche: string | null
           payment_day: number | null
+          phone: string | null
           services: string | null
           status: string | null
           updated_at: string
@@ -296,6 +297,7 @@ export type Database = {
           name: string
           niche?: string | null
           payment_day?: number | null
+          phone?: string | null
           services?: string | null
           status?: string | null
           updated_at?: string
@@ -311,6 +313,7 @@ export type Database = {
           name?: string
           niche?: string | null
           payment_day?: number | null
+          phone?: string | null
           services?: string | null
           status?: string | null
           updated_at?: string
