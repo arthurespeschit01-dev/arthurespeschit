@@ -14,6 +14,74 @@ export type Database = {
   }
   public: {
     Tables: {
+      ad_sets: {
+        Row: {
+          bid_strategy: string | null
+          campaign_id: string
+          created_at: string
+          daily_budget: number | null
+          end_time: string | null
+          id: string
+          last_synced_at: string | null
+          lifetime_budget: number | null
+          meta_adset_id: string | null
+          meta_campaign_id: string | null
+          name: string
+          optimization_goal: string | null
+          source: string
+          start_time: string | null
+          status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bid_strategy?: string | null
+          campaign_id: string
+          created_at?: string
+          daily_budget?: number | null
+          end_time?: string | null
+          id?: string
+          last_synced_at?: string | null
+          lifetime_budget?: number | null
+          meta_adset_id?: string | null
+          meta_campaign_id?: string | null
+          name: string
+          optimization_goal?: string | null
+          source?: string
+          start_time?: string | null
+          status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bid_strategy?: string | null
+          campaign_id?: string
+          created_at?: string
+          daily_budget?: number | null
+          end_time?: string | null
+          id?: string
+          last_synced_at?: string | null
+          lifetime_budget?: number | null
+          meta_adset_id?: string | null
+          meta_campaign_id?: string | null
+          name?: string
+          optimization_goal?: string | null
+          source?: string
+          start_time?: string | null
+          status?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_sets_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_notes: {
         Row: {
           campaign_id: string
