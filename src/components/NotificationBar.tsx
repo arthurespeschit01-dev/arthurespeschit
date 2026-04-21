@@ -95,6 +95,13 @@ export default function NotificationBar() {
 
   useEffect(() => { loadStates(); }, [loadStates]);
 
+  // Keep latest read/dismissed sets in refs so the loader effect doesn't
+  // re-subscribe (and re-query the DB) every time the user marks something.
+  const readIdsRef = useRef(readIds);
+  const dismissedIdsRef = useRef(dismissedIds);
+  useEffect(() => { readIdsRef.current = readIds; }, [readIds]);
+  useEffect(() => { dismissedIdsRef.current = dismissedIds; }, [dismissedIds]);
+
   useEffect(() => {
     if (!user) return;
 
@@ -162,7 +169,7 @@ export default function NotificationBar() {
 
       if (!toastShownRef.current && statesLoadedRef.current && notifs.length > 0) {
         toastShownRef.current = true;
-        const unread = notifs.filter(n => !readIds.has(n.id) && !dismissedIds.has(n.id));
+        const unread = notifs.filter(n => !readIdsRef.current.has(n.id) && !dismissedIdsRef.current.has(n.id));
         const overdueUnread = unread.filter(n => n.priority === 0);
         const todayUnread = unread.filter(n => n.priority === 1);
         if (overdueUnread.length > 0) {
@@ -176,7 +183,7 @@ export default function NotificationBar() {
     load();
     const interval = setInterval(load, 60000);
     return () => clearInterval(interval);
-  }, [user, readIds, dismissedIds]);
+  }, [user]);
 
   const visible = notifications.filter(n => !dismissedIds.has(n.id));
   const unreadList = visible.filter(n => !readIds.has(n.id));
