@@ -192,10 +192,6 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
             <Loader2 className="w-3 h-3 animate-spin" /> Carregando campanhas da Meta...
           </p>
         )}
-              );
-            })}
-          </div>
-        )}
       </div>
     </div>
   );
