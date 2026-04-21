@@ -18,18 +18,24 @@ import Objecoes from "./pages/Objecoes";
 import Planilha from "./pages/Planilha";
 import Tasks from "./pages/Tasks";
 import UTMGenerator from "./pages/UTMGenerator";
+import Bloqueado from "./pages/Bloqueado";
 import NotFound from "./pages/NotFound";
+import { useAccessCheck } from "@/hooks/useAccessCheck";
 
 const queryClient = new QueryClient();
 
 function ProtectedRoutes() {
   const { user, loading } = useAuth();
+  useAccessCheck();
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-background"><div className="text-muted-foreground">Carregando...</div></div>;
   if (!user) return <AuthPage />;
   return (
-    <AppLayout>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
+    <Routes>
+      <Route path="/bloqueado" element={<Bloqueado />} />
+      <Route path="*" element={
+        <AppLayout>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
         <Route path="/clientes" element={<Clientes />} />
         <Route path="/clientes/:id" element={<ClientDetail />} />
         <Route path="/calculadora" element={<Calculadora />} />
