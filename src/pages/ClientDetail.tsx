@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ArrowLeft, Plus, Edit2, Trash2, Send, Upload, FileText, X, Paperclip, Image, BookOpen, BarChart3, Film, Type as TypeIcon, ExternalLink, Sparkles, Link2, Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import MetaAdsTab from '@/components/MetaAdsTab';
@@ -1149,6 +1150,150 @@ export default function ClientDetail() {
                   </a>
                 </div>
               </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+      {/* Export PDF Selection Dialog */}
+      <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Exportar PDF — escolher campanhas</DialogTitle>
+          </DialogHeader>
+
+          {(() => {
+            const allObjectives = Array.from(new Set(campaigns.map(c => c.objective).filter(Boolean))) as string[];
+            const matchesFilters = (c: Campaign) => {
+              const statusOk = exportStatusFilter === 'todas'
+                || (c.status || '').toUpperCase() === exportStatusFilter
+                || (exportStatusFilter === 'ACTIVE' && /ativa/i.test(c.status || ''))
+                || (exportStatusFilter === 'PAUSED' && /pausada/i.test(c.status || ''))
+                || (exportStatusFilter === 'ARCHIVED' && /(encerrada|arquivada)/i.test(c.status || ''));
+              const objOk = exportObjectives.length === 0 || exportObjectives.includes(c.objective || '');
+              return statusOk && objOk;
+            };
+            const visible = campaigns.filter(matchesFilters);
+            const selectedCount = visible.filter(c => exportSelectedIds[c.id]).length;
+            const allSelected = visible.length > 0 && selectedCount === visible.length;
+
+            return (
+              <>
+                <div className="space-y-4 overflow-y-auto pr-1">
+                  {/* Filtro de status */}
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-2 block">Status</Label>
+                    <div className="flex gap-1 p-1 bg-secondary/50 rounded-lg w-fit">
+                      {([
+                        { v: 'todas', l: 'Todas' },
+                        { v: 'ACTIVE', l: 'Ativas' },
+                        { v: 'PAUSED', l: 'Pausadas' },
+                        { v: 'ARCHIVED', l: 'Encerradas' },
+                      ] as const).map(opt => (
+                        <button
+                          key={opt.v}
+                          onClick={() => setExportStatusFilter(opt.v)}
+                          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${exportStatusFilter === opt.v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
+                        >
+                          {opt.l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Filtro de objetivo */}
+                  {allObjectives.length > 0 && (
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-2 block">
+                        Objetivo {exportObjectives.length > 0 && `(${exportObjectives.length} selecionado(s))`}
+                      </Label>
+                      <div className="flex flex-wrap gap-2">
+                        {allObjectives.map(obj => {
+                          const active = exportObjectives.includes(obj);
+                          return (
+                            <button
+                              key={obj}
+                              onClick={() => setExportObjectives(prev => active ? prev.filter(o => o !== obj) : [...prev, obj])}
+                              className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${active ? 'bg-primary/20 border-primary text-primary' : 'border-border text-muted-foreground hover:border-primary/40'}`}
+                            >
+                              {obj}
+                            </button>
+                          );
+                        })}
+                        {exportObjectives.length > 0 && (
+                          <button onClick={() => setExportObjectives([])} className="text-xs px-2.5 py-1 rounded-full text-muted-foreground hover:text-foreground">
+                            Limpar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Lista de campanhas */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <Label className="text-xs text-muted-foreground">
+                        Campanhas ({selectedCount}/{visible.length} selecionadas)
+                      </Label>
+                      <button
+                        onClick={() => {
+                          const next = { ...exportSelectedIds };
+                          visible.forEach(c => { next[c.id] = !allSelected; });
+                          setExportSelectedIds(next);
+                        }}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        {allSelected ? 'Desmarcar todas' : 'Marcar todas'}
+                      </button>
+                    </div>
+                    <div className="border border-border rounded-lg divide-y divide-border max-h-72 overflow-y-auto">
+                      {visible.length === 0 ? (
+                        <p className="text-xs text-muted-foreground text-center py-6">Nenhuma campanha corresponde aos filtros.</p>
+                      ) : visible.map(c => (
+                        <label key={c.id} className="flex items-center gap-3 p-3 hover:bg-secondary/40 cursor-pointer">
+                          <Checkbox
+                            checked={!!exportSelectedIds[c.id]}
+                            onCheckedChange={(v) => setExportSelectedIds(prev => ({ ...prev, [c.id]: !!v }))}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-foreground truncate">{c.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{c.objective || '—'} • {c.status || '—'}</p>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <DialogFooter className="mt-4">
+                  <Button variant="outline" onClick={() => setExportOpen(false)} disabled={exporting}>Cancelar</Button>
+                  <Button
+                    disabled={exporting || selectedCount === 0 || !client}
+                    onClick={async () => {
+                      if (!client) return;
+                      const chosen = visible.filter(c => exportSelectedIds[c.id]);
+                      if (chosen.length === 0) { toast.error('Selecione ao menos 1 campanha'); return; }
+                      const periodLabel = dateRange.preset === 'custom' && dateRange.since && dateRange.until
+                        ? `${dateRange.since} → ${dateRange.until}`
+                        : ({ today: 'Hoje', yesterday: 'Ontem', last_7d: 'Últimos 7 dias', last_14d: 'Últimos 14 dias', last_30d: 'Últimos 30 dias', last_90d: 'Últimos 90 dias' } as Record<string, string>)[dateRange.preset] || dateRange.preset;
+                      setExporting(true);
+                      toast.loading('Gerando PDF...', { id: 'pdf' });
+                      try {
+                        await exportCampaignsPDF({ clientName: client.name, periodLabel, campaigns: chosen });
+                        toast.success(`PDF com ${chosen.length} campanha(s) gerado!`, { id: 'pdf' });
+                        setExportOpen(false);
+                      } catch (e: any) {
+                        toast.error('Falha ao gerar PDF: ' + (e?.message || 'erro'), { id: 'pdf' });
+                      } finally {
+                        setExporting(false);
+                      }
+                    }}
+                    className="gap-2"
+                  >
+                    {exporting ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
+                    Exportar {selectedCount > 0 ? `(${selectedCount})` : ''}
+                  </Button>
+                </DialogFooter>
+              </>
             );
           })()}
         </DialogContent>
