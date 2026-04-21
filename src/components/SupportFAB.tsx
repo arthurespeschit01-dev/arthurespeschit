@@ -1,6 +1,6 @@
 import { MessageCircle } from 'lucide-react';
 
-const SUPPORT_URL = 'https://wa.link/spfu4j';
+const SUPPORT_URL = 'https://wa.me/5531971789803?text=Ol%C3%A1!%20vim%20do%20suporte%20da%20Central%20do%20gestor,%20preciso%20de%20ajuda.';
 
 export default function SupportFAB() {
   return (
