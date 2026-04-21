@@ -65,8 +65,8 @@ Deno.serve(async (req) => {
       if (c.meta_campaign_id) campMap.set(c.meta_campaign_id, c.id);
     }
 
-    // 1) Buscar ads (campos com creative completo + permalink) - paginado
-    const adFields = 'id,name,status,campaign_id,effective_object_story_id,creative{id,thumbnail_url,image_url,object_story_spec,asset_feed_spec,video_id}';
+    // 1) Buscar ads com creative completo (alta resolução)
+    const adFields = 'id,name,status,campaign_id,preview_shareable_link,creative{id,thumbnail_url,image_url,object_story_spec,asset_feed_spec,video_id,effective_object_story_id,instagram_permalink_url}';
     const adsUrl = `${GRAPH}/${accountId}/ads?fields=${encodeURIComponent(adFields)}&limit=50&access_token=${accessToken}`;
     const ads = await fetchAllPages(adsUrl);
 
