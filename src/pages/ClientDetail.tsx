@@ -39,6 +39,7 @@ interface ClientAttachment {
 }
 interface Creative {
   id: string; campaign_id: string; name: string; type: string; link: string; status: string; created_at: string;
+  source?: string; thumbnail_url?: string | null; body?: string | null; title?: string | null; meta_ad_id?: string | null;
 }
 
 const ATTACHMENT_CATEGORIES = [
@@ -521,29 +522,43 @@ export default function ClientDetail() {
             </div>
 
             {filteredCreatives.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {filteredCreatives.map(cr => {
                   const TypeIco = getCreativeTypeIcon(cr.type);
                   const stBadge = getCreativeStatusBadge(cr.status);
+                  const isMeta = cr.source === 'meta';
+                  const thumb = cr.thumbnail_url || (cr.link && /\.(jpg|jpeg|png|webp|gif)/i.test(cr.link) ? cr.link : null);
                   return (
-                    <div key={cr.id} className="bg-secondary/30 border border-border/50 rounded-lg p-3 group hover:border-primary/30 transition-colors">
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <TypeIco className="w-4 h-4 text-primary shrink-0" />
-                          <p className="text-sm font-medium text-foreground truncate">{cr.name}</p>
+                    <div key={cr.id} className="bg-secondary/30 border border-border/50 rounded-lg overflow-hidden group hover:border-primary/30 transition-colors flex flex-col">
+                      {thumb ? (
+                        <div className="aspect-video bg-secondary/50 relative overflow-hidden">
+                          <img src={thumb} alt={cr.name} className="w-full h-full object-cover" loading="lazy" />
+                          {isMeta && <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-blue-500/90 text-white font-semibold">Meta</span>}
                         </div>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${stBadge?.color}`}>{stBadge?.label}</span>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground capitalize">{cr.type}</p>
-                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
-                        {cr.link ? (
-                          <a href={cr.link} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1 truncate">
-                            <ExternalLink className="w-3 h-3 shrink-0" /> Abrir link
-                          </a>
-                        ) : <span className="text-xs text-muted-foreground">Sem link</span>}
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => openEditCreative(cr)}><Edit2 className="w-3 h-3" /></Button>
-                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:text-destructive" onClick={() => deleteCreative(cr.id)}><Trash2 className="w-3 h-3" /></Button>
+                      ) : (
+                        <div className="aspect-video bg-secondary/50 flex items-center justify-center">
+                          <TypeIco className="w-8 h-8 text-muted-foreground/40" />
+                          {isMeta && <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-blue-500/90 text-white font-semibold">Meta</span>}
+                        </div>
+                      )}
+                      <div className="p-3 flex-1 flex flex-col">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className="text-sm font-medium text-foreground line-clamp-2 flex-1">{cr.title || cr.name}</p>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border shrink-0 ${stBadge?.color}`}>{stBadge?.label}</span>
+                        </div>
+                        {cr.body && <p className="text-[11px] text-muted-foreground line-clamp-2 mb-2">{cr.body}</p>}
+                        <div className="flex items-center justify-between mt-auto pt-2 border-t border-border/50">
+                          {cr.link ? (
+                            <a href={cr.link} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1 truncate">
+                              <ExternalLink className="w-3 h-3 shrink-0" /> Ver criativo
+                            </a>
+                          ) : <span className="text-xs text-muted-foreground capitalize">{cr.type}</span>}
+                          {!isMeta && (
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => openEditCreative(cr)}><Edit2 className="w-3 h-3" /></Button>
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:text-destructive" onClick={() => deleteCreative(cr.id)}><Trash2 className="w-3 h-3" /></Button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

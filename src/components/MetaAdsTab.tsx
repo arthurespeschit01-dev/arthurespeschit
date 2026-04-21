@@ -100,13 +100,18 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
     const { data: imp, error: impErr } = await supabase.functions.invoke('meta-import-campaigns', {
       body: { client_id: clientId },
     });
-    setImporting(false);
     if (impErr || imp?.error) {
+      setImporting(false);
       toast.error('Falha ao importar campanhas', { id: 'meta-import' });
-    } else {
-      toast.success(`${imp?.imported ?? 0} campanhas importadas da Meta`, { id: 'meta-import' });
-      onCampaignsImported?.();
+      return;
     }
+    toast.loading('Carregando criativos da Meta...', { id: 'meta-import' });
+    const { data: cre } = await supabase.functions.invoke('meta-import-creatives', {
+      body: { client_id: clientId },
+    });
+    setImporting(false);
+    toast.success(`${imp?.imported ?? 0} campanhas e ${cre?.imported ?? 0} criativos importados`, { id: 'meta-import' });
+    onCampaignsImported?.();
   };
 
   const disconnect = async () => {
