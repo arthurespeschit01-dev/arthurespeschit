@@ -342,34 +342,55 @@ export type Database = {
       }
       creatives: {
         Row: {
+          body: string | null
           campaign_id: string
           created_at: string
           id: string
+          last_synced_at: string | null
           link: string | null
+          meta_ad_id: string | null
+          meta_creative_id: string | null
           name: string
+          source: string
           status: string
+          thumbnail_url: string | null
+          title: string | null
           type: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          body?: string | null
           campaign_id: string
           created_at?: string
           id?: string
+          last_synced_at?: string | null
           link?: string | null
+          meta_ad_id?: string | null
+          meta_creative_id?: string | null
           name: string
+          source?: string
           status?: string
+          thumbnail_url?: string | null
+          title?: string | null
           type?: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          body?: string | null
           campaign_id?: string
           created_at?: string
           id?: string
+          last_synced_at?: string | null
           link?: string | null
+          meta_ad_id?: string | null
+          meta_creative_id?: string | null
           name?: string
+          source?: string
           status?: string
+          thumbnail_url?: string | null
+          title?: string | null
           type?: string
           updated_at?: string
           user_id?: string
