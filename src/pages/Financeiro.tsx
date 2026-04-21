@@ -8,10 +8,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import {
   DollarSign, TrendingDown, TrendingUp, Wallet, Percent, Clock,
-  AlertTriangle, ArrowDownCircle, ArrowUpCircle, Download, FileBarChart, MessageCircle,
+  AlertTriangle, ArrowDownCircle, ArrowUpCircle, Download, FileBarChart, MessageCircle, Copy,
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
