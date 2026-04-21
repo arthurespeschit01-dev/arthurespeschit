@@ -18,12 +18,13 @@ interface Connection {
   token_expires_at: string | null;
 }
 
-export default function MetaAdsTab({ clientId }: { clientId: string }) {
+export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId: string; onCampaignsImported?: () => void }) {
   const [connection, setConnection] = useState<Connection | null>(null);
   const [accounts, setAccounts] = useState<AdAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [selecting, setSelecting] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const loadConnection = useCallback(async () => {
     setLoading(true);
@@ -84,9 +85,28 @@ export default function MetaAdsTab({ clientId }: { clientId: string }) {
     const { error } = await supabase.functions.invoke('meta-get-ad-accounts', {
       body: { client_id: clientId, select_account_id: accountId },
     });
-    if (error) toast.error('Falha ao selecionar');
-    else { toast.success('Conta selecionada'); await loadConnection(); }
+    if (error) {
+      toast.error('Falha ao selecionar');
+      setSelecting(null);
+      return;
+    }
+    toast.success('Conta selecionada');
+    await loadConnection();
     setSelecting(null);
+
+    // Importação automática de campanhas
+    setImporting(true);
+    toast.loading('Carregando campanhas da Meta...', { id: 'meta-import' });
+    const { data: imp, error: impErr } = await supabase.functions.invoke('meta-import-campaigns', {
+      body: { client_id: clientId },
+    });
+    setImporting(false);
+    if (impErr || imp?.error) {
+      toast.error('Falha ao importar campanhas', { id: 'meta-import' });
+    } else {
+      toast.success(`${imp?.imported ?? 0} campanhas importadas da Meta`, { id: 'meta-import' });
+      onCampaignsImported?.();
+    }
   };
 
   const disconnect = async () => {
@@ -158,14 +178,19 @@ export default function MetaAdsTab({ clientId }: { clientId: string }) {
                   {isSelected ? (
                     <span className="text-xs px-2 py-1 rounded-full bg-primary/20 text-primary font-medium flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Ativa</span>
                   ) : (
-                    <Button size="sm" variant="outline" onClick={() => selectAccount(a.id)} disabled={!!selecting}>
-                      {selecting === a.id ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Selecionar'}
+                    <Button size="sm" variant="outline" onClick={() => selectAccount(a.id)} disabled={!!selecting || importing}>
+                      {(selecting === a.id || (importing && connection.selected_ad_account_id === a.id)) ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Selecionar'}
                     </Button>
                   )}
                 </div>
               );
             })}
           </div>
+        )}
+        {importing && (
+          <p className="text-xs text-muted-foreground text-center mt-3 flex items-center justify-center gap-2">
+            <Loader2 className="w-3 h-3 animate-spin" /> Carregando campanhas da Meta...
+          </p>
         )}
       </div>
     </div>
