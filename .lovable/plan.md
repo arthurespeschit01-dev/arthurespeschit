@@ -1,52 +1,72 @@
 
+## Corrigir dados reais de Campanhas, Conjuntos e Criativos da Meta
 
-## Notificações por e-mail (resumo diário)
+Os dados exibidos hoje são parciais e não respeitam o objetivo da campanha. As importações trazem apenas um resumo de 30 dias fixo, sem métricas por objetivo, sem insights nos conjuntos e sem insights nos criativos. Vou corrigir as três importações para puxar os dados reais do Gerenciador de Anúncios e exibir as métricas corretas por objetivo.
 
-Hoje as notificações (tasks vencendo, contratos a vencer, pagamentos próximos) só aparecem no sino dentro do app. Vamos adicionar **envio automático por e-mail** usando a infraestrutura nativa de e-mails do Lovable Cloud.
+## O que está errado hoje
 
-### Como vai funcionar
+**Campanhas (`meta-import-campaigns`)**
+- Período fixo `last_30d` — não bate com o que o usuário vê no Gerenciador (que normalmente usa "Máximo" ou um período selecionado).
+- Só captura `lead` e `purchase`/`revenue` — ignora mensagens, conversões customizadas, link clicks, video views, alcance, frequência etc.
+- Não salva: `reach`, `frequency`, `ctr`, `cpc`, `cpm`, `messages`, `link_clicks`, `video_views`.
+- `cpa` é calculado só sobre leads, mesmo quando o objetivo é vendas/mensagens.
 
-- **1 e-mail por dia, de manhã (ex: 08:00)**, consolidando tudo que precisa de atenção daquele usuário (em vez de 1 e-mail por item — evita spam).
-- Conteúdo do e-mail organizado em seções:
-  - 🚨 **Vencidos** (tasks atrasadas + contratos vencidos)
-  - ⏰ **Vencem hoje** (tasks + pagamentos do dia)
-  - 📅 **Próximos 7 dias** (tasks)
-  - 📄 **Contratos vencendo em 30 dias**
-  - 💰 **Pagamentos nos próximos 3 dias**
-- Cada item com link direto pro módulo correspondente no app.
-- Só envia se houver pelo menos 1 item — dias "limpos" não geram e-mail.
-- Enviado para o e-mail de login do usuário (`auth.users.email`).
+**Conjuntos (`meta-import-adsets`)**
+- NÃO importa insights. Só traz nome, status e orçamento. Por isso aparecem zerados.
 
-### Controle do usuário
+**Criativos (`meta-import-creatives`)**
+- Provavelmente também não importa métricas por anúncio (vou confirmar).
+- Sem spend/leads/compras/CTR por criativo, é impossível comparar performance.
 
-- Toggle nas **Configurações / perfil**: "Receber resumo diário por e-mail" (liga/desliga).
-- Por padrão: **ligado** para todos os usuários existentes.
+**Frontend (`campaignMetrics.ts` + telas)**
+- Já existe lógica `metricsForObjective`, mas os campos `messages`, `link_clicks`, `reach`, `cpl`, `cpm_msg`, `roas` não são preenchidos no banco — então caem sempre no fallback (CTR/CPC).
 
-### Etapas técnicas
+## O que vou implementar
 
-1. **Configurar domínio de e-mail** (pré-requisito do Lovable Emails) — botão de setup vai aparecer pra você configurar o subdomínio (ex: `notify.seudominio.com`). Sem domínio configurado, e-mails não saem.
-2. **Setup da infraestrutura de e-mail** (filas, logs, etc — automático).
-3. **Criar tabela** `user_email_preferences` (user_id, daily_digest_enabled, last_sent_at) com RLS.
-4. **Criar template React Email** `daily-digest` com as seções acima, estilizado no tema do app (escuro/neon).
-5. **Criar Edge Function `send-daily-digest`** que:
-   - Lê todos os usuários com digest ligado
-   - Para cada um, calcula as mesmas notificações que o `NotificationBar` calcula hoje (mesma lógica)
-   - Se houver itens, dispara `send-transactional-email` com o template
-   - Atualiza `last_sent_at`
-6. **Agendar cron diário** (pg_cron) às 08:00 BRT (= 11:00 UTC) chamando a função.
-7. **UI**: adicionar o toggle "Receber resumo diário por e-mail" em algum ponto acessível (provavelmente um menu de perfil — preciso confirmar onde, ver pergunta abaixo).
+### 1. Banco de dados (migração)
+Adicionar colunas que faltam para guardar as métricas reais por objetivo:
 
-### Detalhes técnicos importantes
+**`campaigns`**: `reach`, `frequency`, `ctr`, `cpc`, `cpm`, `leads`, `purchases`, `revenue`, `messages`, `link_clicks`, `video_views`, `date_preset` (período usado na última sync).
 
-- Lógica de cálculo de notificações vai ser **duplicada na Edge Function** (TypeScript no Deno) replicando o que está em `NotificationBar.tsx` (linhas 101–158). Mantemos o sino funcionando igual.
-- E-mail é **transacional** (1 destinatário, evento agendado por preferência do próprio usuário) — compatível com Lovable Emails.
-- Não vai mexer no comportamento atual do sino/toast — é puramente adicional.
+**`ad_sets`**: `spend`, `impressions`, `clicks`, `reach`, `ctr`, `cpc`, `cpm`, `leads`, `purchases`, `revenue`, `messages`, `link_clicks`, `cpa`, `roas`.
 
-### O que preciso confirmar com você
+**`creatives`**: `spend`, `impressions`, `clicks`, `reach`, `ctr`, `cpc`, `cpm`, `leads`, `purchases`, `revenue`, `messages`, `link_clicks`, `cpa`, `roas`.
 
-<lov-actions>
-<lov-suggestion message="Quero o resumo diário por e-mail, e o toggle pode ficar num menu de perfil/configurações novo no canto superior direito do app">Sim, criar menu de perfil novo</lov-suggestion>
-<lov-suggestion message="Quero o resumo diário, mas o toggle de e-mail pode ficar dentro da página de notificações (no painel do sino mesmo, num botão de configurações)">Toggle dentro do sino</lov-suggestion>
-<lov-suggestion message="Avançar com o plano e configurar o domínio de e-mail agora">Avançar e configurar domínio</lov-suggestion>
-</lov-actions>
+### 2. Edge Function `meta-import-campaigns`
+- Aceitar parâmetro opcional `date_preset` (`maximum`, `last_7d`, `last_30d`, `last_90d`, `this_month`, `lifetime`) — padrão `maximum` para bater com o Gerenciador.
+- Expandir o parsing de `actions` e `action_values` para cobrir todos os tipos relevantes:
+  - Leads: `lead`, `onsite_conversion.lead_grouped`, `offsite_conversion.fb_pixel_lead`
+  - Compras: `purchase`, `omni_purchase`, `offsite_conversion.fb_pixel_purchase`, `onsite_web_purchase`
+  - Mensagens: `onsite_conversion.messaging_conversation_started_7d`, `onsite_conversion.total_messaging_connection`
+  - Cliques no link: `link_click`
+  - Video views: `video_view`
+- Pedir campos completos ao Insights: `spend, impressions, clicks, reach, frequency, ctr, cpc, cpm, actions, action_values`.
+- Calcular `cpa` baseado no objetivo (CPL para leads, CPP para compras, custo/conversa para mensagens).
 
+### 3. Edge Function `meta-import-adsets`
+- Adicionar chamada de Insights por adset:  
+  `GET /{campaign_id}/insights?level=adset&fields=...&date_preset=...`
+- Mapear `adset_id` → métricas e fazer upsert no `ad_sets` com todos os campos.
+- Mesmo parsing rico de actions da campanha.
+
+### 4. Edge Function `meta-import-creatives`
+- Adicionar Insights por anúncio:  
+  `GET /{campaign_id}/insights?level=ad&fields=...&date_preset=...`
+- Mapear `ad_id` → métricas e fazer upsert nos `creatives`.
+
+### 5. Frontend
+- **`src/lib/campaignMetrics.ts`**: garantir que `CampaignInsights` reflete os novos campos e que os mapeamentos por objetivo funcionam (já está praticamente pronto — só usar dados reais).
+- **`src/components/MetaAdsTab.tsx`** (e a tela de detalhe da campanha): ler os novos campos do banco; mostrar as métricas corretas por objetivo em campanha/conjunto/criativo usando `metricsForObjective`.
+- Adicionar seletor de período (Máximo / 7d / 30d / 90d / Este mês) no topo, que dispara reimportação com o `date_preset` escolhido — assim os números batem exatamente com o que o usuário ver no Gerenciador.
+
+### 6. Validação
+- Após implementar, rodar uma reimportação e comparar com o Gerenciador para confirmar paridade de números (gasto, leads/compras/conversas, CPL/ROAS/CPP).
+
+## Arquivos afetados
+- `supabase/migrations/` (nova migração com as colunas)
+- `supabase/functions/meta-import-campaigns/index.ts`
+- `supabase/functions/meta-import-adsets/index.ts`
+- `supabase/functions/meta-import-creatives/index.ts`
+- `src/lib/campaignMetrics.ts`
+- `src/components/MetaAdsTab.tsx`
+- Tela de detalhe da campanha (a confirmar no momento da implementação)
