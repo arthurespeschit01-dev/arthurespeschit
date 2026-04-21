@@ -251,26 +251,26 @@ export default function Tasks() {
   return (
     <div className="animate-fade-in space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Tasks Operacionais</h1>
           <p className="text-muted-foreground text-sm mt-1">Organize suas tarefas e acompanhe o progresso</p>
         </div>
-        <Button onClick={openNew} className="neon-glow gap-2"><Plus className="w-4 h-4" /> Nova Task</Button>
+        <Button onClick={openNew} className="neon-glow gap-2 w-full sm:w-auto"><Plus className="w-4 h-4" /> Nova Task</Button>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {Object.entries(statusConfig).map(([key, cfg]) => {
           const Icon = cfg.icon;
           return (
-            <div key={key} className="glass-surface rounded-xl p-4 flex items-center gap-3 border border-border/20">
-              <div className={`p-2 rounded-lg ${cfg.color.split(' ')[0]}`}>
+            <div key={key} className="glass-surface rounded-xl p-3 sm:p-4 flex items-center gap-3 border border-border/20 min-w-0">
+              <div className={`p-2 rounded-lg shrink-0 ${cfg.color.split(' ')[0]}`}>
                 <Icon className={`w-4 h-4 ${cfg.color.split(' ')[1]}`} />
               </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{counts[key as keyof typeof counts]}</p>
-                <p className="text-xs text-muted-foreground">{cfg.label}</p>
+              <div className="min-w-0">
+                <p className="text-xl sm:text-2xl font-bold text-foreground">{counts[key as keyof typeof counts]}</p>
+                <p className="text-xs text-muted-foreground truncate">{cfg.label}</p>
               </div>
             </div>
           );
