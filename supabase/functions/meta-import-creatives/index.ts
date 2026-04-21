@@ -1,4 +1,5 @@
 // Importa criativos (ads) reais da Meta vinculando às campanhas internas via meta_campaign_id
+// + insights por ad (gasto, CTR, CPA)
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -8,6 +9,22 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const GRAPH = 'https://graph.facebook.com/v21.0';
+
+async function fetchAllPages(url: string): Promise<any[]> {
+  const out: any[] = [];
+  let next: string | null = url;
+  let safety = 0;
+  while (next && safety < 20) {
+    const r = await fetch(next);
+    const j = await r.json();
+    if (!r.ok) throw new Error(`Meta: ${JSON.stringify(j)}`);
+    out.push(...(j.data || []));
+    next = j.paging?.next || null;
+    safety++;
+  }
+  return out;
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -38,7 +55,7 @@ Deno.serve(async (req) => {
     const accessToken = conn.access_token;
     const accountId = conn.selected_ad_account_id;
 
-    // Buscar campanhas internas da Meta (mapa meta_campaign_id -> campaign internal id)
+    // Mapa meta_campaign_id -> internal campaign id
     const { data: internalCamps } = await admin.from('campaigns')
       .select('id, meta_campaign_id')
       .eq('client_id', client_id)
@@ -48,13 +65,23 @@ Deno.serve(async (req) => {
       if (c.meta_campaign_id) campMap.set(c.meta_campaign_id, c.id);
     }
 
-    // Buscar ads do account (com creative expandido)
-    const fields = 'id,name,status,campaign_id,creative{id,name,thumbnail_url,image_url,video_id,object_story_spec,body,title}';
-    const adsRes = await fetch(`https://graph.facebook.com/v21.0/${accountId}/ads?fields=${encodeURIComponent(fields)}&limit=200&access_token=${accessToken}`);
-    const adsData = await adsRes.json();
-    if (!adsRes.ok) throw new Error(`Meta ads: ${JSON.stringify(adsData)}`);
-    const ads = (adsData.data || []) as any[];
+    // 1) Buscar ads (campos mínimos) - paginado
+    const adFields = 'id,name,status,campaign_id,creative{id,thumbnail_url}';
+    const adsUrl = `${GRAPH}/${accountId}/ads?fields=${encodeURIComponent(adFields)}&limit=50&access_token=${accessToken}`;
+    const ads = await fetchAllPages(adsUrl);
 
+    // 2) Buscar insights por ad (últimos 30 dias)
+    const insightFields = 'ad_id,spend,impressions,clicks,ctr,cpc,actions,cost_per_action_type';
+    const insightsUrl = `${GRAPH}/${accountId}/insights?level=ad&fields=${encodeURIComponent(insightFields)}&date_preset=last_30d&limit=200&access_token=${accessToken}`;
+    let insightsMap = new Map<string, any>();
+    try {
+      const insights = await fetchAllPages(insightsUrl);
+      for (const ins of insights) insightsMap.set(ins.ad_id, ins);
+    } catch (e) {
+      console.warn('insights failed (continuing):', e);
+    }
+
+    // 3) Buscar detalhes do creative em batch (apenas para ads que vamos importar)
     const statusMap: Record<string, string> = {
       ACTIVE: 'escalando', PAUSED: 'teste', DELETED: 'morto', ARCHIVED: 'morto',
     };
@@ -62,29 +89,37 @@ Deno.serve(async (req) => {
     let imported = 0;
     for (const ad of ads) {
       const internalCampId = campMap.get(ad.campaign_id);
-      if (!internalCampId) continue; // só importa criativos cuja campanha já foi importada
+      if (!internalCampId) continue;
 
       const cr = ad.creative || {};
-      const spec = cr.object_story_spec || {};
-      const link = spec.link_data || spec.video_data || {};
-      const thumb = cr.thumbnail_url || cr.image_url || link.image_url || null;
-      const body = cr.body || link.message || link.description || '';
-      const title = cr.title || link.name || link.title || ad.name;
-      const type = cr.video_id || link.video_id ? 'video' : 'imagem';
+      const ins = insightsMap.get(ad.id) || {};
+
+      // CPA = custo por lead/purchase quando disponível
+      let cpa = 0;
+      const cpaArr = ins.cost_per_action_type || [];
+      const leadCpa = cpaArr.find((x: any) => ['lead', 'offsite_conversion.fb_pixel_lead', 'purchase'].includes(x.action_type));
+      if (leadCpa) cpa = parseFloat(leadCpa.value) || 0;
+
+      const spend = parseFloat(ins.spend || '0') || 0;
+      const ctr = parseFloat(ins.ctr || '0') || 0;
+      const clicks = parseInt(ins.clicks || '0') || 0;
+      const impressions = parseInt(ins.impressions || '0') || 0;
 
       const payload = {
         user_id: userId,
         campaign_id: internalCampId,
         name: ad.name,
-        type,
-        link: thumb || '',
+        type: 'imagem',
+        link: cr.thumbnail_url || '',
         status: statusMap[ad.status] || 'teste',
         source: 'meta',
         meta_ad_id: ad.id,
         meta_creative_id: cr.id || null,
-        thumbnail_url: thumb,
-        body,
-        title,
+        thumbnail_url: cr.thumbnail_url || null,
+        title: ad.name,
+        body: spend > 0
+          ? `Gasto: R$ ${spend.toFixed(2)} • CTR: ${ctr.toFixed(2)}% • CPA: R$ ${cpa.toFixed(2)} • Cliques: ${clicks} • Impressões: ${impressions}`
+          : '',
         last_synced_at: new Date().toISOString(),
       };
 
