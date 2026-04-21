@@ -175,11 +175,22 @@ export default function ClientDetail() {
     }
   };
 
+  const buildPeriodBody = () => {
+    const body: any = {};
+    if (dateRange.preset === 'custom' && dateRange.since && dateRange.until) {
+      body.since = dateRange.since;
+      body.until = dateRange.until;
+    } else {
+      body.date_preset = dateRange.preset;
+    }
+    return body;
+  };
+
   const importAdSetsFor = async (camp: Campaign) => {
     setImportingAdSets(true);
     toast.loading('Carregando conjuntos de anúncios...', { id: 'adsets' });
     const { data, error } = await supabase.functions.invoke('meta-import-adsets', {
-      body: { client_id: id, campaign_id: camp.id },
+      body: { client_id: id, campaign_id: camp.id, ...buildPeriodBody() },
     });
     setImportingAdSets(false);
     if (error || data?.error) {
