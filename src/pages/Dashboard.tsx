@@ -87,16 +87,17 @@ export default function Dashboard() {
       setTransacoes((transRes.data || []) as Transacao[]);
       setTasks((tasksRes.data || []) as TaskItem[]);
 
-      // Contratos a vencer (próximos 60 dias)
+      // Contratos a vencer (próximos 60 dias) - sempre baseado em hoje
+      const hojeReal = new Date();
       const limite = new Date(); limite.setDate(limite.getDate() + 60);
-      const hojeStr = hoje.toISOString().slice(0, 10);
+      const hojeStr = hojeReal.toISOString().slice(0, 10);
       const limStr = limite.toISOString().slice(0, 10);
       setContratos(((contratosRes.data || []) as ContratoVenc[]).filter(c => c.expiry_date >= hojeStr && c.expiry_date <= limStr).slice(0, 5));
 
       // Histórico 6 meses (receita = mensalidades pagas + entradas avulsas)
       const map: Record<string, number> = {};
       for (let i = 5; i >= 0; i--) {
-        const d = new Date(anoAtual, mesAtual - i, 1);
+        const d = new Date(ano, mes - i, 1);
         map[d.toISOString().slice(0, 7)] = 0;
       }
       ((mensHistRes.data || []) as { valor: number; status: string; vencimento: string }[]).forEach(m => {
