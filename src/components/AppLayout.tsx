@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import NotificationBar from '@/components/NotificationBar';
 import SupportFAB from '@/components/SupportFAB';
-import DebugPanel from '@/components/DebugPanel';
+
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ClipboardList,
@@ -131,7 +131,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       <SupportFAB />
-      <DebugPanel />
     </div>
   );
 }
