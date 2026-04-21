@@ -105,6 +105,11 @@ export default function ClientDetail() {
   const [previewHtml, setPreviewHtml] = useState<string>('');
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewAttachment, setPreviewAttachment] = useState<ClientAttachment | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportStatusFilter, setExportStatusFilter] = useState<'todas' | 'ACTIVE' | 'PAUSED' | 'ARCHIVED'>('todas');
+  const [exportObjectives, setExportObjectives] = useState<string[]>([]);
+  const [exportSelectedIds, setExportSelectedIds] = useState<Record<string, boolean>>({});
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (!previewCreative?.meta_ad_id || !id) { setPreviewHtml(''); return; }
