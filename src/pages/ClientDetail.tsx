@@ -650,18 +650,49 @@ export default function ClientDetail() {
                   {adSets.map(a => {
                     const budget = a.daily_budget > 0 ? `R$ ${Number(a.daily_budget).toLocaleString('pt-BR')}/dia` :
                                    a.lifetime_budget > 0 ? `R$ ${Number(a.lifetime_budget).toLocaleString('pt-BR')} total` : '—';
+                    const ins: CampaignInsights = {
+                      spend: Number(a.spend) || 0,
+                      impressions: Number(a.impressions) || 0,
+                      clicks: Number(a.clicks) || 0,
+                      ctr: Number(a.ctr) || 0,
+                      cpc: Number(a.cpc) || 0,
+                      cpm: Number(a.cpm) || 0,
+                      reach: Number(a.reach) || 0,
+                      leads: Number(a.leads) || 0,
+                      purchases: Number(a.purchases) || 0,
+                      messages: Number(a.messages) || 0,
+                      link_clicks: Number(a.link_clicks) || 0,
+                      revenue: Number(a.revenue) || 0,
+                      cpl: Number(a.leads) > 0 ? Number(a.spend) / Number(a.leads) : 0,
+                      cpp: Number(a.purchases) > 0 ? Number(a.spend) / Number(a.purchases) : 0,
+                      cpm_msg: Number(a.messages) > 0 ? Number(a.spend) / Number(a.messages) : 0,
+                      roas: Number(a.roas) || 0,
+                    };
+                    const cells = metricsForObjective(selectedCampaign?.objective || '', ins);
+                    const hasMetrics = ins.spend > 0 || ins.impressions > 0;
                     return (
                       <div key={a.id} className="bg-secondary/30 border border-border/50 rounded-lg p-3 hover:border-primary/30 transition-colors">
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <p className="text-sm font-medium text-foreground line-clamp-2 flex-1">{a.name}</p>
                           <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border shrink-0 ${statusColor(a.status)}`}>{a.status}</span>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+                        <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground mb-2">
                           <div><span className="text-foreground/60">Orçamento:</span> <span className="text-foreground">{budget}</span></div>
                           <div><span className="text-foreground/60">Otimização:</span> <span className="text-foreground">{a.optimization_goal || '—'}</span></div>
-                          <div><span className="text-foreground/60">Lance:</span> <span className="text-foreground">{a.bid_strategy || '—'}</span></div>
-                          <div><span className="text-foreground/60">Início:</span> <span className="text-foreground">{a.start_time ? new Date(a.start_time).toLocaleDateString('pt-BR') : '—'}</span></div>
                         </div>
+                        {hasMetrics && (
+                          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border/50 text-[11px]">
+                            {cells.map((m, i) => (
+                              <div key={i}>
+                                <p className="text-muted-foreground">{m.label}</p>
+                                <p className={`font-semibold ${m.highlight ? 'text-primary' : 'text-foreground'}`}>{m.value}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {!hasMetrics && (
+                          <p className="text-[10px] text-muted-foreground italic pt-2 border-t border-border/50">Sem dados no período</p>
+                        )}
                       </div>
                     );
                   })}
