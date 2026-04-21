@@ -144,6 +144,17 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
     await loadConnection();
   };
 
+  const disconnectMetaFully = async () => {
+    if (!confirm('Desconectar Meta totalmente? O token será removido e você precisará refazer a autenticação para reconectar.')) return;
+    const { error } = await supabase.from('meta_connections')
+      .delete()
+      .eq('client_id', clientId);
+    if (error) { toast.error('Falha ao desconectar Meta'); return; }
+    toast.success('Meta desconectada totalmente');
+    setAccounts([]);
+    setConnection(null);
+  };
+
   if (loading) return <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>;
 
   if (!connection) {
@@ -187,7 +198,8 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
             <RefreshCw className={`w-3 h-3 ${importing ? 'animate-spin' : ''}`} /> Atualizar
           </Button>
           {expired && <Button size="sm" onClick={connect} disabled={connecting}>Reconectar</Button>}
-          <Button variant="ghost" size="sm" onClick={disconnectAccount} className="text-destructive">Desconectar</Button>
+          <Button variant="ghost" size="sm" onClick={disconnectAccount} className="text-destructive">Desconectar conta</Button>
+          <Button variant="ghost" size="sm" onClick={disconnectMetaFully} className="text-destructive">Desconectar Meta totalmente</Button>
         </div>
       </div>
 
