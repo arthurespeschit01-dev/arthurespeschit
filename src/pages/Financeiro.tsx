@@ -70,7 +70,11 @@ export default function Financeiro() {
     if (!user) return;
     const have = new Set(existing.map(m => m.cliente_id));
     const toCreate = cls
-      .filter(c => (c.status ?? 'ativo') === 'ativo' && c.monthly_fee && c.monthly_fee > 0 && !have.has(c.id))
+      .filter(c => {
+        const st = (c.status ?? '').toLowerCase();
+        const ativo = st === '' || st === 'ativo';
+        return ativo && c.monthly_fee && c.monthly_fee > 0 && !have.has(c.id);
+      })
       .map(c => {
         const day = Math.min(c.payment_day || 5, new Date(ano, mes + 1, 0).getDate());
         const venc = new Date(ano, mes, day).toISOString().slice(0, 10);
@@ -126,7 +130,7 @@ export default function Financeiro() {
       const lucro = receita - custo;
       const marg = receita > 0 ? (lucro / receita) * 100 : 0;
       return { client: c, receita, custo, lucro, margem: marg };
-    }).filter(r => r.receita > 0 || r.custo > 0);
+    });
   }, [clients, transacoes, mensalidades]);
 
   const clientesBaixaMargem = rentabilidade.filter(r => r.margem < 20);
