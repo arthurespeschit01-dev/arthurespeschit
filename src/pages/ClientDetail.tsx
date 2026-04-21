@@ -746,7 +746,41 @@ export default function ClientDetail() {
                           <p className="text-sm font-medium text-foreground line-clamp-2 flex-1">{cr.title || cr.name}</p>
                           <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border shrink-0 ${stBadge?.color}`}>{stBadge?.label}</span>
                         </div>
-                        {cr.body && <p className="text-[11px] text-muted-foreground line-clamp-2 mb-2">{cr.body}</p>}
+                        {isMeta && (() => {
+                          const a: any = cr;
+                          const ins: CampaignInsights = {
+                            spend: Number(a.spend) || 0,
+                            impressions: Number(a.impressions) || 0,
+                            clicks: Number(a.clicks) || 0,
+                            ctr: Number(a.ctr) || 0,
+                            cpc: Number(a.cpc) || 0,
+                            cpm: Number(a.cpm) || 0,
+                            reach: Number(a.reach) || 0,
+                            leads: Number(a.leads) || 0,
+                            purchases: Number(a.purchases) || 0,
+                            messages: Number(a.messages) || 0,
+                            link_clicks: Number(a.link_clicks) || 0,
+                            revenue: Number(a.revenue) || 0,
+                            cpl: Number(a.leads) > 0 ? Number(a.spend) / Number(a.leads) : 0,
+                            cpp: Number(a.purchases) > 0 ? Number(a.spend) / Number(a.purchases) : 0,
+                            cpm_msg: Number(a.messages) > 0 ? Number(a.spend) / Number(a.messages) : 0,
+                            roas: Number(a.roas) || 0,
+                          };
+                          const cells = metricsForObjective(selectedCampaign?.objective || '', ins);
+                          const hasMetrics = ins.spend > 0 || ins.impressions > 0;
+                          if (!hasMetrics) return null;
+                          return (
+                            <div className="grid grid-cols-3 gap-1.5 mb-2 pb-2 border-b border-border/50 text-[10px]">
+                              {cells.map((m, i) => (
+                                <div key={i}>
+                                  <p className="text-muted-foreground">{m.label}</p>
+                                  <p className={`font-semibold ${m.highlight ? 'text-primary' : 'text-foreground'}`}>{m.value}</p>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                        {!isMeta && cr.body && <p className="text-[11px] text-muted-foreground line-clamp-2 mb-2">{cr.body}</p>}
                         <div className="flex items-center justify-between mt-auto pt-2 border-t border-border/50">
                           <button type="button" onClick={() => setPreviewCreative(cr)} className="text-xs text-primary hover:underline flex items-center gap-1 truncate">
                             <ExternalLink className="w-3 h-3 shrink-0" /> Ver criativo
