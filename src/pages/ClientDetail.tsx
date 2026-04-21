@@ -983,6 +983,68 @@ export default function ClientDetail() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Attachment Preview Dialog */}
+      <Dialog open={!!previewAttachment} onOpenChange={(o) => !o && setPreviewAttachment(null)}>
+        <DialogContent className="bg-card border-border max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 pr-8 truncate">
+              <Paperclip className="w-4 h-4 text-primary shrink-0" />
+              <span className="truncate">{previewAttachment?.file_name}</span>
+            </DialogTitle>
+          </DialogHeader>
+          {previewAttachment && (() => {
+            const url = previewAttachment.file_url;
+            const name = previewAttachment.file_name.toLowerCase();
+            const ext = name.split('.').pop() || '';
+            const isImage = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'avif'].includes(ext);
+            const isVideo = ['mp4', 'webm', 'mov', 'm4v', 'ogg'].includes(ext);
+            const isAudio = ['mp3', 'wav', 'm4a', 'aac', 'flac'].includes(ext);
+            const isPdf = ext === 'pdf';
+            return (
+              <div className="flex flex-col gap-3 min-h-0">
+                <div className="bg-secondary/30 rounded-lg overflow-hidden flex items-center justify-center min-h-[300px] max-h-[70vh]">
+                  {isImage ? (
+                    <img src={url} alt={previewAttachment.file_name} className="max-w-full max-h-[70vh] object-contain" />
+                  ) : isVideo ? (
+                    <video src={url} controls className="max-w-full max-h-[70vh]" />
+                  ) : isAudio ? (
+                    <audio src={url} controls className="w-full px-6" />
+                  ) : isPdf ? (
+                    <iframe src={url} title={previewAttachment.file_name} className="w-full h-[70vh] border-0 bg-white" />
+                  ) : (
+                    <div className="flex flex-col items-center gap-3 py-12 text-center px-6">
+                      <FileText className="w-12 h-12 text-muted-foreground/50" />
+                      <p className="text-sm text-muted-foreground">
+                        Pré-visualização não disponível para este tipo de arquivo.
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-secondary/60 text-foreground text-sm font-medium hover:bg-secondary transition-colors border border-border/50"
+                  >
+                    <ExternalLink className="w-4 h-4" /> Abrir em nova aba
+                  </a>
+                  <a
+                    href={url}
+                    download={previewAttachment.file_name}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
+                  >
+                    <Download className="w-4 h-4" /> Baixar
+                  </a>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
