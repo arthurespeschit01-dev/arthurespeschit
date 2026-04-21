@@ -564,6 +564,32 @@ export default function Financeiro() {
       </Tabs>
 
       {loading && <p className="text-xs text-muted-foreground text-center">Carregando...</p>}
+
+      <Dialog open={cobrancaOpen} onOpenChange={setCobrancaOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageCircle className="w-5 h-5 text-emerald-400" />
+              {cobrancaTitulo}
+            </DialogTitle>
+            <DialogDescription>
+              Mensagem pronta para você copiar e enviar no WhatsApp do cliente. Ajuste o texto se quiser antes de copiar.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={cobrancaTexto}
+            onChange={(e) => setCobrancaTexto(e.target.value)}
+            rows={12}
+            className="font-mono text-sm leading-relaxed whitespace-pre-wrap"
+          />
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setCobrancaOpen(false)}>Fechar</Button>
+            <Button onClick={copiarCobranca} className="bg-emerald-500 hover:bg-emerald-600 text-white gap-2">
+              <Copy className="w-4 h-4" /> Copiar mensagem
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
