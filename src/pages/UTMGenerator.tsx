@@ -8,11 +8,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 
+type DynParam = { label: string; value: string };
 interface Platform {
   id: string;
   label: string;
   defaults: { utm_source: string; utm_medium: string };
-  dynamicParams: { label: string; value: string }[];
+  // Params grouped by which UTM field they semantically belong to
+  paramsByField: {
+    campaign: DynParam[];
+    term: DynParam[];
+    content: DynParam[];
+  };
 }
 
 const PLATFORMS: Platform[] = [
@@ -20,52 +26,77 @@ const PLATFORMS: Platform[] = [
     id: 'google_ads',
     label: 'Google Ads',
     defaults: { utm_source: 'google', utm_medium: 'cpc' },
-    dynamicParams: [
-      { label: '{keyword}', value: '{keyword}' },
-      { label: '{matchtype}', value: '{matchtype}' },
-      { label: '{adgroupid}', value: '{adgroupid}' },
-      { label: '{campaignid}', value: '{campaignid}' },
-      { label: '{creative}', value: '{creative}' },
-      { label: '{placement}', value: '{placement}' },
-      { label: '{network}', value: '{network}' },
-    ],
+    paramsByField: {
+      campaign: [
+        { label: '{campaignid}', value: '{campaignid}' },
+        { label: '{_campaign}', value: '{_campaign}' },
+      ],
+      term: [
+        { label: '{keyword}', value: '{keyword}' },
+        { label: '{matchtype}', value: '{matchtype}' },
+        { label: '{adgroupid}', value: '{adgroupid}' },
+      ],
+      content: [
+        { label: '{creative}', value: '{creative}' },
+        { label: '{placement}', value: '{placement}' },
+        { label: '{network}', value: '{network}' },
+        { label: '{device}', value: '{device}' },
+      ],
+    },
   },
   {
     id: 'meta_ads',
     label: 'Meta Ads (Facebook / Instagram)',
     defaults: { utm_source: 'facebook', utm_medium: 'paid_social' },
-    dynamicParams: [
-      { label: '{{ad.name}}', value: '{{ad.name}}' },
-      { label: '{{adset.name}}', value: '{{adset.name}}' },
-      { label: '{{campaign.name}}', value: '{{campaign.name}}' },
-      { label: '{{site_source_name}}', value: '{{site_source_name}}' },
-      { label: '{{placement}}', value: '{{placement}}' },
-    ],
+    paramsByField: {
+      campaign: [
+        { label: '{{campaign.name}}', value: '{{campaign.name}}' },
+        { label: '{{campaign.id}}', value: '{{campaign.id}}' },
+      ],
+      term: [
+        { label: '{{adset.name}}', value: '{{adset.name}}' },
+        { label: '{{adset.id}}', value: '{{adset.id}}' },
+        { label: '{{site_source_name}}', value: '{{site_source_name}}' },
+        { label: '{{placement}}', value: '{{placement}}' },
+      ],
+      content: [
+        { label: '{{ad.name}}', value: '{{ad.name}}' },
+        { label: '{{ad.id}}', value: '{{ad.id}}' },
+      ],
+    },
   },
   {
     id: 'tiktok_ads',
     label: 'TikTok Ads',
     defaults: { utm_source: 'tiktok', utm_medium: 'paid_social' },
-    dynamicParams: [
-      { label: '__CAMPAIGN_ID__', value: '__CAMPAIGN_ID__' },
-      { label: '__AID__', value: '__AID__' },
-      { label: '__CID__', value: '__CID__' },
-      { label: '__CAMPAIGN_NAME__', value: '__CAMPAIGN_NAME__' },
-      { label: '__AID_NAME__', value: '__AID_NAME__' },
-      { label: '__CID_NAME__', value: '__CID_NAME__' },
-      { label: '__PLACEMENT__', value: '__PLACEMENT__' },
-    ],
+    paramsByField: {
+      campaign: [
+        { label: '__CAMPAIGN_NAME__', value: '__CAMPAIGN_NAME__' },
+        { label: '__CAMPAIGN_ID__', value: '__CAMPAIGN_ID__' },
+      ],
+      term: [
+        { label: '__AID_NAME__', value: '__AID_NAME__' },
+        { label: '__AID__', value: '__AID__' },
+        { label: '__PLACEMENT__', value: '__PLACEMENT__' },
+      ],
+      content: [
+        { label: '__CID_NAME__', value: '__CID_NAME__' },
+        { label: '__CID__', value: '__CID__' },
+      ],
+    },
   },
   {
     id: 'linkedin_ads',
     label: 'LinkedIn Ads',
     defaults: { utm_source: 'linkedin', utm_medium: 'paid_social' },
-    dynamicParams: [
-      { label: '{campaignId}', value: '{campaignId}' },
-      { label: '{creative}', value: '{creative}' },
-      { label: '{placement}', value: '{placement}' },
-      { label: '{member}', value: '{member}' },
-    ],
+    paramsByField: {
+      campaign: [{ label: '{campaignId}', value: '{campaignId}' }],
+      term: [
+        { label: '{placement}', value: '{placement}' },
+        { label: '{member}', value: '{member}' },
+      ],
+      content: [{ label: '{creative}', value: '{creative}' }],
+    },
   },
   {
     id: 'youtube_ads',
