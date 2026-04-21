@@ -54,6 +54,10 @@ export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  const today = new Date();
+  const [mes, setMes] = useState(today.getMonth());
+  const [ano, setAno] = useState(today.getFullYear());
+
   const [clients, setClients] = useState<Client[]>([]);
   const [mensalidades, setMensalidades] = useState<Mensalidade[]>([]);
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
@@ -64,12 +68,9 @@ export default function Dashboard() {
   useEffect(() => {
     if (!user) return;
     const load = async () => {
-      const hoje = new Date();
-      const mesAtual = hoje.getMonth();
-      const anoAtual = hoje.getFullYear();
-      const inicioMes = new Date(anoAtual, mesAtual, 1).toISOString().slice(0, 10);
-      const fimMes = new Date(anoAtual, mesAtual + 1, 0).toISOString().slice(0, 10);
-      const inicio6Meses = new Date(anoAtual, mesAtual - 5, 1).toISOString().slice(0, 10);
+      const inicioMes = new Date(ano, mes, 1).toISOString().slice(0, 10);
+      const fimMes = new Date(ano, mes + 1, 0).toISOString().slice(0, 10);
+      const inicio6Meses = new Date(ano, mes - 5, 1).toISOString().slice(0, 10);
 
       const [clientsRes, mensRes, transRes, tasksRes, contratosRes, transHistRes, mensHistRes] = await Promise.all([
         supabase.from('clients').select('id, name, status, monthly_fee, payment_day, phone').eq('user_id', user.id),
