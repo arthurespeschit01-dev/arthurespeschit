@@ -40,6 +40,20 @@ Deno.serve(async (req) => {
     const accountId = conn.selected_ad_account_id;
     const accessToken = conn.access_token;
 
+    // Limpar campanhas Meta deste cliente que pertencem a outras contas (troca de conta)
+    const { data: stale } = await admin.from('campaigns')
+      .select('id')
+      .eq('client_id', client_id)
+      .eq('source', 'meta')
+      .neq('meta_ad_account_id', accountId);
+    if (stale && stale.length > 0) {
+      const staleIds = stale.map((s: any) => s.id);
+      await admin.from('creatives').delete().in('campaign_id', staleIds);
+      await admin.from('ad_sets').delete().in('campaign_id', staleIds);
+      await admin.from('campaigns').delete().in('id', staleIds);
+      console.log(`Removed ${staleIds.length} stale campaigns from other accounts`);
+    }
+
     // 1) Listar campanhas (paginado, limite menor)
     async function fetchAllPages(url: string): Promise<any[]> {
       const out: any[] = [];
