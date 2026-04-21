@@ -1274,7 +1274,19 @@ export default function ClientDetail() {
                       if (chosen.length === 0) { toast.error('Selecione ao menos 1 campanha'); return; }
                       const periodLabel = dateRange.preset === 'custom' && dateRange.since && dateRange.until
                         ? `${dateRange.since} → ${dateRange.until}`
-                        : ({ today: 'Hoje', yesterday: 'Ontem', last_7d: 'Últimos 7 dias', last_14d: 'Últimos 14 dias', last_30d: 'Últimos 30 dias', last_90d: 'Últimos 90 dias' } as Record<string, string>)[dateRange.preset] || dateRange.preset;
+                        : ({
+                            today: 'Hoje',
+                            yesterday: 'Ontem',
+                            last_7d: 'Últimos 7 dias',
+                            last_14d: 'Últimos 14 dias',
+                            last_30d: 'Últimos 30 dias',
+                            last_90d: 'Últimos 90 dias',
+                            this_week: 'Esta semana',
+                            last_week: 'Semana passada',
+                            this_month: 'Este mês',
+                            last_month: 'Mês passado',
+                            maximum: 'Máximo',
+                          } as Record<string, string>)[dateRange.preset] || dateRange.preset;
                       setExporting(true);
                       toast.loading('Gerando PDF...', { id: 'pdf' });
                       try {

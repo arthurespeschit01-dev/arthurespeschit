@@ -6,7 +6,19 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
-export type DatePreset = 'today' | 'yesterday' | 'last_7d' | 'last_14d' | 'last_30d' | 'last_90d' | 'custom';
+export type DatePreset =
+  | 'today'
+  | 'yesterday'
+  | 'last_7d'
+  | 'last_14d'
+  | 'last_30d'
+  | 'last_90d'
+  | 'this_week'
+  | 'last_week'
+  | 'this_month'
+  | 'last_month'
+  | 'maximum'
+  | 'custom';
 
 export interface DateRangeValue {
   preset: DatePreset;
@@ -17,11 +29,21 @@ export interface DateRangeValue {
 const PRESETS: { value: DatePreset; label: string }[] = [
   { value: 'today', label: 'Hoje' },
   { value: 'yesterday', label: 'Ontem' },
-  { value: 'last_7d', label: '7 dias' },
-  { value: 'last_14d', label: '14 dias' },
-  { value: 'last_30d', label: '30 dias' },
-  { value: 'last_90d', label: '90 dias' },
+  { value: 'last_7d', label: 'Últimos 7 dias' },
+  { value: 'last_14d', label: 'Últimos 14 dias' },
+  { value: 'last_30d', label: 'Últimos 30 dias' },
+  { value: 'last_90d', label: 'Últimos 90 dias' },
+  { value: 'this_week', label: 'Esta semana' },
+  { value: 'last_week', label: 'Semana passada' },
+  { value: 'this_month', label: 'Este mês' },
+  { value: 'last_month', label: 'Mês passado' },
+  { value: 'maximum', label: 'Máximo' },
 ];
+
+export const PRESET_LABELS: Record<string, string> = PRESETS.reduce((acc, p) => {
+  acc[p.value] = p.label;
+  return acc;
+}, {} as Record<string, string>);
 
 export function DateRangePicker({ value, onChange }: { value: DateRangeValue; onChange: (v: DateRangeValue) => void }) {
   const [open, setOpen] = useState(false);
@@ -30,7 +52,7 @@ export function DateRangePicker({ value, onChange }: { value: DateRangeValue; on
 
   const label = value.preset === 'custom' && value.since && value.until
     ? `${value.since} → ${value.until}`
-    : PRESETS.find(p => p.value === value.preset)?.label || '30 dias';
+    : PRESETS.find(p => p.value === value.preset)?.label || 'Últimos 30 dias';
 
   const applyCustom = () => {
     if (from && to) {
@@ -53,7 +75,7 @@ export function DateRangePicker({ value, onChange }: { value: DateRangeValue; on
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="end">
         <div className="flex">
-          <div className="flex flex-col p-2 border-r border-border min-w-[120px]">
+          <div className="flex flex-col p-2 border-r border-border min-w-[160px] max-h-[420px] overflow-y-auto">
             {PRESETS.map(p => (
               <Button
                 key={p.value}
