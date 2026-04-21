@@ -73,6 +73,9 @@ export default function ClientDetail() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [filter, setFilter] = useState('Todas');
   const [campOpen, setCampOpen] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRangeValue>({ preset: 'last_30d' });
+  const [insightsByCamp, setInsightsByCamp] = useState<Record<string, CampaignInsights>>({});
+  const [loadingInsights, setLoadingInsights] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
   const [campForm, setCampForm] = useState({ name: '', platform: 'Facebook Ads', objective: '', status: 'Ativa', start_date: '', budget: 0, notes: '' });
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
