@@ -517,7 +517,9 @@ export default function ClientDetail() {
               <Button
                 onClick={async () => {
                   setImportingMeta(true);
-                  const { data, error } = await supabase.functions.invoke('meta-import-campaigns', { body: { client_id: id } });
+                  const { data, error } = await supabase.functions.invoke('meta-import-campaigns', {
+                    body: { client_id: id, ...buildPeriodBody() },
+                  });
                   setImportingMeta(false);
                   if (error || data?.error) {
                     const msg = (data?.error || error?.message || '').toString();
