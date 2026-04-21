@@ -230,21 +230,47 @@ export default function Financeiro() {
   };
 
   // ===== Cobrança (modal) =====
+  type Tom = 'amigavel' | 'formal' | 'firme';
   const [cobrancaOpen, setCobrancaOpen] = useState(false);
   const [cobrancaTitulo, setCobrancaTitulo] = useState('');
   const [cobrancaTexto, setCobrancaTexto] = useState('');
+  const [cobrancaTom, setCobrancaTom] = useState<Tom>('amigavel');
+  const [cobrancaCtx, setCobrancaCtx] = useState<
+    | { kind: 'individual'; clienteName: string; valor: number; vencimento: string }
+    | { kind: 'resumo'; linhas: string; total: number; qtd: number }
+    | null
+  >(null);
 
-  const cobrancaMessage = (clienteName: string, valor: number, vencimento: string) => {
+  const buildCobrancaIndividual = (tom: Tom, clienteName: string, valor: number, vencimento: string) => {
     const venc = new Date(vencimento + 'T00:00:00').toLocaleDateString('pt-BR');
     const primeiroNome = (clienteName || '').split(' ')[0] || clienteName;
-    return `Olá, ${primeiroNome}! Tudo bem? 👋\n\nPassando para lembrar, de forma carinhosa, que a sua mensalidade no valor de ${fmt(valor)}, com vencimento em ${venc}, está em aberto por aqui.\n\nQuando puder, poderia confirmar o pagamento? Se já realizou, é só me enviar o comprovante que dou baixa imediatamente. 😉\n\nQualquer dúvida sobre boleto, PIX ou nota fiscal, é só me chamar que resolvo rapidinho.\n\nObrigado pela parceria! 🙏`;
+    if (tom === 'amigavel') {
+      return `Olá, ${primeiroNome}! Tudo bem? 👋\n\nPassando para lembrar, de forma carinhosa, que a sua mensalidade no valor de ${fmt(valor)}, com vencimento em ${venc}, está em aberto por aqui.\n\nQuando puder, poderia confirmar o pagamento? Se já realizou, é só me enviar o comprovante que dou baixa imediatamente. 😉\n\nQualquer dúvida sobre boleto, PIX ou nota fiscal, é só me chamar que resolvo rapidinho.\n\nObrigado pela parceria! 🙏`;
+    }
+    if (tom === 'formal') {
+      return `Prezado(a) ${clienteName},\n\nEspero que esteja bem. Entro em contato para informar que identificamos em nosso sistema a mensalidade no valor de ${fmt(valor)}, com vencimento em ${venc}, ainda em aberto.\n\nSolicito a gentileza de regularizar o pagamento ou, caso já tenha sido efetuado, encaminhar o respectivo comprovante para baixa em nosso controle.\n\nPermaneço à disposição para esclarecimentos sobre boleto, PIX ou emissão de nota fiscal.\n\nAtenciosamente.`;
+    }
+    return `${primeiroNome}, tudo bem?\n\nEstou retomando o contato sobre a mensalidade de ${fmt(valor)}, com vencimento em ${venc}, que segue em aberto até o momento.\n\nPreciso da regularização nos próximos dias para mantermos as entregas e os serviços ativos sem qualquer interrupção. Se o pagamento já foi feito, por favor, encaminhe o comprovante hoje para que eu possa dar baixa.\n\nFico no aguardo da sua confirmação. Obrigado.`;
+  };
+
+  const buildCobrancaResumo = (tom: Tom, linhas: string, total: number, qtd: number) => {
+    if (tom === 'amigavel') {
+      return `Oi! Segue um resuminho das mensalidades em aberto por aqui 👇\n\n${linhas}\n\nTotal: ${fmt(total)}\n\nQualquer dúvida sobre boleto, PIX ou comprovante, é só me chamar que resolvo rapidinho. Obrigado! 🙏`;
+    }
+    if (tom === 'formal') {
+      return `Prezado(a),\n\nSegue abaixo o resumo das mensalidades atualmente em aberto (${qtd} ${qtd === 1 ? 'cliente' : 'clientes'}):\n\n${linhas}\n\nTotal em aberto: ${fmt(total)}\n\nSolicito gentilmente a verificação e regularização dos pagamentos pendentes. Permaneço à disposição.\n\nAtenciosamente.`;
+    }
+    return `Resumo das mensalidades em aberto (${qtd} ${qtd === 1 ? 'cliente' : 'clientes'}):\n\n${linhas}\n\nTotal: ${fmt(total)}\n\nPreciso da regularização nos próximos dias para evitarmos qualquer impacto nos serviços. Por favor, retornem com a confirmação de pagamento ou comprovante o quanto antes.`;
   };
 
   const abrirCobranca = (m: Mensalidade) => {
     const c = clients.find(x => x.id === m.cliente_id);
     if (!c) return;
+    const ctx = { kind: 'individual' as const, clienteName: c.name, valor: Number(m.valor), vencimento: m.vencimento };
+    setCobrancaCtx(ctx);
+    setCobrancaTom('amigavel');
     setCobrancaTitulo(`Cobrança — ${c.name}`);
-    setCobrancaTexto(cobrancaMessage(c.name, Number(m.valor), m.vencimento));
+    setCobrancaTexto(buildCobrancaIndividual('amigavel', ctx.clienteName, ctx.valor, ctx.vencimento));
     setCobrancaOpen(true);
   };
 
@@ -255,11 +281,22 @@ export default function Financeiro() {
       const venc = new Date(m.vencimento + 'T00:00:00').toLocaleDateString('pt-BR');
       return `• ${c?.name || '-'} — ${fmt(Number(m.valor))} (venc. ${venc})`;
     }).join('\n');
+    const ctx = { kind: 'resumo' as const, linhas, total: totalAtrasado, qtd: atrasados.length };
+    setCobrancaCtx(ctx);
+    setCobrancaTom('amigavel');
     setCobrancaTitulo(`Resumo de cobranças em aberto (${atrasados.length})`);
-    setCobrancaTexto(
-      `Resumo das mensalidades em aberto até o momento:\n\n${linhas}\n\nTotal: ${fmt(totalAtrasado)}\n\nUse este resumo como base para o seu acompanhamento ou para encaminhar internamente.`
-    );
+    setCobrancaTexto(buildCobrancaResumo('amigavel', ctx.linhas, ctx.total, ctx.qtd));
     setCobrancaOpen(true);
+  };
+
+  const trocarTom = (tom: Tom) => {
+    setCobrancaTom(tom);
+    if (!cobrancaCtx) return;
+    if (cobrancaCtx.kind === 'individual') {
+      setCobrancaTexto(buildCobrancaIndividual(tom, cobrancaCtx.clienteName, cobrancaCtx.valor, cobrancaCtx.vencimento));
+    } else {
+      setCobrancaTexto(buildCobrancaResumo(tom, cobrancaCtx.linhas, cobrancaCtx.total, cobrancaCtx.qtd));
+    }
   };
 
   const copiarCobranca = async () => {
