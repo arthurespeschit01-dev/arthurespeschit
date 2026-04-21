@@ -81,12 +81,28 @@ Deno.serve(async (req) => {
       console.warn('insights failed (continuing):', e);
     }
 
-    // 3) Buscar detalhes do creative em batch (apenas para ads que vamos importar)
     const statusMap: Record<string, string> = {
       ACTIVE: 'escalando', PAUSED: 'teste', DELETED: 'morto', ARCHIVED: 'morto',
     };
 
-    let imported = 0;
+    // 3) Buscar TODOS os creatives existentes dessas campanhas em uma única query
+    const internalCampIds = Array.from(campMap.values());
+    const existingMap = new Map<string, string>(); // meta_ad_id -> internal id
+    if (internalCampIds.length > 0) {
+      const { data: existingRows } = await admin.from('creatives')
+        .select('id, meta_ad_id')
+        .in('campaign_id', internalCampIds)
+        .not('meta_ad_id', 'is', null);
+      for (const r of existingRows || []) {
+        if (r.meta_ad_id) existingMap.set(r.meta_ad_id, r.id);
+      }
+    }
+
+    // 4) Construir payloads
+    const toInsert: any[] = [];
+    const toUpdate: { id: string; payload: any }[] = [];
+    const now = new Date().toISOString();
+
     for (const ad of ads) {
       const internalCampId = campMap.get(ad.campaign_id);
       if (!internalCampId) continue;
@@ -94,7 +110,6 @@ Deno.serve(async (req) => {
       const cr = ad.creative || {};
       const ins = insightsMap.get(ad.id) || {};
 
-      // CPA = custo por lead/purchase quando disponível
       let cpa = 0;
       const cpaArr = ins.cost_per_action_type || [];
       const leadCpa = cpaArr.find((x: any) => ['lead', 'offsite_conversion.fb_pixel_lead', 'purchase'].includes(x.action_type));
@@ -120,19 +135,35 @@ Deno.serve(async (req) => {
         body: spend > 0
           ? `Gasto: R$ ${spend.toFixed(2)} • CTR: ${ctr.toFixed(2)}% • CPA: R$ ${cpa.toFixed(2)} • Cliques: ${clicks} • Impressões: ${impressions}`
           : '',
-        last_synced_at: new Date().toISOString(),
+        last_synced_at: now,
       };
 
-      const { data: existing } = await admin.from('creatives')
-        .select('id').eq('campaign_id', internalCampId).eq('meta_ad_id', ad.id).maybeSingle();
-      if (existing) {
-        await admin.from('creatives').update(payload).eq('id', existing.id);
-      } else {
-        await admin.from('creatives').insert(payload);
-      }
-      imported++;
+      const existingId = existingMap.get(ad.id);
+      if (existingId) toUpdate.push({ id: existingId, payload });
+      else toInsert.push(payload);
     }
 
+    // 5) Bulk insert + updates em paralelo (chunks)
+    const chunk = <T,>(arr: T[], n: number) => {
+      const out: T[][] = [];
+      for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
+      return out;
+    };
+
+    if (toInsert.length > 0) {
+      for (const batch of chunk(toInsert, 100)) {
+        await admin.from('creatives').insert(batch);
+      }
+    }
+    if (toUpdate.length > 0) {
+      for (const batch of chunk(toUpdate, 25)) {
+        await Promise.all(batch.map(u =>
+          admin.from('creatives').update(u.payload).eq('id', u.id)
+        ));
+      }
+    }
+
+    const imported = toInsert.length + toUpdate.length;
     return new Response(JSON.stringify({ imported, total: ads.length }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
