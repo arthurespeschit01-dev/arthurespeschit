@@ -190,11 +190,30 @@ export default function Dashboard() {
     return Math.ceil((dt.getTime() - hoje.getTime()) / 86400000);
   };
 
+  const meses = Array.from({ length: 12 }, (_, i) => i);
+  const anos = Array.from({ length: 5 }, (_, i) => today.getFullYear() - 2 + i);
+
   return (
     <div className="animate-fade-in space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground text-sm mt-1">Visão geral do seu negócio</p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground text-sm mt-1">Visão geral do seu negócio</p>
+        </div>
+        <div className="flex gap-2">
+          <Select value={String(mes)} onValueChange={(v) => setMes(Number(v))}>
+            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {meses.map(m => <SelectItem key={m} value={String(m)}>{new Date(2000, m, 1).toLocaleDateString('pt-BR', { month: 'long' })}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={String(ano)} onValueChange={(v) => setAno(Number(v))}>
+            <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {anos.map(a => <SelectItem key={a} value={String(a)}>{a}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* KPIs financeiros */}
