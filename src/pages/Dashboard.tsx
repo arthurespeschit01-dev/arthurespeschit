@@ -314,9 +314,9 @@ export default function Dashboard() {
                     </div>
                     <span className="text-sm font-semibold text-foreground">{fmt(Number(m.valor))}</span>
                     <button
-                      onClick={() => cobrarWhatsApp(m.cliente?.name || 'Cliente', m.cliente?.phone || null, Number(m.valor), m.vencimento)}
+                      onClick={() => abrirCobranca(m.cliente?.name || 'Cliente', Number(m.valor), m.vencimento)}
                       className="p-2 rounded-lg bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 transition-colors"
-                      title="Cobrar via WhatsApp"
+                      title="Gerar mensagem de cobrança"
                     >
                       <MessageCircle className="w-4 h-4" />
                     </button>
