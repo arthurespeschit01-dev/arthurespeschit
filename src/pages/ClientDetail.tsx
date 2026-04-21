@@ -525,19 +525,27 @@ export default function ClientDetail() {
                 </div>
                 <p className="text-xs text-muted-foreground">{c.platform} • {c.objective}</p>
                 {c.source === 'meta' && (() => {
-                  const ins = insightsByCamp[c.id];
-                  const cells = ins ? metricsForObjective(c.objective, ins) : [];
-                  if (cells.length === 0) return loadingInsights ? (
-                    <div className="mt-3 pt-2 border-t border-border/50 text-xs text-muted-foreground">Carregando métricas...</div>
-                  ) : null;
+                  const ins = insightsByCamp[c.id] || {
+                    spend: 0, impressions: 0, clicks: 0, ctr: 0, cpc: 0, cpm: 0, reach: 0,
+                    leads: 0, purchases: 0, messages: 0, link_clicks: 0, revenue: 0,
+                    cpl: 0, cpp: 0, cpm_msg: 0, roas: 0,
+                  };
+                  const cells = metricsForObjective(c.objective, ins);
+                  const hasData = !!insightsByCamp[c.id];
                   return (
                     <div className="grid grid-cols-3 gap-2 mt-3 pt-2 border-t border-border/50 text-xs">
                       {cells.map((m, i) => (
                         <div key={i}>
                           <p className="text-muted-foreground">{m.label}</p>
-                          <p className={`font-semibold ${m.highlight ? 'text-primary' : 'text-foreground'}`}>{m.value}</p>
+                          <p className={`font-semibold ${m.highlight ? 'text-primary' : 'text-foreground'} ${!hasData ? 'opacity-50' : ''}`}>{m.value}</p>
                         </div>
                       ))}
+                      {!hasData && !loadingInsights && (
+                        <p className="col-span-3 text-[10px] text-muted-foreground italic">Sem dados no período</p>
+                      )}
+                      {loadingInsights && !hasData && (
+                        <p className="col-span-3 text-[10px] text-muted-foreground">Carregando...</p>
+                      )}
                     </div>
                   );
                 })()}
