@@ -970,6 +970,7 @@ export default function ClientDetail() {
                         />
                       );
                     })()
+                  ) : previewCreative.thumbnail_url ? (
                     <img src={previewCreative.thumbnail_url} alt={previewCreative.name} className="max-w-full max-h-[70vh] object-contain" />
                   ) : (
                     <p className="text-sm text-muted-foreground py-12">Preview indisponível</p>
