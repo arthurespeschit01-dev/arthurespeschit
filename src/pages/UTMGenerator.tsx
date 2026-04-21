@@ -353,44 +353,56 @@ export default function UTMGenerator() {
               {utmFields}
 
               {/* Dynamic params */}
-              {platform && platform.dynamicParams.length > 0 && (
+              {platform && (platform.paramsByField.campaign.length + platform.paramsByField.term.length + platform.paramsByField.content.length) > 0 && (
                 <div className="space-y-3 rounded-lg bg-secondary/50 p-4 border border-border/20">
                   <div>
                     <p className="text-sm font-medium text-foreground">Parâmetros dinâmicos — {platform.label}</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Clique em um parâmetro para inseri-lo no campo selecionado abaixo. A plataforma substituirá automaticamente pelo valor real.
+                      Selecione o campo UTM e clique em um parâmetro compatível para inseri-lo. A plataforma substituirá automaticamente pelo valor real.
                     </p>
                   </div>
 
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground whitespace-nowrap">Inserir em:</span>
-                    {(['campaign', 'term', 'content'] as const).map((f) => (
-                      <Button
-                        key={f}
-                        type="button"
-                        size="sm"
-                        variant={activeInsertField === f ? 'default' : 'outline'}
-                        className="text-xs h-7 px-3"
-                        onClick={() => setActiveInsertField(f)}
-                      >
-                        utm_{f}
-                      </Button>
-                    ))}
+                    {(['campaign', 'term', 'content'] as const).map((f) => {
+                      const count = platform.paramsByField[f].length;
+                      return (
+                        <Button
+                          key={f}
+                          type="button"
+                          size="sm"
+                          variant={activeInsertField === f ? 'default' : 'outline'}
+                          className="text-xs h-7 px-3"
+                          onClick={() => setActiveInsertField(f)}
+                          disabled={count === 0}
+                          title={count === 0 ? 'Sem parâmetros dinâmicos recomendados para este campo' : ''}
+                        >
+                          utm_{f}
+                          <span className="ml-1.5 text-[10px] opacity-70">({count})</span>
+                        </Button>
+                      );
+                    })}
                   </div>
 
-                  <div className="flex flex-wrap gap-1.5">
-                    {platform.dynamicParams.map((param) => (
-                      <Button
-                        key={param.value}
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="text-xs h-7 px-2 font-mono bg-background/40 hover:bg-primary/20 hover:text-primary hover:border-primary/40 transition-colors"
-                        onClick={() => insertDynamic(param.value)}
-                      >
-                        {param.label}
-                      </Button>
-                    ))}
+                  <div className="flex flex-wrap gap-1.5 min-h-[2rem]">
+                    {platform.paramsByField[activeInsertField].length === 0 ? (
+                      <p className="text-xs text-muted-foreground italic">
+                        Nenhum parâmetro dinâmico recomendado para utm_{activeInsertField} nesta plataforma.
+                      </p>
+                    ) : (
+                      platform.paramsByField[activeInsertField].map((param) => (
+                        <Button
+                          key={param.value}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="text-xs h-7 px-2 font-mono bg-background/40 hover:bg-primary/20 hover:text-primary hover:border-primary/40 transition-colors"
+                          onClick={() => insertDynamic(param.value)}
+                        >
+                          {param.label}
+                        </Button>
+                      ))
+                    )}
                   </div>
                 </div>
               )}
