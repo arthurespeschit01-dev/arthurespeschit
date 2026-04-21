@@ -39,6 +39,7 @@ interface ClientAttachment {
 }
 interface Creative {
   id: string; campaign_id: string; name: string; type: string; link: string; status: string; created_at: string;
+  source?: string; thumbnail_url?: string | null; body?: string | null; title?: string | null; meta_ad_id?: string | null;
 }
 
 const ATTACHMENT_CATEGORIES = [
