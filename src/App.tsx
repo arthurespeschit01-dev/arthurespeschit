@@ -9,7 +9,7 @@ import AppLayout from "./components/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Clientes from "./pages/Clientes";
 import ClientDetail from "./pages/ClientDetail";
-import Calculadora from "./pages/Calculadora";
+import Financeiro from "./pages/Financeiro";
 import Processos from "./pages/Processos";
 import Estudos from "./pages/Estudos";
 import Contratos from "./pages/Contratos";
@@ -39,7 +39,8 @@ function ProtectedRoutes() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/clientes" element={<Clientes />} />
             <Route path="/clientes/:id" element={<ClientDetail />} />
-            <Route path="/calculadora" element={<Calculadora />} />
+            <Route path="/financeiro" element={<Financeiro />} />
+            <Route path="/calculadora" element={<Navigate to="/financeiro" replace />} />
             <Route path="/processos" element={<Processos />} />
             <Route path="/estudos" element={<Estudos />} />
             <Route path="/contratos" element={<Contratos />} />

@@ -473,6 +473,50 @@ export type Database = {
           },
         ]
       }
+      mensalidades: {
+        Row: {
+          cliente_id: string
+          created_at: string
+          data_pagamento: string | null
+          id: string
+          status: string
+          updated_at: string
+          user_id: string
+          valor: number
+          vencimento: string
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string
+          data_pagamento?: string | null
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+          valor?: number
+          vencimento: string
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string
+          data_pagamento?: string | null
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+          valor?: number
+          vencimento?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mensalidades_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meta_connections: {
         Row: {
           access_token: string
@@ -889,6 +933,53 @@ export type Database = {
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "operational_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transacoes: {
+        Row: {
+          categoria: string | null
+          cliente_id: string | null
+          created_at: string
+          data: string
+          descricao: string
+          id: string
+          tipo: string
+          updated_at: string
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          categoria?: string | null
+          cliente_id?: string | null
+          created_at?: string
+          data?: string
+          descricao: string
+          id?: string
+          tipo: string
+          updated_at?: string
+          user_id: string
+          valor?: number
+        }
+        Update: {
+          categoria?: string | null
+          cliente_id?: string | null
+          created_at?: string
+          data?: string
+          descricao?: string
+          id?: string
+          tipo?: string
+          updated_at?: string
+          user_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transacoes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]
