@@ -130,6 +130,7 @@ export default function Financeiro() {
       const lucro = receita - custo;
       const marg = receita > 0 ? (lucro / receita) * 100 : 0;
       return { client: c, receita, custo, lucro, margem: marg };
+    });
   }, [clients, transacoes, mensalidades]);
 
   const clientesBaixaMargem = rentabilidade.filter(r => r.margem < 20);
