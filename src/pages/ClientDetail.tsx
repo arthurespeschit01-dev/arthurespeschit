@@ -99,6 +99,7 @@ export default function ClientDetail() {
   const [adSets, setAdSets] = useState<any[]>([]);
   const [loadingAdSets, setLoadingAdSets] = useState(false);
   const [importingAdSets, setImportingAdSets] = useState(false);
+  const [previewCreative, setPreviewCreative] = useState<Creative | null>(null);
 
   const loadClient = async () => {
     const { data } = await supabase.from('clients').select('*').eq('id', id).single();
@@ -669,15 +670,15 @@ export default function ClientDetail() {
                   return (
                     <div key={cr.id} className="bg-secondary/30 border border-border/50 rounded-lg overflow-hidden group hover:border-primary/30 transition-colors flex flex-col">
                       {thumb ? (
-                        <div className="aspect-video bg-secondary/50 relative overflow-hidden">
-                          <img src={thumb} alt={cr.name} className="w-full h-full object-cover" loading="lazy" />
-                          {isMeta && <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-blue-500/90 text-white font-semibold">Meta</span>}
-                        </div>
+                        <button type="button" onClick={() => setPreviewCreative(cr)} className="aspect-square bg-secondary/50 relative overflow-hidden block w-full">
+                          <img src={thumb} alt={cr.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                          {isMeta && <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-primary/90 text-primary-foreground font-semibold">Meta</span>}
+                        </button>
                       ) : (
-                        <div className="aspect-video bg-secondary/50 flex items-center justify-center">
+                        <button type="button" onClick={() => setPreviewCreative(cr)} className="aspect-square bg-secondary/50 flex items-center justify-center relative w-full">
                           <TypeIco className="w-8 h-8 text-muted-foreground/40" />
-                          {isMeta && <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-blue-500/90 text-white font-semibold">Meta</span>}
-                        </div>
+                          {isMeta && <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-primary/90 text-primary-foreground font-semibold">Meta</span>}
+                        </button>
                       )}
                       <div className="p-3 flex-1 flex flex-col">
                         <div className="flex items-start justify-between gap-2 mb-1">
@@ -686,11 +687,9 @@ export default function ClientDetail() {
                         </div>
                         {cr.body && <p className="text-[11px] text-muted-foreground line-clamp-2 mb-2">{cr.body}</p>}
                         <div className="flex items-center justify-between mt-auto pt-2 border-t border-border/50">
-                          {cr.link ? (
-                            <a href={cr.link} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1 truncate">
-                              <ExternalLink className="w-3 h-3 shrink-0" /> Ver criativo
-                            </a>
-                          ) : <span className="text-xs text-muted-foreground capitalize">{cr.type}</span>}
+                          <button type="button" onClick={() => setPreviewCreative(cr)} className="text-xs text-primary hover:underline flex items-center gap-1 truncate">
+                            <ExternalLink className="w-3 h-3 shrink-0" /> Ver criativo
+                          </button>
                           {!isMeta && (
                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => openEditCreative(cr)}><Edit2 className="w-3 h-3" /></Button>
@@ -882,6 +881,45 @@ export default function ClientDetail() {
             <div><Label className="text-muted-foreground text-sm">Link (Drive, URL...)</Label><Input value={creativeForm.link} onChange={(e) => setCreativeForm({ ...creativeForm, link: e.target.value })} placeholder="https://drive.google.com/..." className="bg-secondary/50 border-border/50 mt-1" /></div>
             <Button onClick={saveCreative} className="w-full neon-glow">{editingCreative ? 'Salvar Alterações' : 'Adicionar Criativo'}</Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview do criativo em alta resolução */}
+      <Dialog open={!!previewCreative} onOpenChange={(o) => !o && setPreviewCreative(null)}>
+        <DialogContent className="max-w-3xl bg-card/95 backdrop-blur border-border">
+          <DialogHeader>
+            <DialogTitle className="text-foreground pr-6">{previewCreative?.title || previewCreative?.name}</DialogTitle>
+          </DialogHeader>
+          {previewCreative && (
+            <div className="space-y-3">
+              {previewCreative.thumbnail_url ? (
+                <div className="bg-secondary/30 rounded-lg overflow-hidden flex items-center justify-center max-h-[70vh]">
+                  <img
+                    src={previewCreative.thumbnail_url}
+                    alt={previewCreative.name}
+                    className="max-w-full max-h-[70vh] object-contain"
+                  />
+                </div>
+              ) : (
+                <div className="aspect-video bg-secondary/30 rounded-lg flex items-center justify-center text-muted-foreground text-sm">
+                  Sem prévia disponível
+                </div>
+              )}
+              {previewCreative.body && (
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{previewCreative.body}</p>
+              )}
+              {previewCreative.link && (
+                <a
+                  href={previewCreative.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+                >
+                  <ExternalLink className="w-4 h-4" /> Abrir no Facebook / Meta
+                </a>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

@@ -65,8 +65,8 @@ Deno.serve(async (req) => {
       if (c.meta_campaign_id) campMap.set(c.meta_campaign_id, c.id);
     }
 
-    // 1) Buscar ads (campos mínimos) - paginado
-    const adFields = 'id,name,status,campaign_id,creative{id,thumbnail_url}';
+    // 1) Buscar ads (campos com creative completo + permalink) - paginado
+    const adFields = 'id,name,status,campaign_id,effective_object_story_id,creative{id,thumbnail_url,image_url,object_story_spec,asset_feed_spec,video_id}';
     const adsUrl = `${GRAPH}/${accountId}/ads?fields=${encodeURIComponent(adFields)}&limit=50&access_token=${accessToken}`;
     const ads = await fetchAllPages(adsUrl);
 
@@ -110,6 +110,22 @@ Deno.serve(async (req) => {
       const cr = ad.creative || {};
       const ins = insightsMap.get(ad.id) || {};
 
+      // Melhor imagem possível: image_url (alta) > asset_feed images > object_story_spec link_data picture > thumbnail
+      let bigImage: string | null = cr.image_url || null;
+      const oss = cr.object_story_spec || {};
+      if (!bigImage && oss.link_data?.picture) bigImage = oss.link_data.picture;
+      if (!bigImage && oss.video_data?.image_url) bigImage = oss.video_data.image_url;
+      const afs = cr.asset_feed_spec || {};
+      if (!bigImage && Array.isArray(afs.images) && afs.images[0]?.url) bigImage = afs.images[0].url;
+      const thumb = bigImage || cr.thumbnail_url || null;
+
+      // Link permanente do anúncio na Meta (preview)
+      const permalink = ad.effective_object_story_id
+        ? `https://www.facebook.com/${ad.effective_object_story_id}`
+        : (bigImage || cr.thumbnail_url || '');
+
+      const isVideo = !!cr.video_id || !!oss.video_data;
+
       let cpa = 0;
       const cpaArr = ins.cost_per_action_type || [];
       const leadCpa = cpaArr.find((x: any) => ['lead', 'offsite_conversion.fb_pixel_lead', 'purchase'].includes(x.action_type));
@@ -124,13 +140,13 @@ Deno.serve(async (req) => {
         user_id: userId,
         campaign_id: internalCampId,
         name: ad.name,
-        type: 'imagem',
-        link: cr.thumbnail_url || '',
+        type: isVideo ? 'video' : 'imagem',
+        link: permalink,
         status: statusMap[ad.status] || 'teste',
         source: 'meta',
         meta_ad_id: ad.id,
         meta_creative_id: cr.id || null,
-        thumbnail_url: cr.thumbnail_url || null,
+        thumbnail_url: thumb,
         title: ad.name,
         body: spend > 0
           ? `Gasto: R$ ${spend.toFixed(2)} • CTR: ${ctr.toFixed(2)}% • CPA: R$ ${cpa.toFixed(2)} • Cliques: ${clicks} • Impressões: ${impressions}`
