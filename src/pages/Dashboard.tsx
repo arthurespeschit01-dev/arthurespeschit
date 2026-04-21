@@ -1,143 +1,179 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Users, DollarSign, BarChart3, TrendingUp, ListTodo, Clock, CheckCircle2, XCircle, AlertCircle, UserPlus, Megaphone, FileText } from 'lucide-react';
+import {
+  Users, DollarSign, TrendingUp, Wallet, Percent, AlertTriangle,
+  Clock, CheckCircle2, XCircle, AlertCircle, FileText, MessageCircle,
+  CalendarClock, ArrowUpRight, Trophy
+} from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 
-interface Stats {
-  totalClients: number;
-  activeClients: number;
-  totalCampaigns: number;
-  totalRevenue: number;
-}
+const CUSTOS_DIRETOS = new Set(['Tráfego', 'Anúncios', 'Ferramentas Cliente', 'Freelancer Cliente']);
 
+interface Client {
+  id: string;
+  name: string;
+  status: string | null;
+  monthly_fee: number | null;
+  payment_day: number | null;
+  phone: string | null;
+}
+interface Mensalidade {
+  id: string;
+  cliente_id: string;
+  valor: number;
+  vencimento: string;
+  status: string;
+}
+interface Transacao {
+  id: string;
+  tipo: string;
+  valor: number;
+  cliente_id: string | null;
+  categoria: string | null;
+  data: string;
+}
 interface TaskItem {
   id: string;
   title: string;
   status: string;
   priority: string;
   end_date: string | null;
-  client_name?: string;
 }
-
-interface ActivityItem {
+interface ContratoVenc {
   id: string;
-  type: 'client' | 'campaign' | 'task';
   title: string;
-  date: string;
-}
-
-interface RevenuePoint {
-  month: string;
-  revenue: number;
+  client_name: string;
+  expiry_date: string;
 }
 
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [stats, setStats] = useState<Stats>({ totalClients: 0, activeClients: 0, totalCampaigns: 0, totalRevenue: 0 });
-  const [recentTasks, setRecentTasks] = useState<TaskItem[]>([]);
-  const [activities, setActivities] = useState<ActivityItem[]>([]);
-  const [revenueData, setRevenueData] = useState<RevenuePoint[]>([]);
-  const [taskStats, setTaskStats] = useState({ pending: 0, inProgress: 0, done: 0, cancelled: 0 });
+
+  const [clients, setClients] = useState<Client[]>([]);
+  const [mensalidades, setMensalidades] = useState<Mensalidade[]>([]);
+  const [transacoes, setTransacoes] = useState<Transacao[]>([]);
+  const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [contratos, setContratos] = useState<ContratoVenc[]>([]);
+  const [revenueHistory, setRevenueHistory] = useState<{ month: string; revenue: number }[]>([]);
 
   useEffect(() => {
     if (!user) return;
     const load = async () => {
-      // Stats
-      const [clientsRes, activeRes, campaignsRes, feeRes] = await Promise.all([
-        supabase.from('clients').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-        supabase.from('clients').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'Ativo'),
-        supabase.from('campaigns').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-        supabase.from('clients').select('monthly_fee').eq('user_id', user.id).eq('status', 'Ativo'),
+      const hoje = new Date();
+      const mesAtual = hoje.getMonth();
+      const anoAtual = hoje.getFullYear();
+      const inicioMes = new Date(anoAtual, mesAtual, 1).toISOString().slice(0, 10);
+      const fimMes = new Date(anoAtual, mesAtual + 1, 0).toISOString().slice(0, 10);
+      const inicio6Meses = new Date(anoAtual, mesAtual - 5, 1).toISOString().slice(0, 10);
+
+      const [clientsRes, mensRes, transRes, tasksRes, contratosRes, transHistRes, mensHistRes] = await Promise.all([
+        supabase.from('clients').select('id, name, status, monthly_fee, payment_day, phone').eq('user_id', user.id),
+        supabase.from('mensalidades').select('*').eq('user_id', user.id).gte('vencimento', inicioMes).lte('vencimento', fimMes),
+        supabase.from('transacoes').select('*').eq('user_id', user.id).gte('data', inicioMes).lte('data', fimMes),
+        supabase.from('operational_tasks').select('id, title, status, priority, end_date').eq('user_id', user.id).neq('status', 'concluída').order('end_date', { ascending: true, nullsFirst: false }).limit(6),
+        supabase.from('signed_contracts').select('id, title, client_name, expiry_date').eq('user_id', user.id).not('expiry_date', 'is', null).order('expiry_date', { ascending: true }),
+        supabase.from('transacoes').select('tipo, valor, data').eq('user_id', user.id).gte('data', inicio6Meses),
+        supabase.from('mensalidades').select('valor, status, vencimento').eq('user_id', user.id).gte('vencimento', inicio6Meses),
       ]);
 
-      const totalRevenue = (feeRes.data || []).reduce((sum, c) => sum + (c.monthly_fee || 0), 0);
+      setClients((clientsRes.data || []) as Client[]);
+      setMensalidades((mensRes.data || []) as Mensalidade[]);
+      setTransacoes((transRes.data || []) as Transacao[]);
+      setTasks((tasksRes.data || []) as TaskItem[]);
 
-      setStats({
-        totalClients: clientsRes.count || 0,
-        activeClients: activeRes.count || 0,
-        totalCampaigns: campaignsRes.count || 0,
-        totalRevenue,
-      });
+      // Contratos a vencer (próximos 60 dias)
+      const limite = new Date(); limite.setDate(limite.getDate() + 60);
+      const hojeStr = hoje.toISOString().slice(0, 10);
+      const limStr = limite.toISOString().slice(0, 10);
+      setContratos(((contratosRes.data || []) as ContratoVenc[]).filter(c => c.expiry_date >= hojeStr && c.expiry_date <= limStr).slice(0, 5));
 
-      // Revenue by month (from clients created_at)
-      const { data: allClients } = await supabase
-        .from('clients')
-        .select('monthly_fee, created_at, status')
-        .eq('user_id', user.id)
-        .eq('status', 'Ativo');
-
-      const monthMap: Record<string, number> = {};
-      const now = new Date();
+      // Histórico 6 meses (receita = mensalidades pagas + entradas avulsas)
+      const map: Record<string, number> = {};
       for (let i = 5; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const key = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
-        monthMap[key] = 0;
+        const d = new Date(anoAtual, mesAtual - i, 1);
+        map[d.toISOString().slice(0, 7)] = 0;
       }
-
-      (allClients || []).forEach(c => {
-        const created = new Date(c.created_at);
-        Object.keys(monthMap).forEach((key, idx) => {
-          const d = new Date(now.getFullYear(), now.getMonth() - (5 - idx), 1);
-          if (created <= new Date(d.getFullYear(), d.getMonth() + 1, 0)) {
-            monthMap[key] += c.monthly_fee || 0;
-          }
-        });
+      ((mensHistRes.data || []) as { valor: number; status: string; vencimento: string }[]).forEach(m => {
+        if (m.status === 'pago') {
+          const k = m.vencimento.slice(0, 7);
+          if (k in map) map[k] += Number(m.valor);
+        }
       });
-
-      setRevenueData(Object.entries(monthMap).map(([month, revenue]) => ({ month, revenue })));
-
-      // Tasks
-      const { data: tasks } = await supabase
-        .from('operational_tasks')
-        .select('id, title, status, priority, end_date, client_id')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      setRecentTasks((tasks || []).map(t => ({ ...t, status: t.status, priority: t.priority, end_date: t.end_date })));
-
-      // Task stats
-      const { data: allTasks } = await supabase
-        .from('operational_tasks')
-        .select('status')
-        .eq('user_id', user.id);
-
-      const ts = { pending: 0, inProgress: 0, done: 0, cancelled: 0 };
-      (allTasks || []).forEach(t => {
-        if (t.status === 'pendente') ts.pending++;
-        else if (t.status === 'em andamento') ts.inProgress++;
-        else if (t.status === 'concluída') ts.done++;
-        else if (t.status === 'cancelada') ts.cancelled++;
+      ((transHistRes.data || []) as { tipo: string; valor: number; data: string }[]).forEach(t => {
+        if (t.tipo === 'entrada') {
+          const k = t.data.slice(0, 7);
+          if (k in map) map[k] += Number(t.valor);
+        }
       });
-      setTaskStats(ts);
-
-      // Activity timeline
-      const [{ data: recentClients }, { data: recentCampaigns }, { data: recentTasksAll }] = await Promise.all([
-        supabase.from('clients').select('id, name, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5),
-        supabase.from('campaigns').select('id, name, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5),
-        supabase.from('operational_tasks').select('id, title, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5),
-      ]);
-
-      const acts: ActivityItem[] = [
-        ...(recentClients || []).map(c => ({ id: c.id, type: 'client' as const, title: `Cliente "${c.name}" adicionado`, date: c.created_at })),
-        ...(recentCampaigns || []).map(c => ({ id: c.id, type: 'campaign' as const, title: `Campanha "${c.name}" criada`, date: c.created_at })),
-        ...(recentTasksAll || []).map(t => ({ id: t.id, type: 'task' as const, title: `Task "${t.title}" criada`, date: t.created_at })),
-      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 8);
-
-      setActivities(acts);
+      setRevenueHistory(Object.entries(map).map(([k, v]) => {
+        const [y, mo] = k.split('-');
+        const d = new Date(Number(y), Number(mo) - 1, 1);
+        return { month: d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', ''), revenue: v };
+      }));
     };
     load();
   }, [user]);
 
-  const cards = [
-    { label: 'Total de Clientes', value: stats.totalClients, icon: Users, color: 'text-[hsl(var(--neon-purple))]' },
-    { label: 'Clientes Ativos', value: stats.activeClients, icon: TrendingUp, color: 'text-emerald-400' },
-    { label: 'Campanhas', value: stats.totalCampaigns, icon: BarChart3, color: 'text-[hsl(var(--neon-blue))]' },
-    { label: 'Receita Mensal', value: `R$ ${stats.totalRevenue.toLocaleString('pt-BR')}`, icon: DollarSign, color: 'text-amber-400' },
-  ];
+  // ===== Cálculos financeiros (mês atual) =====
+  const fin = useMemo(() => {
+    const recMens = mensalidades.filter(m => m.status === 'pago').reduce((s, m) => s + Number(m.valor), 0);
+    const recAvulsa = transacoes.filter(t => t.tipo === 'entrada').reduce((s, t) => s + Number(t.valor), 0);
+    const receita = recMens + recAvulsa;
+    const saidas = transacoes.filter(t => t.tipo === 'saida');
+    const custosDiretos = saidas.filter(t => t.cliente_id || (t.categoria && CUSTOS_DIRETOS.has(t.categoria))).reduce((s, t) => s + Number(t.valor), 0);
+    const custosFixos = saidas.filter(t => !t.cliente_id && (!t.categoria || !CUSTOS_DIRETOS.has(t.categoria))).reduce((s, t) => s + Number(t.valor), 0);
+    const lucro = receita - custosDiretos - custosFixos;
+    const margem = receita > 0 ? (lucro / receita) * 100 : 0;
+    const aReceber = mensalidades.filter(m => m.status !== 'pago').reduce((s, m) => s + Number(m.valor), 0);
+    const atrasadas = mensalidades.filter(m => m.status === 'atrasado');
+    const totalAtrasado = atrasadas.reduce((s, m) => s + Number(m.valor), 0);
+    return { receita, lucro, margem, aReceber, totalAtrasado, atrasadasCount: atrasadas.length };
+  }, [mensalidades, transacoes]);
+
+  // ===== Visão de clientes =====
+  const totalClientes = clients.length;
+  const clientesAtivos = clients.filter(c => c.status === 'Ativo').length;
+  const clientesPausados = clients.filter(c => c.status === 'Pausado').length;
+
+  const rentabilidade = useMemo(() => {
+    return clients.map(c => {
+      const recM = mensalidades.filter(m => m.cliente_id === c.id && m.status === 'pago').reduce((s, m) => s + Number(m.valor), 0);
+      const recA = transacoes.filter(t => t.tipo === 'entrada' && t.cliente_id === c.id).reduce((s, t) => s + Number(t.valor), 0);
+      const receita = recM + recA;
+      const custo = transacoes.filter(t => t.tipo === 'saida' && t.cliente_id === c.id).reduce((s, t) => s + Number(t.valor), 0);
+      const lucro = receita - custo;
+      const margem = receita > 0 ? (lucro / receita) * 100 : 0;
+      return { client: c, receita, lucro, margem };
+    });
+  }, [clients, mensalidades, transacoes]);
+
+  const top3 = useMemo(() => [...rentabilidade].filter(r => r.receita > 0).sort((a, b) => b.receita - a.receita).slice(0, 3), [rentabilidade]);
+  const baixaMargem = useMemo(() => rentabilidade.filter(r => r.receita > 0 && r.margem < 20), [rentabilidade]);
+
+  // ===== Próximos eventos =====
+  const proximasMensalidades = useMemo(() => {
+    const hojeStr = new Date().toISOString().slice(0, 10);
+    return mensalidades
+      .filter(m => m.status !== 'pago')
+      .map(m => ({ ...m, cliente: clients.find(c => c.id === m.cliente_id) }))
+      .sort((a, b) => a.vencimento.localeCompare(b.vencimento))
+      .slice(0, 5);
+  }, [mensalidades, clients]);
+
+  const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const fmtDate = (d: string) => new Date(d + 'T00:00').toLocaleDateString('pt-BR');
+
+  const cobrarWhatsApp = (clienteName: string, phone: string | null, valor: number, vencimento: string) => {
+    const msg = `Olá ${clienteName}! Tudo bem? Passando para lembrar da mensalidade no valor de ${fmt(valor)} com vencimento em ${fmtDate(vencimento)}. Qualquer dúvida estou à disposição. 🙌`;
+    const numero = (phone || '').replace(/\D/g, '');
+    const url = numero
+      ? `https://wa.me/${numero}?text=${encodeURIComponent(msg)}`
+      : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
 
   const statusIcon = (s: string) => {
     if (s === 'pendente') return <Clock className="w-3.5 h-3.5 text-amber-400" />;
@@ -146,23 +182,10 @@ export default function Dashboard() {
     return <XCircle className="w-3.5 h-3.5 text-destructive" />;
   };
 
-  const activityIcon = (type: string) => {
-    if (type === 'client') return <UserPlus className="w-4 h-4 text-[hsl(var(--neon-purple))]" />;
-    if (type === 'campaign') return <Megaphone className="w-4 h-4 text-[hsl(var(--neon-blue))]" />;
-    return <FileText className="w-4 h-4 text-emerald-400" />;
-  };
-
-  const formatDate = (d: string) => {
-    const date = new Date(d);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 60) return `${mins}min atrás`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h atrás`;
-    const days = Math.floor(hours / 24);
-    if (days < 7) return `${days}d atrás`;
-    return date.toLocaleDateString('pt-BR');
+  const diasAteVenc = (d: string) => {
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+    const dt = new Date(d + 'T00:00');
+    return Math.ceil((dt.getTime() - hoje.getTime()) / 86400000);
   };
 
   return (
@@ -172,25 +195,35 @@ export default function Dashboard() {
         <p className="text-muted-foreground text-sm mt-1">Visão geral do seu negócio</p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {cards.map((card) => (
-          <div key={card.label} className="glass-surface rounded-xl p-5 hover:border-primary/20 transition-colors">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{card.label}</span>
-              <card.icon className={`w-4 h-4 ${card.color}`} />
-            </div>
-            <div className="text-2xl font-bold text-foreground">{card.value}</div>
-          </div>
-        ))}
+      {/* KPIs financeiros */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard icon={DollarSign} label="Receita do mês" value={fmt(fin.receita)} accent="text-amber-400" />
+        <KpiCard icon={Wallet} label="Lucro Líquido" value={fmt(fin.lucro)} accent={fin.lucro >= 0 ? 'text-emerald-400' : 'text-red-400'} />
+        <KpiCard icon={Percent} label="Margem" value={`${fin.margem.toFixed(1)}%`} accent={fin.margem >= 30 ? 'text-emerald-400' : fin.margem >= 10 ? 'text-amber-400' : 'text-red-400'} />
+        <KpiCard
+          icon={AlertTriangle}
+          label="A receber / Atrasado"
+          value={fmt(fin.aReceber)}
+          sub={fin.totalAtrasado > 0 ? `${fin.atrasadasCount} atrasada(s) — ${fmt(fin.totalAtrasado)}` : 'Sem atrasados'}
+          accent={fin.totalAtrasado > 0 ? 'text-red-400' : 'text-emerald-400'}
+          onClick={() => navigate('/financeiro')}
+        />
       </div>
 
-      {/* Revenue Chart */}
+      {/* KPIs de clientes */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard icon={Users} label="Total de Clientes" value={String(totalClientes)} accent="text-[hsl(var(--neon-purple))]" />
+        <KpiCard icon={TrendingUp} label="Ativos" value={String(clientesAtivos)} accent="text-emerald-400" />
+        <KpiCard icon={Clock} label="Pausados" value={String(clientesPausados)} accent="text-amber-400" />
+        <KpiCard icon={AlertTriangle} label="Margem baixa (<20%)" value={String(baixaMargem.length)} accent={baixaMargem.length > 0 ? 'text-red-400' : 'text-emerald-400'} />
+      </div>
+
+      {/* Gráfico de evolução */}
       <div className="glass-surface rounded-xl p-6">
-        <h2 className="text-lg font-semibold text-foreground mb-4">Receita Mensal Recorrente</h2>
+        <h2 className="text-lg font-semibold text-foreground mb-4">Evolução da receita (últimos 6 meses)</h2>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={revenueData}>
+            <AreaChart data={revenueHistory}>
               <defs>
                 <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="hsl(263, 70%, 58%)" stopOpacity={0.3} />
@@ -199,10 +232,10 @@ export default function Dashboard() {
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 10%, 12%)" />
               <XAxis dataKey="month" stroke="hsl(220, 10%, 55%)" fontSize={12} />
-              <YAxis stroke="hsl(220, 10%, 55%)" fontSize={12} tickFormatter={(v) => `R$${v.toLocaleString('pt-BR')}`} />
+              <YAxis stroke="hsl(220, 10%, 55%)" fontSize={12} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
               <Tooltip
                 contentStyle={{ backgroundColor: 'hsl(232, 25%, 7%)', border: '1px solid hsl(220, 10%, 12%)', borderRadius: '8px', color: 'hsl(220, 20%, 92%)' }}
-                formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR')}`, 'Receita']}
+                formatter={(value: number) => [fmt(value), 'Receita']}
               />
               <Area type="monotone" dataKey="revenue" stroke="hsl(263, 70%, 58%)" fillOpacity={1} fill="url(#colorRevenue)" strokeWidth={2} />
             </AreaChart>
@@ -211,73 +244,167 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Tasks */}
+        {/* Top 3 clientes */}
         <div className="glass-surface rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-foreground">Tasks Recentes</h2>
-            <button onClick={() => navigate('/tasks')} className="text-xs text-primary hover:underline">Ver todas</button>
+            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2"><Trophy className="w-4 h-4 text-amber-400" /> Top 3 clientes por receita</h2>
+            <button onClick={() => navigate('/clientes')} className="text-xs text-primary hover:underline">Ver todos</button>
           </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            <div className="rounded-lg bg-amber-400/10 p-2.5 text-center">
-              <div className="text-lg font-bold text-amber-400">{taskStats.pending}</div>
-              <div className="text-[10px] text-muted-foreground uppercase">Pendentes</div>
-            </div>
-            <div className="rounded-lg bg-[hsl(var(--neon-blue))]/10 p-2.5 text-center">
-              <div className="text-lg font-bold text-[hsl(var(--neon-blue))]">{taskStats.inProgress}</div>
-              <div className="text-[10px] text-muted-foreground uppercase">Em Andamento</div>
-            </div>
-            <div className="rounded-lg bg-emerald-400/10 p-2.5 text-center">
-              <div className="text-lg font-bold text-emerald-400">{taskStats.done}</div>
-              <div className="text-[10px] text-muted-foreground uppercase">Concluídas</div>
-            </div>
-            <div className="rounded-lg bg-destructive/10 p-2.5 text-center">
-              <div className="text-lg font-bold text-destructive">{taskStats.cancelled}</div>
-              <div className="text-[10px] text-muted-foreground uppercase">Canceladas</div>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            {recentTasks.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">Nenhuma task ainda</p>
-            ) : (
-              recentTasks.map(t => (
-                <div key={t.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer" onClick={() => navigate('/tasks')}>
-                  {statusIcon(t.status)}
-                  <span className="text-sm text-foreground flex-1 truncate">{t.title}</span>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full ${
-                    t.priority === 'alta' ? 'bg-destructive/20 text-destructive' :
-                    t.priority === 'média' ? 'bg-amber-400/20 text-amber-400' :
-                    'bg-muted text-muted-foreground'
-                  }`}>{t.priority}</span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Activity Timeline */}
-        <div className="glass-surface rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4">Atividade Recente</h2>
-          <div className="space-y-3">
-            {activities.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">Nenhuma atividade ainda</p>
-            ) : (
-              activities.map((a, i) => (
-                <div key={`${a.id}-${i}`} className="flex items-start gap-3">
-                  <div className="mt-0.5 w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
-                    {activityIcon(a.type)}
+          {top3.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">Sem receita registrada ainda</p>
+          ) : (
+            <div className="space-y-3">
+              {top3.map((r, i) => (
+                <div key={r.client.id} className="flex items-center gap-3 p-3 rounded-lg bg-secondary/40 hover:bg-secondary/70 cursor-pointer transition-colors" onClick={() => navigate(`/clientes/${r.client.id}`)}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${i === 0 ? 'bg-amber-400/20 text-amber-400' : i === 1 ? 'bg-zinc-400/20 text-zinc-300' : 'bg-orange-700/20 text-orange-400'}`}>
+                    {i + 1}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-foreground truncate">{a.title}</p>
-                    <p className="text-xs text-muted-foreground">{formatDate(a.date)}</p>
+                    <p className="text-sm font-medium text-foreground truncate">{r.client.name}</p>
+                    <p className="text-xs text-muted-foreground">Margem {r.margem.toFixed(1)}%</p>
                   </div>
+                  <div className="text-sm font-semibold text-emerald-400">{fmt(r.receita)}</div>
                 </div>
-              ))
-            )}
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Clientes baixa margem */}
+        <div className="glass-surface rounded-xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-red-400" /> Alerta: margem baixa</h2>
+            <button onClick={() => navigate('/financeiro')} className="text-xs text-primary hover:underline">Análise completa</button>
           </div>
+          {baixaMargem.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">Nenhum cliente abaixo de 20% de margem 🎉</p>
+          ) : (
+            <div className="space-y-2">
+              {baixaMargem.slice(0, 5).map(r => (
+                <div key={r.client.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-red-500/5 border border-red-500/20">
+                  <span className="text-sm text-foreground flex-1 truncate">{r.client.name}</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-mono">{r.margem.toFixed(1)}%</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Próximas mensalidades */}
+        <div className="glass-surface rounded-xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2"><CalendarClock className="w-4 h-4 text-[hsl(var(--neon-blue))]" /> Próximas mensalidades</h2>
+            <button onClick={() => navigate('/financeiro')} className="text-xs text-primary hover:underline">Financeiro</button>
+          </div>
+          {proximasMensalidades.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">Nenhuma mensalidade pendente</p>
+          ) : (
+            <div className="space-y-2">
+              {proximasMensalidades.map(m => {
+                const dias = diasAteVenc(m.vencimento);
+                const atrasada = m.status === 'atrasado';
+                return (
+                  <div key={m.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-secondary/40">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{m.cliente?.name || '—'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {fmtDate(m.vencimento)} · {atrasada ? <span className="text-red-400">Atrasada {Math.abs(dias)}d</span> : dias === 0 ? <span className="text-amber-400">Vence hoje</span> : <span>Em {dias}d</span>}
+                      </p>
+                    </div>
+                    <span className="text-sm font-semibold text-foreground">{fmt(Number(m.valor))}</span>
+                    <button
+                      onClick={() => cobrarWhatsApp(m.cliente?.name || 'Cliente', m.cliente?.phone || null, Number(m.valor), m.vencimento)}
+                      className="p-2 rounded-lg bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 transition-colors"
+                      title="Cobrar via WhatsApp"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Contratos a vencer */}
+        <div className="glass-surface rounded-xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2"><FileText className="w-4 h-4 text-[hsl(var(--neon-purple))]" /> Contratos a vencer (60d)</h2>
+            <button onClick={() => navigate('/contratos')} className="text-xs text-primary hover:underline">Ver todos</button>
+          </div>
+          {contratos.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">Nenhum contrato vencendo nos próximos 60 dias</p>
+          ) : (
+            <div className="space-y-2">
+              {contratos.map(c => {
+                const dias = diasAteVenc(c.expiry_date);
+                return (
+                  <div key={c.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-secondary/40 hover:bg-secondary/70 cursor-pointer transition-colors" onClick={() => navigate('/contratos')}>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{c.title}</p>
+                      <p className="text-xs text-muted-foreground truncate">{c.client_name} · {fmtDate(c.expiry_date)}</p>
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded-full ${dias <= 7 ? 'bg-red-500/20 text-red-400' : dias <= 30 ? 'bg-amber-400/20 text-amber-400' : 'bg-secondary text-muted-foreground'}`}>
+                      {dias}d
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Tasks em andamento */}
+      <div className="glass-surface rounded-xl p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-foreground">Integrações em andamento</h2>
+          <button onClick={() => navigate('/tasks')} className="text-xs text-primary hover:underline flex items-center gap-1">Ver todas <ArrowUpRight className="w-3 h-3" /></button>
+        </div>
+        {tasks.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">Nenhuma task pendente 🎉</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {tasks.map(t => (
+              <div key={t.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer" onClick={() => navigate('/tasks')}>
+                {statusIcon(t.status)}
+                <span className="text-sm text-foreground flex-1 truncate">{t.title}</span>
+                {t.end_date && <span className="text-xs text-muted-foreground">{fmtDate(t.end_date)}</span>}
+                <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                  t.priority === 'alta' ? 'bg-destructive/20 text-destructive' :
+                  t.priority === 'média' ? 'bg-amber-400/20 text-amber-400' :
+                  'bg-muted text-muted-foreground'
+                }`}>{t.priority}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function KpiCard({ icon: Icon, label, value, sub, accent, onClick }: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  sub?: string;
+  accent: string;
+  onClick?: () => void;
+}) {
+  return (
+    <div
+      onClick={onClick}
+      className={`glass-surface rounded-xl p-5 transition-colors ${onClick ? 'cursor-pointer hover:border-primary/40' : 'hover:border-primary/20'}`}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{label}</span>
+        <Icon className={`w-4 h-4 ${accent}`} />
+      </div>
+      <div className={`text-2xl font-bold ${accent}`}>{value}</div>
+      {sub && <div className="text-xs text-muted-foreground mt-1">{sub}</div>}
     </div>
   );
 }
