@@ -49,13 +49,22 @@ export type Database = {
       campaigns: {
         Row: {
           budget: number | null
+          clicks: number | null
           client_id: string
+          cpa: number | null
           created_at: string
           id: string
+          impressions: number | null
+          last_synced_at: string | null
+          meta_ad_account_id: string | null
+          meta_campaign_id: string | null
           name: string
           notes: string | null
           objective: string | null
           platform: string | null
+          roas: number | null
+          source: string
+          spend: number | null
           start_date: string | null
           status: string | null
           updated_at: string
@@ -63,13 +72,22 @@ export type Database = {
         }
         Insert: {
           budget?: number | null
+          clicks?: number | null
           client_id: string
+          cpa?: number | null
           created_at?: string
           id?: string
+          impressions?: number | null
+          last_synced_at?: string | null
+          meta_ad_account_id?: string | null
+          meta_campaign_id?: string | null
           name: string
           notes?: string | null
           objective?: string | null
           platform?: string | null
+          roas?: number | null
+          source?: string
+          spend?: number | null
           start_date?: string | null
           status?: string | null
           updated_at?: string
@@ -77,13 +95,22 @@ export type Database = {
         }
         Update: {
           budget?: number | null
+          clicks?: number | null
           client_id?: string
+          cpa?: number | null
           created_at?: string
           id?: string
+          impressions?: number | null
+          last_synced_at?: string | null
+          meta_ad_account_id?: string | null
+          meta_campaign_id?: string | null
           name?: string
           notes?: string | null
           objective?: string | null
           platform?: string | null
+          roas?: number | null
+          source?: string
+          spend?: number | null
           start_date?: string | null
           status?: string | null
           updated_at?: string
@@ -356,6 +383,74 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      meta_connections: {
+        Row: {
+          access_token: string
+          client_id: string
+          created_at: string
+          id: string
+          meta_user_id: string | null
+          selected_ad_account_id: string | null
+          selected_ad_account_name: string | null
+          token_expires_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          client_id: string
+          created_at?: string
+          id?: string
+          meta_user_id?: string | null
+          selected_ad_account_id?: string | null
+          selected_ad_account_name?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          meta_user_id?: string | null
+          selected_ad_account_id?: string | null
+          selected_ad_account_name?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_connections_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meta_oauth_states: {
+        Row: {
+          client_id: string
+          created_at: string
+          state: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          state: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          state?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       notification_states: {
         Row: {
