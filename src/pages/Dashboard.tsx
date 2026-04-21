@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useNavigate } from 'react-router-dom';
+import CobrancaDialog from '@/components/CobrancaDialog';
 
 const CUSTOS_DIRETOS = new Set(['Tráfego', 'Anúncios', 'Ferramentas Cliente', 'Freelancer Cliente']);
 
@@ -166,13 +167,11 @@ export default function Dashboard() {
   const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const fmtDate = (d: string) => new Date(d + 'T00:00').toLocaleDateString('pt-BR');
 
-  const cobrarWhatsApp = (clienteName: string, phone: string | null, valor: number, vencimento: string) => {
-    const msg = `Olá ${clienteName}! Tudo bem? Passando para lembrar da mensalidade no valor de ${fmt(valor)} com vencimento em ${fmtDate(vencimento)}. Qualquer dúvida estou à disposição. 🙌`;
-    const numero = (phone || '').replace(/\D/g, '');
-    const url = numero
-      ? `https://wa.me/${numero}?text=${encodeURIComponent(msg)}`
-      : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+  const [cobrancaOpen, setCobrancaOpen] = useState(false);
+  const [cobrancaData, setCobrancaData] = useState<{ name: string; valor: number; vencimento: string }>({ name: '', valor: 0, vencimento: '' });
+  const abrirCobranca = (clienteName: string, valor: number, vencimento: string) => {
+    setCobrancaData({ name: clienteName, valor, vencimento });
+    setCobrancaOpen(true);
   };
 
   const statusIcon = (s: string) => {
@@ -315,9 +314,9 @@ export default function Dashboard() {
                     </div>
                     <span className="text-sm font-semibold text-foreground">{fmt(Number(m.valor))}</span>
                     <button
-                      onClick={() => cobrarWhatsApp(m.cliente?.name || 'Cliente', m.cliente?.phone || null, Number(m.valor), m.vencimento)}
+                      onClick={() => abrirCobranca(m.cliente?.name || 'Cliente', Number(m.valor), m.vencimento)}
                       className="p-2 rounded-lg bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 transition-colors"
-                      title="Cobrar via WhatsApp"
+                      title="Gerar mensagem de cobrança"
                     >
                       <MessageCircle className="w-4 h-4" />
                     </button>
@@ -382,6 +381,14 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      <CobrancaDialog
+        open={cobrancaOpen}
+        onOpenChange={setCobrancaOpen}
+        clienteName={cobrancaData.name}
+        valor={cobrancaData.valor}
+        vencimento={cobrancaData.vencimento}
+      />
     </div>
   );
 }
