@@ -53,7 +53,7 @@ export default function Financeiro() {
     if (!user) return;
     setLoading(true);
     const [clientsRes, transRes, mensRes] = await Promise.all([
-      supabase.from('clients').select('id,name,monthly_fee,payment_day,status').eq('user_id', user.id).order('name'),
+      supabase.from('clients').select('id,name,monthly_fee,payment_day,status,phone').eq('user_id', user.id).order('name'),
       supabase.from('transacoes').select('*').eq('user_id', user.id).gte('data', periodoStart).lte('data', periodoEnd).order('data', { ascending: false }),
       supabase.from('mensalidades').select('*').eq('user_id', user.id).gte('vencimento', periodoStart).lte('vencimento', periodoEnd),
     ]);
