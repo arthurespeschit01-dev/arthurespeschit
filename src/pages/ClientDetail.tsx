@@ -517,13 +517,23 @@ export default function ClientDetail() {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">{c.platform} • {c.objective}</p>
-                {c.source === 'meta' && (c.spend! > 0 || c.impressions! > 0) && (
-                  <div className="grid grid-cols-3 gap-2 mt-3 pt-2 border-t border-border/50 text-xs">
-                    <div><p className="text-muted-foreground">Gasto</p><p className="font-semibold text-foreground">R$ {(c.spend || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</p></div>
-                    <div><p className="text-muted-foreground">CPA</p><p className="font-semibold text-foreground">R$ {(c.cpa || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</p></div>
-                    <div><p className="text-muted-foreground">ROAS</p><p className="font-semibold text-primary">{(c.roas || 0).toFixed(2)}x</p></div>
-                  </div>
-                )}
+                {c.source === 'meta' && (() => {
+                  const ins = insightsByCamp[c.id];
+                  const cells = ins ? metricsForObjective(c.objective, ins) : [];
+                  if (cells.length === 0) return loadingInsights ? (
+                    <div className="mt-3 pt-2 border-t border-border/50 text-xs text-muted-foreground">Carregando métricas...</div>
+                  ) : null;
+                  return (
+                    <div className="grid grid-cols-3 gap-2 mt-3 pt-2 border-t border-border/50 text-xs">
+                      {cells.map((m, i) => (
+                        <div key={i}>
+                          <p className="text-muted-foreground">{m.label}</p>
+                          <p className={`font-semibold ${m.highlight ? 'text-primary' : 'text-foreground'}`}>{m.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
                 <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
                   <span className="text-xs text-muted-foreground">{c.start_date || 'Sem data'}</span>
                   {c.budget > 0 && <span className="text-xs font-semibold text-primary">R$ {c.budget.toLocaleString('pt-BR')}</span>}
