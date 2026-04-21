@@ -65,8 +65,8 @@ Deno.serve(async (req) => {
       if (c.meta_campaign_id) campMap.set(c.meta_campaign_id, c.id);
     }
 
-    // 1) Buscar ads (campos com creative completo + permalink) - paginado
-    const adFields = 'id,name,status,campaign_id,effective_object_story_id,creative{id,thumbnail_url,image_url,object_story_spec,asset_feed_spec,video_id}';
+    // 1) Buscar ads com creative completo (alta resolução)
+    const adFields = 'id,name,status,campaign_id,preview_shareable_link,creative{id,thumbnail_url,image_url,object_story_spec,asset_feed_spec,video_id,effective_object_story_id,instagram_permalink_url}';
     const adsUrl = `${GRAPH}/${accountId}/ads?fields=${encodeURIComponent(adFields)}&limit=50&access_token=${accessToken}`;
     const ads = await fetchAllPages(adsUrl);
 
@@ -110,19 +110,22 @@ Deno.serve(async (req) => {
       const cr = ad.creative || {};
       const ins = insightsMap.get(ad.id) || {};
 
-      // Melhor imagem possível: image_url (alta) > asset_feed images > object_story_spec link_data picture > thumbnail
-      let bigImage: string | null = cr.image_url || null;
+      // Melhor imagem: object_story_spec.link_data.picture > asset_feed images > image_url > thumbnail
       const oss = cr.object_story_spec || {};
-      if (!bigImage && oss.link_data?.picture) bigImage = oss.link_data.picture;
-      if (!bigImage && oss.video_data?.image_url) bigImage = oss.video_data.image_url;
       const afs = cr.asset_feed_spec || {};
+      let bigImage: string | null = oss.link_data?.picture || null;
       if (!bigImage && Array.isArray(afs.images) && afs.images[0]?.url) bigImage = afs.images[0].url;
+      if (!bigImage && oss.video_data?.image_url) bigImage = oss.video_data.image_url;
+      if (!bigImage) bigImage = cr.image_url || null;
       const thumb = bigImage || cr.thumbnail_url || null;
 
-      // Link permanente do anúncio na Meta (preview)
-      const permalink = ad.effective_object_story_id
-        ? `https://www.facebook.com/${ad.effective_object_story_id}`
-        : (bigImage || cr.thumbnail_url || '');
+      // Link de preview real do anúncio (full-size na Meta/Instagram)
+      const permalink = cr.instagram_permalink_url
+        || ad.preview_shareable_link
+        || (cr.effective_object_story_id ? `https://www.facebook.com/${cr.effective_object_story_id}` : '')
+        || bigImage
+        || cr.thumbnail_url
+        || '';
 
       const isVideo = !!cr.video_id || !!oss.video_data;
 

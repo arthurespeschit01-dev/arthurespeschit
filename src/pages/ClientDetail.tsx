@@ -100,6 +100,22 @@ export default function ClientDetail() {
   const [loadingAdSets, setLoadingAdSets] = useState(false);
   const [importingAdSets, setImportingAdSets] = useState(false);
   const [previewCreative, setPreviewCreative] = useState<Creative | null>(null);
+  const [previewFormat, setPreviewFormat] = useState<string>('DESKTOP_FEED_STANDARD');
+  const [previewHtml, setPreviewHtml] = useState<string>('');
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  useEffect(() => {
+    if (!previewCreative?.meta_ad_id || !id) { setPreviewHtml(''); return; }
+    setPreviewLoading(true);
+    setPreviewHtml('');
+    supabase.functions.invoke('meta-ad-preview', {
+      body: { client_id: id, meta_ad_id: previewCreative.meta_ad_id, format: previewFormat },
+    }).then(({ data, error }) => {
+      setPreviewLoading(false);
+      if (error || data?.error) { setPreviewHtml(''); return; }
+      setPreviewHtml(data?.html || '');
+    });
+  }, [previewCreative?.meta_ad_id, previewFormat, id]);
 
   const loadClient = async () => {
     const { data } = await supabase.from('clients').select('*').eq('id', id).single();
@@ -886,25 +902,62 @@ export default function ClientDetail() {
 
       {/* Preview do criativo em alta resolução */}
       <Dialog open={!!previewCreative} onOpenChange={(o) => !o && setPreviewCreative(null)}>
-        <DialogContent className="max-w-3xl bg-card/95 backdrop-blur border-border">
+        <DialogContent className="max-w-4xl bg-card/95 backdrop-blur border-border max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-foreground pr-6">{previewCreative?.title || previewCreative?.name}</DialogTitle>
           </DialogHeader>
           {previewCreative && (
             <div className="space-y-3">
-              {previewCreative.thumbnail_url ? (
+              {previewCreative.source === 'meta' && previewCreative.meta_ad_id && (
+                <div className="flex flex-wrap gap-1 p-1 bg-secondary/50 rounded-lg w-fit">
+                  {[
+                    { v: 'DESKTOP_FEED_STANDARD', l: 'Feed Desktop' },
+                    { v: 'MOBILE_FEED_STANDARD', l: 'Feed Mobile' },
+                    { v: 'INSTAGRAM_STANDARD', l: 'Instagram Feed' },
+                    { v: 'INSTAGRAM_STORY', l: 'Stories' },
+                    { v: 'INSTAGRAM_REELS', l: 'Reels' },
+                  ].map(f => (
+                    <button
+                      key={f.v}
+                      onClick={() => setPreviewFormat(f.v)}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${previewFormat === f.v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                      {f.l}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {previewCreative.source === 'meta' && previewCreative.meta_ad_id ? (
+                <div className="bg-secondary/30 rounded-lg overflow-hidden flex items-center justify-center min-h-[500px]">
+                  {previewLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground py-12">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Carregando preview da Meta...
+                    </div>
+                  ) : previewHtml ? (
+                    <iframe
+                      title="Meta Ad Preview"
+                      srcDoc={previewHtml}
+                      sandbox="allow-scripts allow-same-origin allow-popups"
+                      className="w-full border-0"
+                      style={{ height: previewFormat.includes('STORY') || previewFormat.includes('REELS') ? '720px' : '600px' }}
+                    />
+                  ) : previewCreative.thumbnail_url ? (
+                    <img src={previewCreative.thumbnail_url} alt={previewCreative.name} className="max-w-full max-h-[70vh] object-contain" />
+                  ) : (
+                    <p className="text-sm text-muted-foreground py-12">Preview indisponível</p>
+                  )}
+                </div>
+              ) : previewCreative.thumbnail_url ? (
                 <div className="bg-secondary/30 rounded-lg overflow-hidden flex items-center justify-center max-h-[70vh]">
-                  <img
-                    src={previewCreative.thumbnail_url}
-                    alt={previewCreative.name}
-                    className="max-w-full max-h-[70vh] object-contain"
-                  />
+                  <img src={previewCreative.thumbnail_url} alt={previewCreative.name} className="max-w-full max-h-[70vh] object-contain" />
                 </div>
               ) : (
                 <div className="aspect-video bg-secondary/30 rounded-lg flex items-center justify-center text-muted-foreground text-sm">
                   Sem prévia disponível
                 </div>
               )}
+
               {previewCreative.body && (
                 <p className="text-sm text-muted-foreground whitespace-pre-wrap">{previewCreative.body}</p>
               )}
