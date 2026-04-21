@@ -319,8 +319,8 @@ export default function Financeiro() {
                 <p className="font-semibold text-red-300">{atrasados.length} {atrasados.length === 1 ? 'cliente com pagamento atrasado' : 'clientes com pagamentos atrasados'}</p>
                 <p className="text-sm text-red-300/80">Total em atraso: <span className="font-semibold">{fmt(totalAtrasado)}</span></p>
               </div>
-              <Button onClick={cobrarTodos} size="sm" className="bg-emerald-500 hover:bg-emerald-600 text-white gap-2">
-                <MessageCircle className="w-4 h-4" /> Resumo no WhatsApp
+              <Button onClick={abrirCobrancaResumo} size="sm" className="bg-emerald-500 hover:bg-emerald-600 text-white gap-2">
+                <MessageCircle className="w-4 h-4" /> Gerar mensagem de resumo
               </Button>
             </Card>
           )}
