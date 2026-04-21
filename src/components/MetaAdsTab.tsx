@@ -198,7 +198,8 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
             <RefreshCw className={`w-3 h-3 ${importing ? 'animate-spin' : ''}`} /> Atualizar
           </Button>
           {expired && <Button size="sm" onClick={connect} disabled={connecting}>Reconectar</Button>}
-          <Button variant="ghost" size="sm" onClick={disconnectAccount} className="text-destructive">Desconectar</Button>
+          <Button variant="ghost" size="sm" onClick={disconnectAccount} className="text-destructive">Desconectar conta</Button>
+          <Button variant="ghost" size="sm" onClick={disconnectMetaFully} className="text-destructive">Desconectar Meta totalmente</Button>
         </div>
       </div>
 
