@@ -517,6 +517,27 @@ export default function ClientDetail() {
               <DateRangePicker value={dateRange} onChange={setDateRange} />
               <Button
                 onClick={async () => {
+                  if (!client) return;
+                  if (campaigns.length === 0) { toast.error('Nenhuma campanha para exportar'); return; }
+                  const periodLabel = dateRange.preset === 'custom' && dateRange.since && dateRange.until
+                    ? `${dateRange.since} → ${dateRange.until}`
+                    : ({ today: 'Hoje', yesterday: 'Ontem', last_7d: 'Últimos 7 dias', last_14d: 'Últimos 14 dias', last_30d: 'Últimos 30 dias', last_90d: 'Últimos 90 dias' } as Record<string, string>)[dateRange.preset] || dateRange.preset;
+                  toast.loading('Gerando PDF...', { id: 'pdf' });
+                  try {
+                    await exportCampaignsPDF({ clientName: client.name, periodLabel, campaigns });
+                    toast.success('PDF gerado!', { id: 'pdf' });
+                  } catch (e: any) {
+                    toast.error('Falha ao gerar PDF: ' + (e?.message || 'erro'), { id: 'pdf' });
+                  }
+                }}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                <FileText className="w-3 h-3" /> Exportar PDF
+              </Button>
+              <Button
+                onClick={async () => {
                   setImportingMeta(true);
                   const { data, error } = await supabase.functions.invoke('meta-import-campaigns', {
                     body: { client_id: id, ...buildPeriodBody() },
