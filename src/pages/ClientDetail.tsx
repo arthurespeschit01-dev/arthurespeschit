@@ -165,6 +165,34 @@ export default function ClientDetail() {
 
   useEffect(() => { loadClient(); loadCampaigns(); loadAttachments(); }, [id]);
 
+  // Buscar insights da Meta para o período selecionado
+  const loadInsights = async () => {
+    if (!id) return;
+    const hasMeta = campaigns.some(c => c.source === 'meta');
+    if (!hasMeta) { setInsightsByCamp({}); return; }
+    setLoadingInsights(true);
+    const body: any = { client_id: id };
+    if (dateRange.preset === 'custom' && dateRange.since && dateRange.until) {
+      body.since = dateRange.since;
+      body.until = dateRange.until;
+    } else {
+      body.date_preset = dateRange.preset;
+    }
+    const { data, error } = await supabase.functions.invoke('meta-campaign-insights', { body });
+    setLoadingInsights(false);
+    if (error || data?.error) return;
+    // Mapear meta_campaign_id -> internal campaign id
+    const mapped: Record<string, CampaignInsights> = {};
+    for (const c of campaigns) {
+      if (c.meta_campaign_id && data.insights[c.meta_campaign_id]) {
+        mapped[c.id] = data.insights[c.meta_campaign_id];
+      }
+    }
+    setInsightsByCamp(mapped);
+  };
+
+  useEffect(() => { loadInsights(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [campaigns.length, dateRange.preset, dateRange.since, dateRange.until]);
+
   const saveClient = async () => {
     await supabase.from('clients').update({
       name: clientForm.name, services: clientForm.services, monthly_fee: clientForm.monthly_fee,
