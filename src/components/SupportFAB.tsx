@@ -7,7 +7,8 @@ export default function SupportFAB() {
     <a
       href={SUPPORT_URL}
       target="_blank"
-      rel="noopener noreferrer"
+      rel="noopener noreferrer external"
+      referrerPolicy="no-referrer"
       aria-label="Falar com o suporte no WhatsApp"
       title="Suporte via WhatsApp"
       className="fixed bottom-6 right-6 z-50 group flex items-center gap-2 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/30 px-4 py-3 transition-all hover:scale-105 hover:shadow-emerald-500/50"
