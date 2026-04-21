@@ -135,6 +135,29 @@ export default function ClientDetail() {
     setCreatives((data || []) as unknown as Creative[]);
   };
 
+  const loadAdSets = async (campId: string) => {
+    setLoadingAdSets(true);
+    const { data } = await supabase.from('ad_sets' as any).select('*').eq('campaign_id', campId).order('created_at', { ascending: false });
+    setAdSets((data || []) as any[]);
+    setLoadingAdSets(false);
+  };
+
+  const importAdSets = async () => {
+    if (!selectedCampaign) return;
+    setImportingAdSets(true);
+    toast.loading('Carregando conjuntos de anúncios...', { id: 'adsets' });
+    const { data, error } = await supabase.functions.invoke('meta-import-adsets', {
+      body: { client_id: id, campaign_id: selectedCampaign.id },
+    });
+    setImportingAdSets(false);
+    if (error || data?.error) {
+      toast.error('Falha ao buscar conjuntos de anúncio', { id: 'adsets' });
+      return;
+    }
+    toast.success(`${data?.imported ?? 0} conjuntos importados`, { id: 'adsets' });
+    loadAdSets(selectedCampaign.id);
+  };
+
   useEffect(() => { loadClient(); loadCampaigns(); loadAttachments(); }, [id]);
 
   const saveClient = async () => {
