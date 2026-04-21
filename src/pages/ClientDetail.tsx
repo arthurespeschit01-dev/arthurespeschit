@@ -670,15 +670,15 @@ export default function ClientDetail() {
                   return (
                     <div key={cr.id} className="bg-secondary/30 border border-border/50 rounded-lg overflow-hidden group hover:border-primary/30 transition-colors flex flex-col">
                       {thumb ? (
-                        <div className="aspect-video bg-secondary/50 relative overflow-hidden">
-                          <img src={thumb} alt={cr.name} className="w-full h-full object-cover" loading="lazy" />
-                          {isMeta && <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-blue-500/90 text-white font-semibold">Meta</span>}
-                        </div>
+                        <button type="button" onClick={() => setPreviewCreative(cr)} className="aspect-square bg-secondary/50 relative overflow-hidden block w-full">
+                          <img src={thumb} alt={cr.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                          {isMeta && <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-primary/90 text-primary-foreground font-semibold">Meta</span>}
+                        </button>
                       ) : (
-                        <div className="aspect-video bg-secondary/50 flex items-center justify-center">
+                        <button type="button" onClick={() => setPreviewCreative(cr)} className="aspect-square bg-secondary/50 flex items-center justify-center relative w-full">
                           <TypeIco className="w-8 h-8 text-muted-foreground/40" />
-                          {isMeta && <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-blue-500/90 text-white font-semibold">Meta</span>}
-                        </div>
+                          {isMeta && <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-primary/90 text-primary-foreground font-semibold">Meta</span>}
+                        </button>
                       )}
                       <div className="p-3 flex-1 flex flex-col">
                         <div className="flex items-start justify-between gap-2 mb-1">
@@ -687,11 +687,9 @@ export default function ClientDetail() {
                         </div>
                         {cr.body && <p className="text-[11px] text-muted-foreground line-clamp-2 mb-2">{cr.body}</p>}
                         <div className="flex items-center justify-between mt-auto pt-2 border-t border-border/50">
-                          {cr.link ? (
-                            <a href={cr.link} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1 truncate">
-                              <ExternalLink className="w-3 h-3 shrink-0" /> Ver criativo
-                            </a>
-                          ) : <span className="text-xs text-muted-foreground capitalize">{cr.type}</span>}
+                          <button type="button" onClick={() => setPreviewCreative(cr)} className="text-xs text-primary hover:underline flex items-center gap-1 truncate">
+                            <ExternalLink className="w-3 h-3 shrink-0" /> Ver criativo
+                          </button>
                           {!isMeta && (
                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => openEditCreative(cr)}><Edit2 className="w-3 h-3" /></Button>
