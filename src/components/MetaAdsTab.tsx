@@ -85,9 +85,28 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
     const { error } = await supabase.functions.invoke('meta-get-ad-accounts', {
       body: { client_id: clientId, select_account_id: accountId },
     });
-    if (error) toast.error('Falha ao selecionar');
-    else { toast.success('Conta selecionada'); await loadConnection(); }
+    if (error) {
+      toast.error('Falha ao selecionar');
+      setSelecting(null);
+      return;
+    }
+    toast.success('Conta selecionada');
+    await loadConnection();
     setSelecting(null);
+
+    // Importação automática de campanhas
+    setImporting(true);
+    toast.loading('Carregando campanhas da Meta...', { id: 'meta-import' });
+    const { data: imp, error: impErr } = await supabase.functions.invoke('meta-import-campaigns', {
+      body: { client_id: clientId },
+    });
+    setImporting(false);
+    if (impErr || imp?.error) {
+      toast.error('Falha ao importar campanhas', { id: 'meta-import' });
+    } else {
+      toast.success(`${imp?.imported ?? 0} campanhas importadas da Meta`, { id: 'meta-import' });
+      onCampaignsImported?.();
+    }
   };
 
   const disconnect = async () => {
