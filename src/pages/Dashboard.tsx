@@ -167,13 +167,11 @@ export default function Dashboard() {
   const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const fmtDate = (d: string) => new Date(d + 'T00:00').toLocaleDateString('pt-BR');
 
-  const cobrarWhatsApp = (clienteName: string, phone: string | null, valor: number, vencimento: string) => {
-    const msg = `Olá ${clienteName}! Tudo bem? Passando para lembrar da mensalidade no valor de ${fmt(valor)} com vencimento em ${fmtDate(vencimento)}. Qualquer dúvida estou à disposição. 🙌`;
-    const numero = (phone || '').replace(/\D/g, '');
-    const url = numero
-      ? `https://wa.me/${numero}?text=${encodeURIComponent(msg)}`
-      : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+  const [cobrancaOpen, setCobrancaOpen] = useState(false);
+  const [cobrancaData, setCobrancaData] = useState<{ name: string; valor: number; vencimento: string }>({ name: '', valor: 0, vencimento: '' });
+  const abrirCobranca = (clienteName: string, valor: number, vencimento: string) => {
+    setCobrancaData({ name: clienteName, valor, vencimento });
+    setCobrancaOpen(true);
   };
 
   const statusIcon = (s: string) => {
