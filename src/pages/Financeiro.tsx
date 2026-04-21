@@ -300,12 +300,15 @@ export default function Financeiro() {
           </div>
 
           {atrasados.length > 0 && (
-            <Card className="p-4 bg-red-500/10 border-red-500/30 flex items-start gap-3">
+            <Card className="p-4 bg-red-500/10 border-red-500/30 flex items-start gap-3 flex-wrap">
               <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-              <div className="flex-1">
+              <div className="flex-1 min-w-[200px]">
                 <p className="font-semibold text-red-300">{atrasados.length} {atrasados.length === 1 ? 'cliente com pagamento atrasado' : 'clientes com pagamentos atrasados'}</p>
                 <p className="text-sm text-red-300/80">Total em atraso: <span className="font-semibold">{fmt(totalAtrasado)}</span></p>
               </div>
+              <Button onClick={cobrarTodos} size="sm" className="bg-emerald-500 hover:bg-emerald-600 text-white gap-2">
+                <MessageCircle className="w-4 h-4" /> Resumo no WhatsApp
+              </Button>
             </Card>
           )}
 
@@ -327,9 +330,22 @@ export default function Financeiro() {
                         <td className="p-3 text-muted-foreground">{new Date(m.vencimento + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
                         <td className="p-3">{statusBadge(m.status)}</td>
                         <td className="p-3 text-right">
-                          <Button size="sm" variant={m.status === 'pago' ? 'outline' : 'default'} onClick={() => togglePago(m)}>
-                            {m.status === 'pago' ? 'Marcar pendente' : 'Marcar pago'}
-                          </Button>
+                          <div className="flex justify-end gap-2 flex-wrap">
+                            {m.status !== 'pago' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openWhatsApp(m)}
+                                className="gap-1.5 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
+                                title={c?.phone ? `Enviar para ${c.phone}` : 'Sem telefone — abrir WhatsApp Web'}
+                              >
+                                <MessageCircle className="w-3.5 h-3.5" /> Cobrar
+                              </Button>
+                            )}
+                            <Button size="sm" variant={m.status === 'pago' ? 'outline' : 'default'} onClick={() => togglePago(m)}>
+                              {m.status === 'pago' ? 'Marcar pendente' : 'Marcar pago'}
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     );
