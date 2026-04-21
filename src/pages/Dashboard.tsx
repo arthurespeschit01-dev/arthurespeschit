@@ -9,6 +9,7 @@ import {
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 import CobrancaDialog from '@/components/CobrancaDialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const CUSTOS_DIRETOS = new Set(['Tráfego', 'Anúncios', 'Ferramentas Cliente', 'Freelancer Cliente']);
 
