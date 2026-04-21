@@ -9,6 +9,7 @@ import {
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 import CobrancaDialog from '@/components/CobrancaDialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const CUSTOS_DIRETOS = new Set(['Tráfego', 'Anúncios', 'Ferramentas Cliente', 'Freelancer Cliente']);
 
@@ -53,6 +54,10 @@ export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  const today = new Date();
+  const [mes, setMes] = useState(today.getMonth());
+  const [ano, setAno] = useState(today.getFullYear());
+
   const [clients, setClients] = useState<Client[]>([]);
   const [mensalidades, setMensalidades] = useState<Mensalidade[]>([]);
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
@@ -63,12 +68,9 @@ export default function Dashboard() {
   useEffect(() => {
     if (!user) return;
     const load = async () => {
-      const hoje = new Date();
-      const mesAtual = hoje.getMonth();
-      const anoAtual = hoje.getFullYear();
-      const inicioMes = new Date(anoAtual, mesAtual, 1).toISOString().slice(0, 10);
-      const fimMes = new Date(anoAtual, mesAtual + 1, 0).toISOString().slice(0, 10);
-      const inicio6Meses = new Date(anoAtual, mesAtual - 5, 1).toISOString().slice(0, 10);
+      const inicioMes = new Date(ano, mes, 1).toISOString().slice(0, 10);
+      const fimMes = new Date(ano, mes + 1, 0).toISOString().slice(0, 10);
+      const inicio6Meses = new Date(ano, mes - 5, 1).toISOString().slice(0, 10);
 
       const [clientsRes, mensRes, transRes, tasksRes, contratosRes, transHistRes, mensHistRes] = await Promise.all([
         supabase.from('clients').select('id, name, status, monthly_fee, payment_day, phone').eq('user_id', user.id),
@@ -85,16 +87,17 @@ export default function Dashboard() {
       setTransacoes((transRes.data || []) as Transacao[]);
       setTasks((tasksRes.data || []) as TaskItem[]);
 
-      // Contratos a vencer (próximos 60 dias)
+      // Contratos a vencer (próximos 60 dias) - sempre baseado em hoje
+      const hojeReal = new Date();
       const limite = new Date(); limite.setDate(limite.getDate() + 60);
-      const hojeStr = hoje.toISOString().slice(0, 10);
+      const hojeStr = hojeReal.toISOString().slice(0, 10);
       const limStr = limite.toISOString().slice(0, 10);
       setContratos(((contratosRes.data || []) as ContratoVenc[]).filter(c => c.expiry_date >= hojeStr && c.expiry_date <= limStr).slice(0, 5));
 
       // Histórico 6 meses (receita = mensalidades pagas + entradas avulsas)
       const map: Record<string, number> = {};
       for (let i = 5; i >= 0; i--) {
-        const d = new Date(anoAtual, mesAtual - i, 1);
+        const d = new Date(ano, mes - i, 1);
         map[d.toISOString().slice(0, 7)] = 0;
       }
       ((mensHistRes.data || []) as { valor: number; status: string; vencimento: string }[]).forEach(m => {
@@ -116,7 +119,7 @@ export default function Dashboard() {
       }));
     };
     load();
-  }, [user]);
+  }, [user, mes, ano]);
 
   // ===== Cálculos financeiros (mês atual) =====
   const fin = useMemo(() => {
@@ -187,11 +190,30 @@ export default function Dashboard() {
     return Math.ceil((dt.getTime() - hoje.getTime()) / 86400000);
   };
 
+  const meses = Array.from({ length: 12 }, (_, i) => i);
+  const anos = Array.from({ length: 5 }, (_, i) => today.getFullYear() - 2 + i);
+
   return (
     <div className="animate-fade-in space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground text-sm mt-1">Visão geral do seu negócio</p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground text-sm mt-1">Visão geral do seu negócio</p>
+        </div>
+        <div className="flex gap-2">
+          <Select value={String(mes)} onValueChange={(v) => setMes(Number(v))}>
+            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {meses.map(m => <SelectItem key={m} value={String(m)}>{new Date(2000, m, 1).toLocaleDateString('pt-BR', { month: 'long' })}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={String(ano)} onValueChange={(v) => setAno(Number(v))}>
+            <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {anos.map(a => <SelectItem key={a} value={String(a)}>{a}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* KPIs financeiros */}
