@@ -11,12 +11,12 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import {
   DollarSign, TrendingDown, TrendingUp, Wallet, Percent, Clock,
-  AlertTriangle, ArrowDownCircle, ArrowUpCircle, Download, FileBarChart,
+  AlertTriangle, ArrowDownCircle, ArrowUpCircle, Download, FileBarChart, MessageCircle,
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-interface Client { id: string; name: string; monthly_fee: number | null; payment_day: number | null; status: string | null; }
+interface Client { id: string; name: string; monthly_fee: number | null; payment_day: number | null; status: string | null; phone?: string | null; }
 interface Transacao {
   id: string; tipo: 'entrada' | 'saida'; descricao: string; valor: number;
   data: string; cliente_id: string | null; categoria: string | null;
