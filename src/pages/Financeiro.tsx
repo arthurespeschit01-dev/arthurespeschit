@@ -70,7 +70,11 @@ export default function Financeiro() {
     if (!user) return;
     const have = new Set(existing.map(m => m.cliente_id));
     const toCreate = cls
-      .filter(c => (c.status ?? 'ativo') === 'ativo' && c.monthly_fee && c.monthly_fee > 0 && !have.has(c.id))
+      .filter(c => {
+        const st = (c.status ?? '').toLowerCase();
+        const ativo = st === '' || st === 'ativo';
+        return ativo && c.monthly_fee && c.monthly_fee > 0 && !have.has(c.id);
+      })
       .map(c => {
         const day = Math.min(c.payment_day || 5, new Date(ano, mes + 1, 0).getDate());
         const venc = new Date(ano, mes, day).toISOString().slice(0, 10);
