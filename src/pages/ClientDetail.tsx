@@ -90,6 +90,11 @@ export default function ClientDetail() {
   const [editingCreative, setEditingCreative] = useState<Creative | null>(null);
   const [creativeForm, setCreativeForm] = useState({ name: '', type: 'video', link: '', status: 'teste' });
 
+  // Ad Sets (Conjuntos de Anúncio)
+  const [adSets, setAdSets] = useState<any[]>([]);
+  const [loadingAdSets, setLoadingAdSets] = useState(false);
+  const [importingAdSets, setImportingAdSets] = useState(false);
+
   const loadClient = async () => {
     const { data } = await supabase.from('clients').select('*').eq('id', id).single();
     if (data) {
