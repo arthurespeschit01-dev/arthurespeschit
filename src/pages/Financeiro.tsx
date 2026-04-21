@@ -613,21 +613,25 @@ export default function Financeiro() {
               Mensagem pronta para você copiar e enviar no WhatsApp do cliente. Ajuste o texto se quiser antes de copiar.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex gap-2 flex-wrap">
-            {([
-              { id: 'amigavel', label: '😊 Amigável' },
-              { id: 'formal', label: '🎩 Formal' },
-              { id: 'firme', label: '🔥 Firme' },
-            ] as { id: Tom; label: string }[]).map(t => (
-              <Button
-                key={t.id}
-                size="sm"
-                variant={cobrancaTom === t.id ? 'default' : 'outline'}
-                onClick={() => trocarTom(t.id)}
-              >
-                {t.label}
-              </Button>
-            ))}
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Tom da mensagem</Label>
+            <div className="flex gap-2 flex-wrap">
+              {([
+                { id: 'amigavel', label: '😊 Amigável' },
+                { id: 'formal', label: '🎩 Formal' },
+                { id: 'firme', label: '🔥 Firme' },
+              ] as { id: Tom; label: string }[]).map(t => (
+                <Button
+                  key={t.id}
+                  size="sm"
+                  variant={cobrancaTom === t.id ? 'default' : 'outline'}
+                  onClick={() => trocarTom(t.id)}
+                  className={cobrancaTom === t.id ? 'bg-primary text-primary-foreground' : ''}
+                >
+                  {t.label}
+                </Button>
+              ))}
+            </div>
           </div>
           <Textarea
             value={cobrancaTexto}
