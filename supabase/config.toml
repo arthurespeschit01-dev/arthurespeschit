@@ -2,3 +2,6 @@ project_id = "ffvmmnzvmjiddqtywkko"
 
 [functions.strategy-chat]
 verify_jwt = false
+
+[functions.meta-auth-callback]
+verify_jwt = false

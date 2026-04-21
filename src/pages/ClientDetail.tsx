@@ -8,8 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Plus, Edit2, Trash2, Send, Upload, FileText, X, Paperclip, Image, BookOpen, BarChart3, Film, Type as TypeIcon, ExternalLink, Sparkles } from 'lucide-react';
+import { ArrowLeft, Plus, Edit2, Trash2, Send, Upload, FileText, X, Paperclip, Image, BookOpen, BarChart3, Film, Type as TypeIcon, ExternalLink, Sparkles, Link2, Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import MetaAdsTab from '@/components/MetaAdsTab';
 
 interface AccountIds {
   bm?: string;
@@ -26,6 +27,9 @@ interface Client {
 interface Campaign {
   id: string; name: string; platform: string; objective: string; status: string; start_date: string;
   budget: number; notes: string;
+  source?: string; meta_campaign_id?: string | null;
+  spend?: number; impressions?: number; clicks?: number; cpa?: number; roas?: number;
+  last_synced_at?: string | null;
 }
 interface Note {
   id: string; text: string; created_at: string;
@@ -61,7 +65,8 @@ export default function ClientDetail() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [client, setClient] = useState<Client | null>(null);
-  const [tab, setTab] = useState<'dados' | 'campanhas' | 'anexos'>('dados');
+  const [tab, setTab] = useState<'dados' | 'campanhas' | 'anexos' | 'meta'>('dados');
+  const [importingMeta, setImportingMeta] = useState(false);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [filter, setFilter] = useState('Todas');
   const [campOpen, setCampOpen] = useState(false);
@@ -291,13 +296,17 @@ export default function ClientDetail() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-secondary/50 rounded-lg w-fit">
+      <div className="flex gap-1 p-1 bg-secondary/50 rounded-lg w-fit flex-wrap">
         <button onClick={() => setTab('dados')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'dados' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>Dados do Cliente</button>
         <button onClick={() => { setTab('campanhas'); setSelectedCampaign(null); }} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'campanhas' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>Campanhas</button>
+        <button onClick={() => setTab('meta')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'meta' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>Meta Ads</button>
         <button onClick={() => setTab('anexos')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'anexos' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
           Anexos {attachments.length > 0 && <span className="ml-1 text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded-full">{attachments.length}</span>}
         </button>
       </div>
+
+      {/* Meta Ads Tab */}
+      {tab === 'meta' && id && <MetaAdsTab clientId={id} />}
 
       {/* Dados Tab */}
       {tab === 'dados' && (
@@ -396,22 +405,61 @@ export default function ClientDetail() {
                 <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${filter === f ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>{f}</button>
               ))}
             </div>
-            <Button onClick={openNewCampaign} className="neon-glow gap-2" size="sm"><Plus className="w-3 h-3" /> Nova Campanha</Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={async () => {
+                  setImportingMeta(true);
+                  const { data, error } = await supabase.functions.invoke('meta-import-campaigns', { body: { client_id: id } });
+                  setImportingMeta(false);
+                  if (error || data?.error) {
+                    const msg = (data?.error || error?.message || '').toString();
+                    if (msg.includes('no_connection')) toast.error('Conecte a Meta Ads na aba "Meta Ads" primeiro');
+                    else if (msg.includes('no_selected_account')) toast.error('Selecione uma conta de anúncio na aba "Meta Ads"');
+                    else toast.error('Falha ao importar: ' + msg);
+                    return;
+                  }
+                  toast.success(`${data.imported} campanhas importadas da Meta`);
+                  loadCampaigns();
+                }}
+                disabled={importingMeta}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                {importingMeta ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                Importar da Meta
+              </Button>
+              <Button onClick={openNewCampaign} className="neon-glow gap-2" size="sm"><Plus className="w-3 h-3" /> Nova Campanha</Button>
+            </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filtered.map(c => (
               <div key={c.id} onClick={() => openSelectedCampaign(c)} className="glass-surface rounded-xl p-4 cursor-pointer hover:border-primary/30 transition-all group">
                 <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-semibold text-foreground text-sm">{c.name}</h3>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-semibold text-foreground text-sm">{c.name}</h3>
+                    {c.source === 'meta' && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 font-medium flex items-center gap-1">
+                        <Link2 className="w-2.5 h-2.5" /> Meta
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(c.status)}`}>{c.status}</span>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={(e) => openEditCampaign(c, e)}><Edit2 className="w-3 h-3" /></Button>
+                      {c.source !== 'meta' && <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={(e) => openEditCampaign(c, e)}><Edit2 className="w-3 h-3" /></Button>}
                       <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:text-destructive" onClick={(e) => deleteCampaign(c.id, e)}><Trash2 className="w-3 h-3" /></Button>
                     </div>
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">{c.platform} • {c.objective}</p>
+                {c.source === 'meta' && (c.spend! > 0 || c.impressions! > 0) && (
+                  <div className="grid grid-cols-3 gap-2 mt-3 pt-2 border-t border-border/50 text-xs">
+                    <div><p className="text-muted-foreground">Gasto</p><p className="font-semibold text-foreground">R$ {(c.spend || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</p></div>
+                    <div><p className="text-muted-foreground">CPA</p><p className="font-semibold text-foreground">R$ {(c.cpa || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</p></div>
+                    <div><p className="text-muted-foreground">ROAS</p><p className="font-semibold text-primary">{(c.roas || 0).toFixed(2)}x</p></div>
+                  </div>
+                )}
                 <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
                   <span className="text-xs text-muted-foreground">{c.start_date || 'Sem data'}</span>
                   {c.budget > 0 && <span className="text-xs font-semibold text-primary">R$ {c.budget.toLocaleString('pt-BR')}</span>}
