@@ -797,11 +797,15 @@ export default function ClientDetail() {
                 {filteredAttachments.map(att => {
                   const CatIcon = getCategoryIcon(att.category);
                   return (
-                    <div key={att.id} className="flex items-center justify-between bg-secondary/30 rounded-lg p-3 group">
-                      <div className="flex items-center gap-3 min-w-0">
+                    <div key={att.id} className="flex items-center justify-between bg-secondary/30 rounded-lg p-3 group hover:bg-secondary/50 transition-colors">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewAttachment(att)}
+                        className="flex items-center gap-3 min-w-0 flex-1 text-left"
+                      >
                         <CatIcon className="w-5 h-5 text-primary shrink-0" />
                         <div className="min-w-0">
-                          <a href={att.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-foreground hover:text-primary truncate block">{att.file_name}</a>
+                          <span className="text-sm text-foreground hover:text-primary truncate block">{att.file_name}</span>
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">
                               {ATTACHMENT_CATEGORIES.find(c => c.value === att.category)?.label || 'Outros'}
@@ -809,8 +813,21 @@ export default function ClientDetail() {
                             <span className="text-xs text-muted-foreground">{new Date(att.created_at).toLocaleDateString('pt-BR')}</span>
                           </div>
                         </div>
+                      </button>
+                      <div className="flex items-center gap-1 shrink-0 ml-2">
+                        <a
+                          href={att.file_url}
+                          download={att.file_name}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="p-2 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                          title="Baixar"
+                        >
+                          <Download className="w-4 h-4" />
+                        </a>
+                        <button onClick={() => removeAttachment(att)} className="p-2 rounded-md opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity" title="Remover"><X className="w-4 h-4" /></button>
                       </div>
-                      <button onClick={() => removeAttachment(att)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"><X className="w-4 h-4" /></button>
                     </div>
                   );
                 })}
