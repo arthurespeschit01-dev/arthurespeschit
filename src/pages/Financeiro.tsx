@@ -348,9 +348,8 @@ export default function Financeiro() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => openWhatsApp(m)}
+                                onClick={() => abrirCobranca(m)}
                                 className="gap-1.5 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
-                                title={c?.phone ? `Enviar para ${c.phone}` : 'Sem telefone — abrir WhatsApp Web'}
                               >
                                 <MessageCircle className="w-3.5 h-3.5" /> Cobrar
                               </Button>
