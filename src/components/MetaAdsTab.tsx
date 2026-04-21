@@ -183,9 +183,11 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={loadAccounts} className="gap-1"><RefreshCw className="w-3 h-3" /> Atualizar</Button>
+          <Button variant="outline" size="sm" onClick={refresh} disabled={importing} className="gap-1">
+            <RefreshCw className={`w-3 h-3 ${importing ? 'animate-spin' : ''}`} /> Atualizar
+          </Button>
           {expired && <Button size="sm" onClick={connect} disabled={connecting}>Reconectar</Button>}
-          <Button variant="ghost" size="sm" onClick={disconnect} className="text-destructive">Desconectar</Button>
+          <Button variant="ghost" size="sm" onClick={disconnectAccount} className="text-destructive">Desconectar</Button>
         </div>
       </div>
 
