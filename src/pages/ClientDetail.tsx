@@ -405,22 +405,61 @@ export default function ClientDetail() {
                 <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${filter === f ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>{f}</button>
               ))}
             </div>
-            <Button onClick={openNewCampaign} className="neon-glow gap-2" size="sm"><Plus className="w-3 h-3" /> Nova Campanha</Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={async () => {
+                  setImportingMeta(true);
+                  const { data, error } = await supabase.functions.invoke('meta-import-campaigns', { body: { client_id: id } });
+                  setImportingMeta(false);
+                  if (error || data?.error) {
+                    const msg = (data?.error || error?.message || '').toString();
+                    if (msg.includes('no_connection')) toast.error('Conecte a Meta Ads na aba "Meta Ads" primeiro');
+                    else if (msg.includes('no_selected_account')) toast.error('Selecione uma conta de anúncio na aba "Meta Ads"');
+                    else toast.error('Falha ao importar: ' + msg);
+                    return;
+                  }
+                  toast.success(`${data.imported} campanhas importadas da Meta`);
+                  loadCampaigns();
+                }}
+                disabled={importingMeta}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                {importingMeta ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                Importar da Meta
+              </Button>
+              <Button onClick={openNewCampaign} className="neon-glow gap-2" size="sm"><Plus className="w-3 h-3" /> Nova Campanha</Button>
+            </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filtered.map(c => (
               <div key={c.id} onClick={() => openSelectedCampaign(c)} className="glass-surface rounded-xl p-4 cursor-pointer hover:border-primary/30 transition-all group">
                 <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-semibold text-foreground text-sm">{c.name}</h3>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-semibold text-foreground text-sm">{c.name}</h3>
+                    {c.source === 'meta' && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 font-medium flex items-center gap-1">
+                        <Link2 className="w-2.5 h-2.5" /> Meta
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(c.status)}`}>{c.status}</span>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={(e) => openEditCampaign(c, e)}><Edit2 className="w-3 h-3" /></Button>
+                      {c.source !== 'meta' && <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={(e) => openEditCampaign(c, e)}><Edit2 className="w-3 h-3" /></Button>}
                       <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:text-destructive" onClick={(e) => deleteCampaign(c.id, e)}><Trash2 className="w-3 h-3" /></Button>
                     </div>
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">{c.platform} • {c.objective}</p>
+                {c.source === 'meta' && (c.spend! > 0 || c.impressions! > 0) && (
+                  <div className="grid grid-cols-3 gap-2 mt-3 pt-2 border-t border-border/50 text-xs">
+                    <div><p className="text-muted-foreground">Gasto</p><p className="font-semibold text-foreground">R$ {(c.spend || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</p></div>
+                    <div><p className="text-muted-foreground">CPA</p><p className="font-semibold text-foreground">R$ {(c.cpa || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</p></div>
+                    <div><p className="text-muted-foreground">ROAS</p><p className="font-semibold text-primary">{(c.roas || 0).toFixed(2)}x</p></div>
+                  </div>
+                )}
                 <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
                   <span className="text-xs text-muted-foreground">{c.start_date || 'Sem data'}</span>
                   {c.budget > 0 && <span className="text-xs font-semibold text-primary">R$ {c.budget.toLocaleString('pt-BR')}</span>}
