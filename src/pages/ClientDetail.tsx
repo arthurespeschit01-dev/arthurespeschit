@@ -8,8 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Plus, Edit2, Trash2, Send, Upload, FileText, X, Paperclip, Image, BookOpen, BarChart3, Film, Type as TypeIcon, ExternalLink, Sparkles } from 'lucide-react';
+import { ArrowLeft, Plus, Edit2, Trash2, Send, Upload, FileText, X, Paperclip, Image, BookOpen, BarChart3, Film, Type as TypeIcon, ExternalLink, Sparkles, Link2, Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import MetaAdsTab from '@/components/MetaAdsTab';
 
 interface AccountIds {
   bm?: string;
@@ -26,6 +27,9 @@ interface Client {
 interface Campaign {
   id: string; name: string; platform: string; objective: string; status: string; start_date: string;
   budget: number; notes: string;
+  source?: string; meta_campaign_id?: string | null;
+  spend?: number; impressions?: number; clicks?: number; cpa?: number; roas?: number;
+  last_synced_at?: string | null;
 }
 interface Note {
   id: string; text: string; created_at: string;
@@ -61,7 +65,8 @@ export default function ClientDetail() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [client, setClient] = useState<Client | null>(null);
-  const [tab, setTab] = useState<'dados' | 'campanhas' | 'anexos'>('dados');
+  const [tab, setTab] = useState<'dados' | 'campanhas' | 'anexos' | 'meta'>('dados');
+  const [importingMeta, setImportingMeta] = useState(false);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [filter, setFilter] = useState('Todas');
   const [campOpen, setCampOpen] = useState(false);
