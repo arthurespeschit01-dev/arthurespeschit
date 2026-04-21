@@ -11,12 +11,12 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import {
   DollarSign, TrendingDown, TrendingUp, Wallet, Percent, Clock,
-  AlertTriangle, ArrowDownCircle, ArrowUpCircle, Download, FileBarChart,
+  AlertTriangle, ArrowDownCircle, ArrowUpCircle, Download, FileBarChart, MessageCircle,
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-interface Client { id: string; name: string; monthly_fee: number | null; payment_day: number | null; status: string | null; }
+interface Client { id: string; name: string; monthly_fee: number | null; payment_day: number | null; status: string | null; phone?: string | null; }
 interface Transacao {
   id: string; tipo: 'entrada' | 'saida'; descricao: string; valor: number;
   data: string; cliente_id: string | null; categoria: string | null;
@@ -53,7 +53,7 @@ export default function Financeiro() {
     if (!user) return;
     setLoading(true);
     const [clientsRes, transRes, mensRes] = await Promise.all([
-      supabase.from('clients').select('id,name,monthly_fee,payment_day,status').eq('user_id', user.id).order('name'),
+      supabase.from('clients').select('id,name,monthly_fee,payment_day,status,phone').eq('user_id', user.id).order('name'),
       supabase.from('transacoes').select('*').eq('user_id', user.id).gte('data', periodoStart).lte('data', periodoEnd).order('data', { ascending: false }),
       supabase.from('mensalidades').select('*').eq('user_id', user.id).gte('vencimento', periodoStart).lte('vencimento', periodoEnd),
     ]);
@@ -223,6 +223,40 @@ export default function Financeiro() {
     return <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30">Aguardando</Badge>;
   };
 
+  // ===== WhatsApp cobrança =====
+  const sanitizePhone = (raw?: string | null) => (raw || '').replace(/\D/g, '');
+  const buildBrazilPhone = (raw?: string | null) => {
+    const digits = sanitizePhone(raw);
+    if (!digits) return '';
+    return digits.startsWith('55') ? digits : `55${digits}`;
+  };
+  const cobrancaMessage = (clienteName: string, valor: number, vencimento: string) => {
+    const venc = new Date(vencimento + 'T00:00:00').toLocaleDateString('pt-BR');
+    return `Olá, ${clienteName}! Tudo bem? 👋\n\nPassando para lembrar que a mensalidade no valor de ${fmt(valor)}, com vencimento em ${venc}, está em aberto.\n\nAssim que possível, poderia confirmar o pagamento? Se já realizou, é só nos enviar o comprovante.\n\nObrigado! 🙏`;
+  };
+  const openWhatsApp = (m: Mensalidade) => {
+    const c = clients.find(x => x.id === m.cliente_id);
+    if (!c) return;
+    const phone = buildBrazilPhone(c.phone);
+    const text = encodeURIComponent(cobrancaMessage(c.name, Number(m.valor), m.vencimento));
+    const base = phone ? `https://wa.me/${phone}` : 'https://wa.me/';
+    const url = `${base}?text=${text}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+    if (!phone) {
+      toast.info('Cliente sem telefone cadastrado — abrimos o WhatsApp Web com a mensagem pronta para você escolher o contato.');
+    }
+  };
+  const cobrarTodos = () => {
+    if (atrasados.length === 0) return;
+    const linhas = atrasados.map(m => {
+      const c = clients.find(x => x.id === m.cliente_id);
+      const venc = new Date(m.vencimento + 'T00:00:00').toLocaleDateString('pt-BR');
+      return `• ${c?.name || '-'} — ${fmt(Number(m.valor))} (venc. ${venc})`;
+    }).join('\n');
+    const text = encodeURIComponent(`Lembretes de cobrança em aberto:\n\n${linhas}`);
+    window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -266,12 +300,15 @@ export default function Financeiro() {
           </div>
 
           {atrasados.length > 0 && (
-            <Card className="p-4 bg-red-500/10 border-red-500/30 flex items-start gap-3">
+            <Card className="p-4 bg-red-500/10 border-red-500/30 flex items-start gap-3 flex-wrap">
               <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-              <div className="flex-1">
+              <div className="flex-1 min-w-[200px]">
                 <p className="font-semibold text-red-300">{atrasados.length} {atrasados.length === 1 ? 'cliente com pagamento atrasado' : 'clientes com pagamentos atrasados'}</p>
                 <p className="text-sm text-red-300/80">Total em atraso: <span className="font-semibold">{fmt(totalAtrasado)}</span></p>
               </div>
+              <Button onClick={cobrarTodos} size="sm" className="bg-emerald-500 hover:bg-emerald-600 text-white gap-2">
+                <MessageCircle className="w-4 h-4" /> Resumo no WhatsApp
+              </Button>
             </Card>
           )}
 
@@ -293,9 +330,22 @@ export default function Financeiro() {
                         <td className="p-3 text-muted-foreground">{new Date(m.vencimento + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
                         <td className="p-3">{statusBadge(m.status)}</td>
                         <td className="p-3 text-right">
-                          <Button size="sm" variant={m.status === 'pago' ? 'outline' : 'default'} onClick={() => togglePago(m)}>
-                            {m.status === 'pago' ? 'Marcar pendente' : 'Marcar pago'}
-                          </Button>
+                          <div className="flex justify-end gap-2 flex-wrap">
+                            {m.status !== 'pago' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openWhatsApp(m)}
+                                className="gap-1.5 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
+                                title={c?.phone ? `Enviar para ${c.phone}` : 'Sem telefone — abrir WhatsApp Web'}
+                              >
+                                <MessageCircle className="w-3.5 h-3.5" /> Cobrar
+                              </Button>
+                            )}
+                            <Button size="sm" variant={m.status === 'pago' ? 'outline' : 'default'} onClick={() => togglePago(m)}>
+                              {m.status === 'pago' ? 'Marcar pendente' : 'Marcar pago'}
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     );

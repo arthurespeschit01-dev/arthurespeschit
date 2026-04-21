@@ -30,6 +30,7 @@ interface Client {
   account_ids: AccountIds;
   verba_mensal: number;
   niche: string;
+  phone: string;
 }
 
 export default function Clientes() {
@@ -40,7 +41,7 @@ export default function Clientes() {
   const [editing, setEditing] = useState<Client | null>(null);
   const [form, setForm] = useState({
     name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo',
-    payment_day: '' as string, verba_mensal: 0, niche: '',
+    payment_day: '' as string, verba_mensal: 0, niche: '', phone: '',
     account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '' } as AccountIds,
   });
 
@@ -52,6 +53,7 @@ export default function Clientes() {
       account_ids: (d.account_ids as AccountIds) || {},
       verba_mensal: (d as any).verba_mensal ?? 0,
       niche: (d as any).niche ?? '',
+      phone: (d as any).phone ?? '',
     })));
   };
 
@@ -59,7 +61,7 @@ export default function Clientes() {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo', payment_day: '', verba_mensal: 0, niche: '', account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '' } });
+    setForm({ name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo', payment_day: '', verba_mensal: 0, niche: '', phone: '', account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '' } });
     setOpen(true);
   };
 
@@ -69,7 +71,7 @@ export default function Clientes() {
     setForm({
       name: c.name, services: c.services, monthly_fee: c.monthly_fee, contract_duration: c.contract_duration, status: c.status,
       payment_day: c.payment_day ? String(c.payment_day) : '',
-      verba_mensal: c.verba_mensal || 0, niche: c.niche || '',
+      verba_mensal: c.verba_mensal || 0, niche: c.niche || '', phone: c.phone || '',
       account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '', ...c.account_ids },
     });
     setOpen(true);
@@ -87,6 +89,7 @@ export default function Clientes() {
       account_ids: form.account_ids,
       verba_mensal: form.verba_mensal,
       niche: form.niche,
+      phone: form.phone,
     };
     if (editing) {
       await supabase.from('clients').update(payload).eq('id', editing.id);
@@ -185,6 +188,10 @@ export default function Clientes() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div><Label className="text-muted-foreground text-sm">Dia de pagamento</Label><Input type="number" min={1} max={31} value={form.payment_day} onChange={(e) => setForm({ ...form, payment_day: e.target.value })} placeholder="Ex: 10" className="bg-secondary/50 border-border/50 mt-1" /></div>
+              <div><Label className="text-muted-foreground text-sm">WhatsApp / Telefone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="Ex: 11999998888 (com DDD)" className="bg-secondary/50 border-border/50 mt-1" /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div></div>
               <div>
                 <Label className="text-muted-foreground text-sm">Status</Label>
                 <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
