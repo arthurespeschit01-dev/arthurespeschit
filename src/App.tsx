@@ -36,20 +36,22 @@ function ProtectedRoutes() {
         <AppLayout>
           <Routes>
             <Route path="/" element={<Dashboard />} />
-        <Route path="/clientes" element={<Clientes />} />
-        <Route path="/clientes/:id" element={<ClientDetail />} />
-        <Route path="/calculadora" element={<Calculadora />} />
-        <Route path="/processos" element={<Processos />} />
-        <Route path="/estudos" element={<Estudos />} />
-        <Route path="/contratos" element={<Contratos />} />
-        <Route path="/scripts" element={<Scripts />} />
-        <Route path="/objecoes" element={<Objecoes />} />
-        <Route path="/planilha" element={<Planilha />} />
-        <Route path="/tasks" element={<Tasks />} />
-        <Route path="/utm" element={<UTMGenerator />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </AppLayout>
+            <Route path="/clientes" element={<Clientes />} />
+            <Route path="/clientes/:id" element={<ClientDetail />} />
+            <Route path="/calculadora" element={<Calculadora />} />
+            <Route path="/processos" element={<Processos />} />
+            <Route path="/estudos" element={<Estudos />} />
+            <Route path="/contratos" element={<Contratos />} />
+            <Route path="/scripts" element={<Scripts />} />
+            <Route path="/objecoes" element={<Objecoes />} />
+            <Route path="/planilha" element={<Planilha />} />
+            <Route path="/tasks" element={<Tasks />} />
+            <Route path="/utm" element={<UTMGenerator />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AppLayout>
+      } />
+    </Routes>
   );
 }
 
