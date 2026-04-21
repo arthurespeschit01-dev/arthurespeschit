@@ -99,6 +99,7 @@ export default function ClientDetail() {
   const [adSets, setAdSets] = useState<any[]>([]);
   const [loadingAdSets, setLoadingAdSets] = useState(false);
   const [importingAdSets, setImportingAdSets] = useState(false);
+  const [previewCreative, setPreviewCreative] = useState<Creative | null>(null);
 
   const loadClient = async () => {
     const { data } = await supabase.from('clients').select('*').eq('id', id).single();
