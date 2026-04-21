@@ -18,17 +18,31 @@ export type Database = {
         Row: {
           bid_strategy: string | null
           campaign_id: string
+          clicks: number | null
+          cpa: number | null
+          cpc: number | null
+          cpm: number | null
           created_at: string
+          ctr: number | null
           daily_budget: number | null
           end_time: string | null
           id: string
+          impressions: number | null
           last_synced_at: string | null
+          leads: number | null
           lifetime_budget: number | null
+          link_clicks: number | null
+          messages: number | null
           meta_adset_id: string | null
           meta_campaign_id: string | null
           name: string
           optimization_goal: string | null
+          purchases: number | null
+          reach: number | null
+          revenue: number | null
+          roas: number | null
           source: string
+          spend: number | null
           start_time: string | null
           status: string | null
           updated_at: string
@@ -37,17 +51,31 @@ export type Database = {
         Insert: {
           bid_strategy?: string | null
           campaign_id: string
+          clicks?: number | null
+          cpa?: number | null
+          cpc?: number | null
+          cpm?: number | null
           created_at?: string
+          ctr?: number | null
           daily_budget?: number | null
           end_time?: string | null
           id?: string
+          impressions?: number | null
           last_synced_at?: string | null
+          leads?: number | null
           lifetime_budget?: number | null
+          link_clicks?: number | null
+          messages?: number | null
           meta_adset_id?: string | null
           meta_campaign_id?: string | null
           name: string
           optimization_goal?: string | null
+          purchases?: number | null
+          reach?: number | null
+          revenue?: number | null
+          roas?: number | null
           source?: string
+          spend?: number | null
           start_time?: string | null
           status?: string | null
           updated_at?: string
@@ -56,17 +84,31 @@ export type Database = {
         Update: {
           bid_strategy?: string | null
           campaign_id?: string
+          clicks?: number | null
+          cpa?: number | null
+          cpc?: number | null
+          cpm?: number | null
           created_at?: string
+          ctr?: number | null
           daily_budget?: number | null
           end_time?: string | null
           id?: string
+          impressions?: number | null
           last_synced_at?: string | null
+          leads?: number | null
           lifetime_budget?: number | null
+          link_clicks?: number | null
+          messages?: number | null
           meta_adset_id?: string | null
           meta_campaign_id?: string | null
           name?: string
           optimization_goal?: string | null
+          purchases?: number | null
+          reach?: number | null
+          revenue?: number | null
+          roas?: number | null
           source?: string
+          spend?: number | null
           start_time?: string | null
           status?: string | null
           updated_at?: string
@@ -120,16 +162,27 @@ export type Database = {
           clicks: number | null
           client_id: string
           cpa: number | null
+          cpc: number | null
+          cpm: number | null
           created_at: string
+          ctr: number | null
+          date_preset: string | null
+          frequency: number | null
           id: string
           impressions: number | null
           last_synced_at: string | null
+          leads: number | null
+          link_clicks: number | null
+          messages: number | null
           meta_ad_account_id: string | null
           meta_campaign_id: string | null
           name: string
           notes: string | null
           objective: string | null
           platform: string | null
+          purchases: number | null
+          reach: number | null
+          revenue: number | null
           roas: number | null
           source: string
           spend: number | null
@@ -137,22 +190,34 @@ export type Database = {
           status: string | null
           updated_at: string
           user_id: string
+          video_views: number | null
         }
         Insert: {
           budget?: number | null
           clicks?: number | null
           client_id: string
           cpa?: number | null
+          cpc?: number | null
+          cpm?: number | null
           created_at?: string
+          ctr?: number | null
+          date_preset?: string | null
+          frequency?: number | null
           id?: string
           impressions?: number | null
           last_synced_at?: string | null
+          leads?: number | null
+          link_clicks?: number | null
+          messages?: number | null
           meta_ad_account_id?: string | null
           meta_campaign_id?: string | null
           name: string
           notes?: string | null
           objective?: string | null
           platform?: string | null
+          purchases?: number | null
+          reach?: number | null
+          revenue?: number | null
           roas?: number | null
           source?: string
           spend?: number | null
@@ -160,22 +225,34 @@ export type Database = {
           status?: string | null
           updated_at?: string
           user_id: string
+          video_views?: number | null
         }
         Update: {
           budget?: number | null
           clicks?: number | null
           client_id?: string
           cpa?: number | null
+          cpc?: number | null
+          cpm?: number | null
           created_at?: string
+          ctr?: number | null
+          date_preset?: string | null
+          frequency?: number | null
           id?: string
           impressions?: number | null
           last_synced_at?: string | null
+          leads?: number | null
+          link_clicks?: number | null
+          messages?: number | null
           meta_ad_account_id?: string | null
           meta_campaign_id?: string | null
           name?: string
           notes?: string | null
           objective?: string | null
           platform?: string | null
+          purchases?: number | null
+          reach?: number | null
+          revenue?: number | null
           roas?: number | null
           source?: string
           spend?: number | null
@@ -183,6 +260,7 @@ export type Database = {
           status?: string | null
           updated_at?: string
           user_id?: string
+          video_views?: number | null
         }
         Relationships: [
           {
@@ -415,14 +493,28 @@ export type Database = {
         Row: {
           body: string | null
           campaign_id: string
+          clicks: number | null
+          cpa: number | null
+          cpc: number | null
+          cpm: number | null
           created_at: string
+          ctr: number | null
           id: string
+          impressions: number | null
           last_synced_at: string | null
+          leads: number | null
           link: string | null
+          link_clicks: number | null
+          messages: number | null
           meta_ad_id: string | null
           meta_creative_id: string | null
           name: string
+          purchases: number | null
+          reach: number | null
+          revenue: number | null
+          roas: number | null
           source: string
+          spend: number | null
           status: string
           thumbnail_url: string | null
           title: string | null
@@ -433,14 +525,28 @@ export type Database = {
         Insert: {
           body?: string | null
           campaign_id: string
+          clicks?: number | null
+          cpa?: number | null
+          cpc?: number | null
+          cpm?: number | null
           created_at?: string
+          ctr?: number | null
           id?: string
+          impressions?: number | null
           last_synced_at?: string | null
+          leads?: number | null
           link?: string | null
+          link_clicks?: number | null
+          messages?: number | null
           meta_ad_id?: string | null
           meta_creative_id?: string | null
           name: string
+          purchases?: number | null
+          reach?: number | null
+          revenue?: number | null
+          roas?: number | null
           source?: string
+          spend?: number | null
           status?: string
           thumbnail_url?: string | null
           title?: string | null
@@ -451,14 +557,28 @@ export type Database = {
         Update: {
           body?: string | null
           campaign_id?: string
+          clicks?: number | null
+          cpa?: number | null
+          cpc?: number | null
+          cpm?: number | null
           created_at?: string
+          ctr?: number | null
           id?: string
+          impressions?: number | null
           last_synced_at?: string | null
+          leads?: number | null
           link?: string | null
+          link_clicks?: number | null
+          messages?: number | null
           meta_ad_id?: string | null
           meta_creative_id?: string | null
           name?: string
+          purchases?: number | null
+          reach?: number | null
+          revenue?: number | null
+          roas?: number | null
           source?: string
+          spend?: number | null
           status?: string
           thumbnail_url?: string | null
           title?: string | null
