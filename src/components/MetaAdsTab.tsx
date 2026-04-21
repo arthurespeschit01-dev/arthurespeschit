@@ -18,12 +18,13 @@ interface Connection {
   token_expires_at: string | null;
 }
 
-export default function MetaAdsTab({ clientId }: { clientId: string }) {
+export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId: string; onCampaignsImported?: () => void }) {
   const [connection, setConnection] = useState<Connection | null>(null);
   const [accounts, setAccounts] = useState<AdAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [selecting, setSelecting] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const loadConnection = useCallback(async () => {
     setLoading(true);
