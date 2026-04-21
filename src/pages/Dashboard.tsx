@@ -119,7 +119,7 @@ export default function Dashboard() {
       }));
     };
     load();
-  }, [user]);
+  }, [user, mes, ano]);
 
   // ===== Cálculos financeiros (mês atual) =====
   const fin = useMemo(() => {
