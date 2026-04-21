@@ -109,11 +109,39 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
     onCampaignsImported?.();
   };
 
-  const disconnect = async () => {
-    if (!confirm('Desconectar a conta Meta deste cliente?')) return;
-    await supabase.from('meta_connections').delete().eq('client_id', clientId);
-    setConnection(null); setAccounts([]);
-    toast.success('Desconectado');
+  const refresh = async () => {
+    if (!connection?.selected_ad_account_id) {
+      await loadAccounts();
+      toast.success('Lista de contas atualizada');
+      return;
+    }
+    setImporting(true);
+    toast.loading('Atualizando campanhas e criativos...', { id: 'meta-refresh' });
+    const { data: imp, error: impErr } = await supabase.functions.invoke('meta-import-campaigns', {
+      body: { client_id: clientId },
+    });
+    if (impErr || imp?.error) {
+      setImporting(false);
+      toast.error('Falha ao atualizar campanhas', { id: 'meta-refresh' });
+      return;
+    }
+    const { data: cre } = await supabase.functions.invoke('meta-import-creatives', {
+      body: { client_id: clientId },
+    });
+    setImporting(false);
+    toast.success(`${imp?.imported ?? 0} campanhas e ${cre?.imported ?? 0} criativos atualizados`, { id: 'meta-refresh' });
+    await loadAccounts();
+    onCampaignsImported?.();
+  };
+
+  const disconnectAccount = async () => {
+    if (!confirm('Desconectar esta conta? Você poderá selecionar outra conta Meta em seguida.')) return;
+    const { error } = await supabase.from('meta_connections')
+      .update({ selected_ad_account_id: null, selected_ad_account_name: null })
+      .eq('client_id', clientId);
+    if (error) { toast.error('Falha ao desconectar conta'); return; }
+    toast.success('Conta desconectada — selecione outra abaixo');
+    await loadConnection();
   };
 
   if (loading) return <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>;
@@ -155,9 +183,11 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={loadAccounts} className="gap-1"><RefreshCw className="w-3 h-3" /> Atualizar</Button>
+          <Button variant="outline" size="sm" onClick={refresh} disabled={importing} className="gap-1">
+            <RefreshCw className={`w-3 h-3 ${importing ? 'animate-spin' : ''}`} /> Atualizar
+          </Button>
           {expired && <Button size="sm" onClick={connect} disabled={connecting}>Reconectar</Button>}
-          <Button variant="ghost" size="sm" onClick={disconnect} className="text-destructive">Desconectar</Button>
+          <Button variant="ghost" size="sm" onClick={disconnectAccount} className="text-destructive">Desconectar</Button>
         </div>
       </div>
 
