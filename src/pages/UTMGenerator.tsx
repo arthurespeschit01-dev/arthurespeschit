@@ -122,8 +122,43 @@ function FieldLabel({ label, tooltip, optional }: { label: string; tooltip: stri
   );
 }
 
+// Sanitize a UTM value:
+// - trim, lowercase non-token text, replace whitespace with underscore
+// - PRESERVE dynamic ad-platform macros literally ({{ad.name}}, {keyword}, __CID__, etc.)
+//   because Meta/Google/TikTok need them un-encoded to swap at click-time.
+const TOKEN_REGEX = /(\{\{[^}]+\}\}|\{[^}]+\}|__[A-Z0-9_]+__)/g;
+
 function sanitize(val: string) {
-  return val.replace(/\s+/g, '_');
+  if (!val) return '';
+  // Split into [text, token, text, token, ...] preserving tokens
+  const parts = val.split(TOKEN_REGEX);
+  return parts
+    .map((part) => {
+      if (!part) return '';
+      if (TOKEN_REGEX.test(part)) {
+        TOKEN_REGEX.lastIndex = 0; // reset stateful regex
+        return part; // keep macro literal
+      }
+      return part.trim().toLowerCase().replace(/\s+/g, '_');
+    })
+    .join('');
+}
+
+// Build query string manually so dynamic macros stay un-encoded.
+// Standard chars get URI-encoded; tokens are passed through verbatim.
+function encodeUtmValue(val: string) {
+  if (!val) return '';
+  const parts = val.split(TOKEN_REGEX);
+  return parts
+    .map((part) => {
+      if (!part) return '';
+      if (TOKEN_REGEX.test(part)) {
+        TOKEN_REGEX.lastIndex = 0;
+        return part;
+      }
+      return encodeURIComponent(part);
+    })
+    .join('');
 }
 
 export default function UTMGenerator() {
@@ -154,17 +189,28 @@ export default function UTMGenerator() {
     try {
       const raw = baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`;
       const url = new URL(raw);
-      const src = sanitize(utmSource);
-      const med = sanitize(utmMedium);
-      const camp = sanitize(utmCampaign);
-      const term = sanitize(utmTerm);
-      const content = sanitize(utmContent);
-      if (src) url.searchParams.set('utm_source', src);
-      if (med) url.searchParams.set('utm_medium', med);
-      if (camp) url.searchParams.set('utm_campaign', camp);
-      if (term) url.searchParams.set('utm_term', term);
-      if (content) url.searchParams.set('utm_content', content);
-      return url.toString();
+      // Strip any existing utm_* params so we control them
+      ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'].forEach((k) =>
+        url.searchParams.delete(k)
+      );
+
+      // Preserve any non-utm params already on the URL
+      const preserved = url.search ? url.search.replace(/^\?/, '') : '';
+
+      const pairs: string[] = [];
+      const push = (k: string, v: string) => {
+        const clean = sanitize(v);
+        if (clean) pairs.push(`${k}=${encodeUtmValue(clean)}`);
+      };
+      push('utm_source', utmSource);
+      push('utm_medium', utmMedium);
+      push('utm_campaign', utmCampaign);
+      push('utm_term', utmTerm);
+      push('utm_content', utmContent);
+
+      const query = [preserved, pairs.join('&')].filter(Boolean).join('&');
+      const base = `${url.origin}${url.pathname}`;
+      return query ? `${base}?${query}${url.hash}` : `${base}${url.hash}`;
     } catch {
       return '';
     }
