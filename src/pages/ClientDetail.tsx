@@ -261,7 +261,7 @@ export default function ClientDetail() {
     setSelectedCampaign(c);
     loadNotes(c.id);
     loadCreatives(c.id);
-    loadAdSets(c.id);
+    loadAdSets(c.id, c);
   };
 
   const sendNote = async () => {
