@@ -12,7 +12,15 @@ const GRAPH = 'https://graph.facebook.com/v21.0';
 
 const VALID_PRESETS = new Set([
   'today', 'yesterday', 'last_7d', 'last_14d', 'last_30d', 'last_90d',
+  'this_week_mon_sun', 'last_week_mon_sun', 'this_month', 'last_month', 'maximum',
 ]);
+
+function normalizePreset(p: string | undefined): string {
+  if (!p) return 'last_30d';
+  if (p === 'this_week') return 'this_week_mon_sun';
+  if (p === 'last_week') return 'last_week_mon_sun';
+  return p;
+}
 
 async function fetchAllPages(url: string): Promise<any[]> {
   const out: any[] = [];
@@ -63,7 +71,8 @@ Deno.serve(async (req) => {
     if (since && until) {
       timeParam = `&time_range=${encodeURIComponent(JSON.stringify({ since, until }))}`;
     } else {
-      const preset = VALID_PRESETS.has(date_preset) ? date_preset : 'last_30d';
+      const norm = normalizePreset(date_preset);
+      const preset = VALID_PRESETS.has(norm) ? norm : 'last_30d';
       timeParam = `&date_preset=${preset}`;
     }
 
