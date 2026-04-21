@@ -306,7 +306,7 @@ export default function ClientDetail() {
       </div>
 
       {/* Meta Ads Tab */}
-      {tab === 'meta' && id && <MetaAdsTab clientId={id} />}
+      {tab === 'meta' && id && <MetaAdsTab clientId={id} onCampaignsImported={() => { loadCampaigns(); setTab('campanhas'); }} />}
 
       {/* Dados Tab */}
       {tab === 'dados' && (
