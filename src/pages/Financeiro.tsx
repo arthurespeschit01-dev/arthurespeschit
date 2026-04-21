@@ -221,6 +221,39 @@ export default function Financeiro() {
     if (s === 'pago') return <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">Pago</Badge>;
     if (s === 'atrasado') return <Badge className="bg-red-500/15 text-red-400 border-red-500/30">Atrasado</Badge>;
     return <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30">Aguardando</Badge>;
+
+  // ===== WhatsApp cobrança =====
+  const sanitizePhone = (raw?: string | null) => (raw || '').replace(/\D/g, '');
+  const buildBrazilPhone = (raw?: string | null) => {
+    const digits = sanitizePhone(raw);
+    if (!digits) return '';
+    return digits.startsWith('55') ? digits : `55${digits}`;
+  };
+  const cobrancaMessage = (clienteName: string, valor: number, vencimento: string) => {
+    const venc = new Date(vencimento + 'T00:00:00').toLocaleDateString('pt-BR');
+    return `Olá, ${clienteName}! Tudo bem? 👋\n\nPassando para lembrar que a mensalidade no valor de ${fmt(valor)}, com vencimento em ${venc}, está em aberto.\n\nAssim que possível, poderia confirmar o pagamento? Se já realizou, é só nos enviar o comprovante.\n\nObrigado! 🙏`;
+  };
+  const openWhatsApp = (m: Mensalidade) => {
+    const c = clients.find(x => x.id === m.cliente_id);
+    if (!c) return;
+    const phone = buildBrazilPhone(c.phone);
+    const text = encodeURIComponent(cobrancaMessage(c.name, Number(m.valor), m.vencimento));
+    const base = phone ? `https://wa.me/${phone}` : 'https://wa.me/';
+    const url = `${base}?text=${text}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+    if (!phone) {
+      toast.info('Cliente sem telefone cadastrado — abrimos o WhatsApp Web com a mensagem pronta para você escolher o contato.');
+    }
+  };
+  const cobrarTodos = () => {
+    if (atrasados.length === 0) return;
+    const linhas = atrasados.map(m => {
+      const c = clients.find(x => x.id === m.cliente_id);
+      const venc = new Date(m.vencimento + 'T00:00:00').toLocaleDateString('pt-BR');
+      return `• ${c?.name || '-'} — ${fmt(Number(m.valor))} (venc. ${venc})`;
+    }).join('\n');
+    const text = encodeURIComponent(`Lembretes de cobrança em aberto:\n\n${linhas}`);
+    window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
   };
 
   return (
