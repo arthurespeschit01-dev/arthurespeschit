@@ -100,6 +100,22 @@ export default function ClientDetail() {
   const [loadingAdSets, setLoadingAdSets] = useState(false);
   const [importingAdSets, setImportingAdSets] = useState(false);
   const [previewCreative, setPreviewCreative] = useState<Creative | null>(null);
+  const [previewFormat, setPreviewFormat] = useState<string>('DESKTOP_FEED_STANDARD');
+  const [previewHtml, setPreviewHtml] = useState<string>('');
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  useEffect(() => {
+    if (!previewCreative?.meta_ad_id || !id) { setPreviewHtml(''); return; }
+    setPreviewLoading(true);
+    setPreviewHtml('');
+    supabase.functions.invoke('meta-ad-preview', {
+      body: { client_id: id, meta_ad_id: previewCreative.meta_ad_id, format: previewFormat },
+    }).then(({ data, error }) => {
+      setPreviewLoading(false);
+      if (error || data?.error) { setPreviewHtml(''); return; }
+      setPreviewHtml(data?.html || '');
+    });
+  }, [previewCreative?.meta_ad_id, previewFormat, id]);
 
   const loadClient = async () => {
     const { data } = await supabase.from('clients').select('*').eq('id', id).single();
