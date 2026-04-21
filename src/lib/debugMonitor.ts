@@ -30,23 +30,35 @@ const renders = new Map<string, RenderStat>();
 let totalRequests = 0;
 const startedAt = Date.now();
 const listeners = new Set<() => void>();
+let cachedSnapshot: Snapshot = {
+  endpoints: [],
+  renders: [],
+  totalRequests: 0,
+  startedAt,
+};
+let dirty = true;
 
 function notify() {
+  dirty = true;
   listeners.forEach((l) => l());
 }
 
 export function subscribeDebug(cb: () => void) {
   listeners.add(cb);
-  return () => listeners.delete(cb);
+  return () => { listeners.delete(cb); };
 }
 
 export function getDebugSnapshot(): Snapshot {
-  return {
-    endpoints: Array.from(endpoints.values()).sort((a, b) => b.count - a.count),
-    renders: Array.from(renders.values()).sort((a, b) => b.lastMs - a.lastMs),
-    totalRequests,
-    startedAt,
-  };
+  if (dirty) {
+    cachedSnapshot = {
+      endpoints: Array.from(endpoints.values()).sort((a, b) => b.count - a.count),
+      renders: Array.from(renders.values()).sort((a, b) => b.lastMs - a.lastMs),
+      totalRequests,
+      startedAt,
+    };
+    dirty = false;
+  }
+  return cachedSnapshot;
 }
 
 export function resetDebug() {
