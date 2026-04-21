@@ -296,13 +296,17 @@ export default function ClientDetail() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-secondary/50 rounded-lg w-fit">
+      <div className="flex gap-1 p-1 bg-secondary/50 rounded-lg w-fit flex-wrap">
         <button onClick={() => setTab('dados')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'dados' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>Dados do Cliente</button>
         <button onClick={() => { setTab('campanhas'); setSelectedCampaign(null); }} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'campanhas' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>Campanhas</button>
+        <button onClick={() => setTab('meta')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'meta' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>Meta Ads</button>
         <button onClick={() => setTab('anexos')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'anexos' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
           Anexos {attachments.length > 0 && <span className="ml-1 text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded-full">{attachments.length}</span>}
         </button>
       </div>
+
+      {/* Meta Ads Tab */}
+      {tab === 'meta' && id && <MetaAdsTab clientId={id} />}
 
       {/* Dados Tab */}
       {tab === 'dados' && (
