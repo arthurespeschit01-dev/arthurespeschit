@@ -110,13 +110,18 @@ Deno.serve(async (req) => {
       const cr = ad.creative || {};
       const ins = insightsMap.get(ad.id) || {};
 
-      // Melhor imagem: object_story_spec.link_data.picture > asset_feed images > image_url > thumbnail
+      // Prioridade de melhor imagem (alta resolução):
+      // 1) image_url (original full-size do creative)
+      // 2) asset_feed_spec.images[0].url
+      // 3) object_story_spec.link_data.picture (geralmente menor)
+      // 4) video_data.image_url (thumb do vídeo)
+      // 5) thumbnail_url (último recurso, baixa resolução)
       const oss = cr.object_story_spec || {};
       const afs = cr.asset_feed_spec || {};
-      let bigImage: string | null = oss.link_data?.picture || null;
+      let bigImage: string | null = cr.image_url || null;
       if (!bigImage && Array.isArray(afs.images) && afs.images[0]?.url) bigImage = afs.images[0].url;
+      if (!bigImage && oss.link_data?.picture) bigImage = oss.link_data.picture;
       if (!bigImage && oss.video_data?.image_url) bigImage = oss.video_data.image_url;
-      if (!bigImage) bigImage = cr.image_url || null;
       const thumb = bigImage || cr.thumbnail_url || null;
 
       // Link de preview real do anúncio (full-size na Meta/Instagram)
