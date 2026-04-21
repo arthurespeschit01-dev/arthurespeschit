@@ -11,6 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ArrowLeft, Plus, Edit2, Trash2, Send, Upload, FileText, X, Paperclip, Image, BookOpen, BarChart3, Film, Type as TypeIcon, ExternalLink, Sparkles, Link2, Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import MetaAdsTab from '@/components/MetaAdsTab';
+import { DateRangePicker, type DateRangeValue } from '@/components/DateRangePicker';
+import { metricsForObjective, type CampaignInsights } from '@/lib/campaignMetrics';
 
 interface AccountIds {
   bm?: string;
@@ -71,6 +73,9 @@ export default function ClientDetail() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [filter, setFilter] = useState('Todas');
   const [campOpen, setCampOpen] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRangeValue>({ preset: 'last_30d' });
+  const [insightsByCamp, setInsightsByCamp] = useState<Record<string, CampaignInsights>>({});
+  const [loadingInsights, setLoadingInsights] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
   const [campForm, setCampForm] = useState({ name: '', platform: 'Facebook Ads', objective: '', status: 'Ativa', start_date: '', budget: 0, notes: '' });
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
@@ -159,6 +164,34 @@ export default function ClientDetail() {
   };
 
   useEffect(() => { loadClient(); loadCampaigns(); loadAttachments(); }, [id]);
+
+  // Buscar insights da Meta para o período selecionado
+  const loadInsights = async () => {
+    if (!id) return;
+    const hasMeta = campaigns.some(c => c.source === 'meta');
+    if (!hasMeta) { setInsightsByCamp({}); return; }
+    setLoadingInsights(true);
+    const body: any = { client_id: id };
+    if (dateRange.preset === 'custom' && dateRange.since && dateRange.until) {
+      body.since = dateRange.since;
+      body.until = dateRange.until;
+    } else {
+      body.date_preset = dateRange.preset;
+    }
+    const { data, error } = await supabase.functions.invoke('meta-campaign-insights', { body });
+    setLoadingInsights(false);
+    if (error || data?.error) return;
+    // Mapear meta_campaign_id -> internal campaign id
+    const mapped: Record<string, CampaignInsights> = {};
+    for (const c of campaigns) {
+      if (c.meta_campaign_id && data.insights[c.meta_campaign_id]) {
+        mapped[c.id] = data.insights[c.meta_campaign_id];
+      }
+    }
+    setInsightsByCamp(mapped);
+  };
+
+  useEffect(() => { loadInsights(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [campaigns.length, dateRange.preset, dateRange.since, dateRange.until]);
 
   const saveClient = async () => {
     await supabase.from('clients').update({
@@ -435,7 +468,8 @@ export default function ClientDetail() {
                 <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${filter === f ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>{f}</button>
               ))}
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center flex-wrap">
+              <DateRangePicker value={dateRange} onChange={setDateRange} />
               <Button
                 onClick={async () => {
                   setImportingMeta(true);
@@ -483,13 +517,23 @@ export default function ClientDetail() {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">{c.platform} • {c.objective}</p>
-                {c.source === 'meta' && (c.spend! > 0 || c.impressions! > 0) && (
-                  <div className="grid grid-cols-3 gap-2 mt-3 pt-2 border-t border-border/50 text-xs">
-                    <div><p className="text-muted-foreground">Gasto</p><p className="font-semibold text-foreground">R$ {(c.spend || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</p></div>
-                    <div><p className="text-muted-foreground">CPA</p><p className="font-semibold text-foreground">R$ {(c.cpa || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</p></div>
-                    <div><p className="text-muted-foreground">ROAS</p><p className="font-semibold text-primary">{(c.roas || 0).toFixed(2)}x</p></div>
-                  </div>
-                )}
+                {c.source === 'meta' && (() => {
+                  const ins = insightsByCamp[c.id];
+                  const cells = ins ? metricsForObjective(c.objective, ins) : [];
+                  if (cells.length === 0) return loadingInsights ? (
+                    <div className="mt-3 pt-2 border-t border-border/50 text-xs text-muted-foreground">Carregando métricas...</div>
+                  ) : null;
+                  return (
+                    <div className="grid grid-cols-3 gap-2 mt-3 pt-2 border-t border-border/50 text-xs">
+                      {cells.map((m, i) => (
+                        <div key={i}>
+                          <p className="text-muted-foreground">{m.label}</p>
+                          <p className={`font-semibold ${m.highlight ? 'text-primary' : 'text-foreground'}`}>{m.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
                 <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
                   <span className="text-xs text-muted-foreground">{c.start_date || 'Sem data'}</span>
                   {c.budget > 0 && <span className="text-xs font-semibold text-primary">R$ {c.budget.toLocaleString('pt-BR')}</span>}
