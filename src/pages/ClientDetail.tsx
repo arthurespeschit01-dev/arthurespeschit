@@ -953,14 +953,23 @@ export default function ClientDetail() {
                       <Loader2 className="w-4 h-4 animate-spin" /> Carregando preview da Meta...
                     </div>
                   ) : previewHtml ? (
-                    <iframe
-                      title="Meta Ad Preview"
-                      srcDoc={previewHtml}
-                      sandbox="allow-scripts allow-same-origin allow-popups"
-                      className="w-full border-0"
-                      style={{ height: previewFormat.includes('STORY') || previewFormat.includes('REELS') ? '720px' : '600px' }}
-                    />
-                  ) : previewCreative.thumbnail_url ? (
+                    (() => {
+                      const isVertical = previewFormat.includes('STORY') || previewFormat.includes('REELS');
+                      return (
+                        <iframe
+                          title="Meta Ad Preview"
+                          srcDoc={previewHtml}
+                          sandbox="allow-scripts allow-same-origin allow-popups"
+                          scrolling="no"
+                          className="border-0 bg-background"
+                          style={
+                            isVertical
+                              ? { width: '360px', height: '720px', maxWidth: '100%' }
+                              : { width: '100%', height: '600px' }
+                          }
+                        />
+                      );
+                    })()
                     <img src={previewCreative.thumbnail_url} alt={previewCreative.name} className="max-w-full max-h-[70vh] object-contain" />
                   ) : (
                     <p className="text-sm text-muted-foreground py-12">Preview indisponível</p>
