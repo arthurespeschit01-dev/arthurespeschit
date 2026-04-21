@@ -521,19 +521,12 @@ export default function ClientDetail() {
             <div className="flex gap-2 items-center flex-wrap">
               <DateRangePicker value={dateRange} onChange={setDateRange} />
               <Button
-                onClick={async () => {
-                  if (!client) return;
+                onClick={() => {
                   if (campaigns.length === 0) { toast.error('Nenhuma campanha para exportar'); return; }
-                  const periodLabel = dateRange.preset === 'custom' && dateRange.since && dateRange.until
-                    ? `${dateRange.since} → ${dateRange.until}`
-                    : ({ today: 'Hoje', yesterday: 'Ontem', last_7d: 'Últimos 7 dias', last_14d: 'Últimos 14 dias', last_30d: 'Últimos 30 dias', last_90d: 'Últimos 90 dias' } as Record<string, string>)[dateRange.preset] || dateRange.preset;
-                  toast.loading('Gerando PDF...', { id: 'pdf' });
-                  try {
-                    await exportCampaignsPDF({ clientName: client.name, periodLabel, campaigns });
-                    toast.success('PDF gerado!', { id: 'pdf' });
-                  } catch (e: any) {
-                    toast.error('Falha ao gerar PDF: ' + (e?.message || 'erro'), { id: 'pdf' });
-                  }
+                  setExportStatusFilter('todas');
+                  setExportObjectives([]);
+                  setExportSelectedIds(Object.fromEntries(campaigns.map(c => [c.id, true])));
+                  setExportOpen(true);
                 }}
                 variant="outline"
                 size="sm"
