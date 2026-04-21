@@ -883,6 +883,45 @@ export default function ClientDetail() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Preview do criativo em alta resolução */}
+      <Dialog open={!!previewCreative} onOpenChange={(o) => !o && setPreviewCreative(null)}>
+        <DialogContent className="max-w-3xl bg-card/95 backdrop-blur border-border">
+          <DialogHeader>
+            <DialogTitle className="text-foreground pr-6">{previewCreative?.title || previewCreative?.name}</DialogTitle>
+          </DialogHeader>
+          {previewCreative && (
+            <div className="space-y-3">
+              {previewCreative.thumbnail_url ? (
+                <div className="bg-secondary/30 rounded-lg overflow-hidden flex items-center justify-center max-h-[70vh]">
+                  <img
+                    src={previewCreative.thumbnail_url}
+                    alt={previewCreative.name}
+                    className="max-w-full max-h-[70vh] object-contain"
+                  />
+                </div>
+              ) : (
+                <div className="aspect-video bg-secondary/30 rounded-lg flex items-center justify-center text-muted-foreground text-sm">
+                  Sem prévia disponível
+                </div>
+              )}
+              {previewCreative.body && (
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{previewCreative.body}</p>
+              )}
+              {previewCreative.link && (
+                <a
+                  href={previewCreative.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+                >
+                  <ExternalLink className="w-4 h-4" /> Abrir no Facebook / Meta
+                </a>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
