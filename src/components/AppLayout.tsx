@@ -3,9 +3,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import NotificationBar from '@/components/NotificationBar';
 import { NavLink } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, Calculator, ClipboardList,
+  LayoutDashboard, Users, ClipboardList,
   BookOpen, FileText, MessageSquare, ShieldAlert,
-  BarChart3, LogOut, Zap, Menu, X, ListTodo, ChevronDown, FolderOpen, Link2, Sparkles
+  BarChart3, LogOut, Zap, Menu, X, ListTodo, ChevronDown, FolderOpen, Link2, Sparkles, DollarSign
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import logoCentralGestor from '@/assets/logo-central-gestor.png';
@@ -14,7 +14,7 @@ const mainNavItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/clientes', label: 'Clientes', icon: Users },
   { to: '/tasks', label: 'Tasks', icon: ListTodo },
-  { to: '/calculadora', label: 'Calculadora', icon: Calculator },
+  { to: '/financeiro', label: 'Financeiro', icon: DollarSign },
   { to: '/planilha', label: 'Planilha', icon: BarChart3 },
   { to: '/contratos', label: 'Contratos', icon: FileText },
   { to: '/estrategias', label: 'Geração de Estratégia', icon: Sparkles },
