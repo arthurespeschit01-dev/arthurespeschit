@@ -705,6 +705,36 @@ export default function Tasks() {
                 <Input type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" />
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-muted-foreground text-sm flex items-center gap-1.5"><Repeat className="w-3.5 h-3.5" /> Recorrência</Label>
+                <Select value={form.recurrence} onValueChange={(v) => setForm({ ...form, recurrence: v })}>
+                  <SelectTrigger className="bg-secondary/50 border-border/50 mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(recurrenceLabels).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {form.recurrence !== 'none' && (
+                <div>
+                  <Label className="text-muted-foreground text-sm">Intervalo (a cada)</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={form.recurrence_interval}
+                    onChange={(e) => setForm({ ...form, recurrence_interval: Math.max(1, Number(e.target.value) || 1) })}
+                    className="bg-secondary/50 border-border/50 mt-1"
+                  />
+                </div>
+              )}
+            </div>
+            {form.recurrence !== 'none' && (
+              <p className="text-xs text-muted-foreground -mt-2">
+                Ao marcar como concluída, uma nova ocorrência será criada automaticamente com as datas avançadas.
+              </p>
+            )}
             <Button onClick={save} className="w-full neon-glow">Salvar</Button>
           </div>
         </DialogContent>
