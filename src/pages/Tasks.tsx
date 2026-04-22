@@ -35,6 +35,26 @@ interface Task {
   end_date: string | null;
   client_id: string | null;
   created_at: string;
+  recurrence: string;
+  recurrence_interval: number;
+}
+
+const recurrenceLabels: Record<string, string> = {
+  none: 'Não repetir',
+  daily: 'Diariamente',
+  weekly: 'Semanalmente',
+  monthly: 'Mensalmente',
+  yearly: 'Anualmente',
+};
+
+function addRecurrence(dateStr: string, recurrence: string, interval: number): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  const n = Math.max(1, interval || 1);
+  if (recurrence === 'daily') d.setDate(d.getDate() + n);
+  else if (recurrence === 'weekly') d.setDate(d.getDate() + 7 * n);
+  else if (recurrence === 'monthly') d.setMonth(d.getMonth() + n);
+  else if (recurrence === 'yearly') d.setFullYear(d.getFullYear() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 interface Client {
