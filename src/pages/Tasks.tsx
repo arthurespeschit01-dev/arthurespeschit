@@ -129,7 +129,7 @@ export default function Tasks() {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ title: '', description: '', status: 'pendente', priority: 'média', start_date: '', end_date: '', client_id: '' });
+    setForm({ title: '', description: '', status: 'pendente', priority: 'média', start_date: '', end_date: '', client_id: '', recurrence: 'none', recurrence_interval: 1 });
     setOpen(true);
   };
 
@@ -138,6 +138,7 @@ export default function Tasks() {
     setForm({
       title: t.title, description: t.description || '', status: t.status, priority: t.priority,
       start_date: t.start_date || '', end_date: t.end_date || '', client_id: t.client_id || '',
+      recurrence: t.recurrence || 'none', recurrence_interval: t.recurrence_interval || 1,
     });
     setOpen(true);
   };
@@ -147,7 +148,9 @@ export default function Tasks() {
     const payload = {
       title: form.title.trim(), description: form.description.trim(), status: form.status,
       priority: form.priority, start_date: form.start_date || null, end_date: form.end_date || null,
-      client_id: form.client_id || null,
+      client_id: form.client_id && form.client_id !== 'none' ? form.client_id : null,
+      recurrence: form.recurrence || 'none',
+      recurrence_interval: Math.max(1, Number(form.recurrence_interval) || 1),
     };
     if (editing) {
       await supabase.from('operational_tasks').update(payload).eq('id', editing.id);
