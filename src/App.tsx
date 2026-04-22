@@ -28,6 +28,32 @@ const Estrategias = lazy(() => import("./pages/Estrategias"));
 const Bloqueado = lazy(() => import("./pages/Bloqueado"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
+function RoutePrefetcher() {
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void import("./pages/Dashboard");
+      void import("./pages/Clientes");
+      void import("./pages/ClientDetail");
+      void import("./pages/Financeiro");
+      void import("./pages/Processos");
+      void import("./pages/Estudos");
+      void import("./pages/Contratos");
+      void import("./pages/Scripts");
+      void import("./pages/Objecoes");
+      void import("./pages/Planilha");
+      void import("./pages/Tasks");
+      void import("./pages/UTMGenerator");
+      void import("./pages/Estrategias");
+      void import("./pages/Bloqueado");
+      void import("./pages/NotFound");
+    }, 1200);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  return null;
+}
+
 const queryClient = new QueryClient();
 
 const PageFallback = () => (
@@ -81,31 +107,34 @@ function ProtectedRoutes() {
 
 function ChunkErrorRecovery() {
   useEffect(() => {
+    const key = "__chunk_reloaded_at__";
     const isChunkError = (msg?: string) =>
       !!msg && (/Loading chunk|Loading CSS chunk|dynamically imported module|Importing a module script failed/i.test(msg));
+    const reloadIfNeeded = () => {
+      const lastReloadAt = Number(sessionStorage.getItem(key) || "0");
+      if (Date.now() - lastReloadAt > 15000) {
+        sessionStorage.setItem(key, String(Date.now()));
+        window.location.reload();
+      }
+    };
     const handler = (event: ErrorEvent) => {
       if (isChunkError(event.message)) {
-        // Stale build after deploy: hard reload once
-        const key = "__chunk_reloaded__";
-        if (!sessionStorage.getItem(key)) {
-          sessionStorage.setItem(key, "1");
-          window.location.reload();
-        }
+        reloadIfNeeded();
       }
     };
     const rejHandler = (event: PromiseRejectionEvent) => {
       const msg = event.reason?.message || String(event.reason || "");
       if (isChunkError(msg)) {
-        const key = "__chunk_reloaded__";
-        if (!sessionStorage.getItem(key)) {
-          sessionStorage.setItem(key, "1");
-          window.location.reload();
-        }
+        reloadIfNeeded();
       }
     };
+    const successTimer = window.setTimeout(() => {
+      sessionStorage.removeItem(key);
+    }, 15000);
     window.addEventListener("error", handler);
     window.addEventListener("unhandledrejection", rejHandler);
     return () => {
+      window.clearTimeout(successTimer);
       window.removeEventListener("error", handler);
       window.removeEventListener("unhandledrejection", rejHandler);
     };
@@ -120,6 +149,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <ChunkErrorRecovery />
+        <RoutePrefetcher />
         <ScrollToTop />
         <AuthProvider>
           <Routes>
