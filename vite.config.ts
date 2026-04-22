@@ -13,6 +13,19 @@ export default defineConfig(({ mode }) => ({
     },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "react-vendor": ["react", "react-dom", "react-router-dom"],
+          "data-vendor": ["@supabase/supabase-js", "@tanstack/react-query", "@tanstack/query-core"],
+          "charts-vendor": ["recharts"],
+          "pdf-vendor": ["jspdf", "jspdf-autotable", "html2canvas"],
+          "date-vendor": ["date-fns"],
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
