@@ -15,7 +15,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import {
   Plus, Search, Calendar, Paperclip, Trash2, Edit2,
   CheckCircle2, Clock, AlertCircle, Upload, X, FileText, XCircle,
-  MessageSquare, Send, Eye, CalendarIcon, Filter
+  MessageSquare, Send, Eye, CalendarIcon, Filter, Repeat
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
