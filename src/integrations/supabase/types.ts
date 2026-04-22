@@ -794,6 +794,8 @@ export type Database = {
           end_date: string | null
           id: string
           priority: string
+          recurrence: string
+          recurrence_interval: number
           start_date: string | null
           status: string
           title: string
@@ -807,6 +809,8 @@ export type Database = {
           end_date?: string | null
           id?: string
           priority?: string
+          recurrence?: string
+          recurrence_interval?: number
           start_date?: string | null
           status?: string
           title: string
@@ -820,6 +824,8 @@ export type Database = {
           end_date?: string | null
           id?: string
           priority?: string
+          recurrence?: string
+          recurrence_interval?: number
           start_date?: string | null
           status?: string
           title?: string
