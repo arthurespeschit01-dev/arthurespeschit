@@ -826,8 +826,108 @@ export default function Tasks() {
                 </div>
               )}
             </div>
+            {form.recurrence === 'weekly' && (
+              <div>
+                <Label className="text-muted-foreground text-sm">Dias da semana</Label>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {weekDayLabels.map((wd) => {
+                    const active = form.recurrence_days.includes(wd.value);
+                    return (
+                      <button
+                        type="button"
+                        key={wd.value}
+                        onClick={() => {
+                          const next = active
+                            ? form.recurrence_days.filter((d) => d !== wd.value)
+                            : [...form.recurrence_days, wd.value];
+                          setForm({ ...form, recurrence_days: next });
+                        }}
+                        className={cn(
+                          'px-3 py-1.5 rounded-md text-xs font-medium border transition-all',
+                          active
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-secondary/50 text-muted-foreground border-border/50 hover:border-primary/50',
+                        )}
+                        title={wd.full}
+                      >
+                        {wd.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1.5">
+                  Selecione um ou mais dias. A próxima ocorrência cairá no próximo dia escolhido.
+                </p>
+              </div>
+            )}
+            {form.recurrence === 'monthly' && (
+              <div>
+                <Label className="text-muted-foreground text-sm">Dias do mês</Label>
+                <div className="grid grid-cols-7 gap-1.5 mt-2">
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
+                    const active = form.recurrence_days.includes(day);
+                    return (
+                      <button
+                        type="button"
+                        key={day}
+                        onClick={() => {
+                          const next = active
+                            ? form.recurrence_days.filter((d) => d !== day)
+                            : [...form.recurrence_days, day];
+                          setForm({ ...form, recurrence_days: next });
+                        }}
+                        className={cn(
+                          'h-8 rounded-md text-xs font-medium border transition-all',
+                          active
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-secondary/50 text-muted-foreground border-border/50 hover:border-primary/50',
+                        )}
+                      >
+                        {day}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1.5">
+                  Selecione um ou mais dias do mês para repetir.
+                </p>
+              </div>
+            )}
+            {form.recurrence === 'yearly' && (
+              <div>
+                <Label className="text-muted-foreground text-sm">Meses do ano</Label>
+                <div className="grid grid-cols-6 gap-1.5 mt-2">
+                  {monthLabels.map((m, idx) => {
+                    const active = form.recurrence_days.includes(idx);
+                    return (
+                      <button
+                        type="button"
+                        key={idx}
+                        onClick={() => {
+                          const next = active
+                            ? form.recurrence_days.filter((d) => d !== idx)
+                            : [...form.recurrence_days, idx];
+                          setForm({ ...form, recurrence_days: next });
+                        }}
+                        className={cn(
+                          'h-8 rounded-md text-xs font-medium border transition-all',
+                          active
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-secondary/50 text-muted-foreground border-border/50 hover:border-primary/50',
+                        )}
+                      >
+                        {m}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1.5">
+                  Selecione os meses em que a tarefa deve repetir.
+                </p>
+              </div>
+            )}
             {form.recurrence !== 'none' && (
-              <p className="text-xs text-muted-foreground -mt-2">
+              <p className="text-xs text-muted-foreground">
                 Ao marcar como concluída, uma nova ocorrência será criada automaticamente com as datas avançadas.
               </p>
             )}
