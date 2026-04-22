@@ -453,6 +453,13 @@ export default function Tasks() {
                               <div className="flex items-center gap-2 flex-wrap">
                                 <h3 className={`font-semibold text-foreground ${t.status === 'concluída' || t.status === 'cancelada' ? 'line-through opacity-60' : ''}`}>{t.title}</h3>
                                 <Badge variant="outline" className={`text-[10px] ${pc.color}`}>{pc.label}</Badge>
+                                {t.recurrence && t.recurrence !== 'none' && (
+                                  <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/20 gap-1">
+                                    <Repeat className="w-2.5 h-2.5" />
+                                    {recurrenceLabels[t.recurrence] || t.recurrence}
+                                    {t.recurrence_interval > 1 ? ` (${t.recurrence_interval}x)` : ''}
+                                  </Badge>
+                                )}
                               </div>
 
                               {t.description && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{t.description}</p>}
