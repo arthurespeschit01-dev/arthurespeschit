@@ -171,6 +171,28 @@ export default function Tasks() {
 
   const changeStatus = async (t: Task, newStatus: string) => {
     await supabase.from('operational_tasks').update({ status: newStatus }).eq('id', t.id);
+
+    // If completing a recurring task, create the next occurrence
+    if (newStatus === 'concluída' && t.recurrence && t.recurrence !== 'none' && user) {
+      const interval = Math.max(1, t.recurrence_interval || 1);
+      const nextStart = t.start_date ? addRecurrence(t.start_date, t.recurrence, interval) : null;
+      const nextEnd = t.end_date ? addRecurrence(t.end_date, t.recurrence, interval) : null;
+      if (nextStart || nextEnd) {
+        await supabase.from('operational_tasks').insert({
+          user_id: user.id,
+          title: t.title,
+          description: t.description || '',
+          status: 'pendente',
+          priority: t.priority,
+          start_date: nextStart,
+          end_date: nextEnd,
+          client_id: t.client_id,
+          recurrence: t.recurrence,
+          recurrence_interval: interval,
+        });
+        toast.success('Próxima recorrência criada!');
+      }
+    }
     load();
   };
 
