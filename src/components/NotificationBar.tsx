@@ -191,11 +191,11 @@ export default function NotificationBar() {
     };
   }, [user]);
 
-  const visible = notifications.filter(n => !dismissedIds.has(n.id));
-  const unreadList = visible.filter(n => !readIds.has(n.id));
-  const readList = visible.filter(n => readIds.has(n.id));
+  const visible = useMemo(() => notifications.filter(n => !dismissedIds.has(n.id)), [notifications, dismissedIds]);
+  const unreadList = useMemo(() => visible.filter(n => !readIds.has(n.id)), [visible, readIds]);
+  const readList = useMemo(() => visible.filter(n => readIds.has(n.id)), [visible, readIds]);
   const unreadCount = unreadList.length;
-  const overdueUnreadCount = unreadList.filter(n => n.type === 'task_overdue' || n.type === 'contract_expired').length;
+  const overdueUnreadCount = useMemo(() => unreadList.filter(n => n.type === 'task_overdue' || n.type === 'contract_expired').length, [unreadList]);
   const currentList = tab === 'unread' ? unreadList : readList;
 
   const toggleRead = (id: string, e: React.MouseEvent) => {
