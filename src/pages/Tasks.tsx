@@ -108,6 +108,7 @@ export default function Tasks() {
   const [form, setForm] = useState({
     title: '', description: '', status: 'pendente', priority: 'média',
     start_date: '', end_date: '', client_id: '',
+    recurrence: 'none', recurrence_interval: 1,
   });
 
   const load = async () => {
