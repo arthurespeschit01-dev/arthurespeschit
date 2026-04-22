@@ -194,6 +194,7 @@ export default function Tasks() {
     title: '', description: '', status: 'pendente', priority: 'média',
     start_date: '', end_date: '', client_id: '',
     recurrence: 'none', recurrence_interval: 1,
+    recurrence_days: [] as number[],
   });
 
   const load = async () => {
@@ -204,7 +205,13 @@ export default function Tasks() {
       supabase.from('task_attachments').select('*').eq('user_id', user.id),
       supabase.from('task_comments').select('*').eq('user_id', user.id).order('created_at', { ascending: true }),
     ]);
-    setTasks(tasksRes.data || []);
+    const normalized: Task[] = (tasksRes.data || []).map((t) => ({
+      ...t,
+      recurrence_days: Array.isArray(t.recurrence_days)
+        ? (t.recurrence_days as unknown[]).map((n) => Number(n)).filter((n) => !Number.isNaN(n))
+        : [],
+    }));
+    setTasks(normalized);
     setClients(clientsRes.data || []);
     setAttachments(attachRes.data || []);
     setComments(commentsRes.data || []);
@@ -214,7 +221,7 @@ export default function Tasks() {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ title: '', description: '', status: 'pendente', priority: 'média', start_date: '', end_date: '', client_id: '', recurrence: 'none', recurrence_interval: 1 });
+    setForm({ title: '', description: '', status: 'pendente', priority: 'média', start_date: '', end_date: '', client_id: '', recurrence: 'none', recurrence_interval: 1, recurrence_days: [] });
     setOpen(true);
   };
 
@@ -224,6 +231,7 @@ export default function Tasks() {
       title: t.title, description: t.description || '', status: t.status, priority: t.priority,
       start_date: t.start_date || '', end_date: t.end_date || '', client_id: t.client_id || '',
       recurrence: t.recurrence || 'none', recurrence_interval: t.recurrence_interval || 1,
+      recurrence_days: t.recurrence_days || [],
     });
     setOpen(true);
   };
@@ -236,6 +244,7 @@ export default function Tasks() {
       client_id: form.client_id && form.client_id !== 'none' ? form.client_id : null,
       recurrence: form.recurrence || 'none',
       recurrence_interval: Math.max(1, Number(form.recurrence_interval) || 1),
+      recurrence_days: form.recurrence === 'none' ? [] : [...form.recurrence_days].sort((a, b) => a - b),
     };
     if (editing) {
       await supabase.from('operational_tasks').update(payload).eq('id', editing.id);
@@ -260,8 +269,9 @@ export default function Tasks() {
     // If completing a recurring task, create the next occurrence
     if (newStatus === 'concluída' && t.recurrence && t.recurrence !== 'none' && user) {
       const interval = Math.max(1, t.recurrence_interval || 1);
-      const nextStart = t.start_date ? addRecurrence(t.start_date, t.recurrence, interval) : null;
-      const nextEnd = t.end_date ? addRecurrence(t.end_date, t.recurrence, interval) : null;
+      const days = t.recurrence_days || [];
+      const nextStart = t.start_date ? addRecurrence(t.start_date, t.recurrence, interval, days) : null;
+      const nextEnd = t.end_date ? addRecurrence(t.end_date, t.recurrence, interval, days) : null;
       if (nextStart || nextEnd) {
         await supabase.from('operational_tasks').insert({
           user_id: user.id,
@@ -274,6 +284,7 @@ export default function Tasks() {
           client_id: t.client_id,
           recurrence: t.recurrence,
           recurrence_interval: interval,
+          recurrence_days: days,
         });
         toast.success('Próxima recorrência criada!');
       }
