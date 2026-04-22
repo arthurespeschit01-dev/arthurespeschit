@@ -34,23 +34,38 @@ export function useAccessCheck() {
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), 4000);
 
-    fetch(`${CHECK_ACCESS_URL}?email=${encodeURIComponent(user.email)}`, { signal: controller.signal, cache: 'no-store' })
-      .then((res) => res.json())
-      .then((data) => {
-        sessionStorage.setItem(cacheKey, JSON.stringify({ access: !!data.access, checkedAt: Date.now() }));
-        if (!data.access) {
-          navigate('/bloqueado', { replace: true });
-        }
-      })
-      .catch(() => {
-        // fail-open: do not block on network error
-      })
-      .finally(() => {
-        window.clearTimeout(timeoutId);
-      });
+    // Defer to idle time to avoid blocking navigation/render.
+    const run = () => {
+      fetch(`${CHECK_ACCESS_URL}?email=${encodeURIComponent(user.email)}`, { signal: controller.signal, cache: 'no-store' })
+        .then((res) => res.json())
+        .then((data) => {
+          try {
+            sessionStorage.setItem(cacheKey, JSON.stringify({ access: !!data.access, checkedAt: Date.now() }));
+          } catch { /* ignore quota */ }
+          if (!data.access) {
+            navigate('/bloqueado', { replace: true });
+          }
+        })
+        .catch(() => {
+          // fail-open: silent. Do not log to avoid console noise.
+        })
+        .finally(() => {
+          window.clearTimeout(timeoutId);
+        });
+    };
+
+    const idleId = (window as unknown as { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback
+      ? (window as unknown as { requestIdleCallback: (cb: () => void) => number }).requestIdleCallback(run)
+      : window.setTimeout(run, 200);
 
     return () => {
       window.clearTimeout(timeoutId);
+      const w = window as unknown as { cancelIdleCallback?: (id: number) => void };
+      if (w.cancelIdleCallback && typeof idleId === 'number') {
+        try { w.cancelIdleCallback(idleId); } catch { /* ignore */ }
+      } else {
+        window.clearTimeout(idleId as number);
+      }
       controller.abort();
     };
   }, [user?.email, navigate]);

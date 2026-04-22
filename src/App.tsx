@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -54,18 +54,34 @@ function RoutePrefetcher() {
   return null;
 }
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      gcTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 const PageFallback = () => (
-  <div className="min-h-[60vh] flex items-center justify-center">
-    <div className="text-muted-foreground text-sm">Carregando...</div>
+  <div className="min-h-[60vh] p-6 space-y-4 animate-pulse">
+    <div className="h-8 w-48 bg-muted/40 rounded" />
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="h-24 bg-muted/30 rounded-xl" />
+      <div className="h-24 bg-muted/30 rounded-xl" />
+      <div className="h-24 bg-muted/30 rounded-xl" />
+      <div className="h-24 bg-muted/30 rounded-xl" />
+    </div>
+    <div className="h-64 bg-muted/20 rounded-xl" />
   </div>
 );
 
 function RouteBoundary({ children }: { children: React.ReactNode }) {
-  const location = useLocation();
-  // Reset boundary state when route changes so a crash on one page doesn't stick on the next
-  return <ErrorBoundary key={location.pathname}>{children}</ErrorBoundary>;
+  // No key by route: keeps tree mounted between navigations to avoid flashes.
+  // ErrorBoundary will still catch real errors.
+  return <ErrorBoundary>{children}</ErrorBoundary>;
 }
 
 function ProtectedRoutes() {
@@ -109,13 +125,12 @@ function ChunkErrorRecovery() {
   useEffect(() => {
     const key = "__chunk_reloaded_at__";
     const isChunkError = (msg?: string) =>
-      !!msg && (/Loading chunk|Loading CSS chunk|dynamically imported module|Importing a module script failed/i.test(msg));
+      !!msg && (/Loading chunk \d+ failed|Loading CSS chunk \d+ failed|Failed to fetch dynamically imported module|Importing a module script failed/i.test(msg));
     const reloadIfNeeded = () => {
-      const lastReloadAt = Number(sessionStorage.getItem(key) || "0");
-      if (Date.now() - lastReloadAt > 15000) {
-        sessionStorage.setItem(key, String(Date.now()));
-        window.location.reload();
-      }
+      // Only reload once per session to avoid loops / black screen.
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, String(Date.now()));
+      window.location.reload();
     };
     const handler = (event: ErrorEvent) => {
       if (isChunkError(event.message)) {
@@ -128,13 +143,9 @@ function ChunkErrorRecovery() {
         reloadIfNeeded();
       }
     };
-    const successTimer = window.setTimeout(() => {
-      sessionStorage.removeItem(key);
-    }, 15000);
     window.addEventListener("error", handler);
     window.addEventListener("unhandledrejection", rejHandler);
     return () => {
-      window.clearTimeout(successTimer);
       window.removeEventListener("error", handler);
       window.removeEventListener("unhandledrejection", rejHandler);
     };

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Bell, X, AlertTriangle, Clock, FileText, ChevronUp, CheckCheck, Eye, EyeOff, Trash2 } from 'lucide-react';
@@ -106,6 +106,9 @@ export default function NotificationBar() {
     if (!user) return;
 
     const load = async () => {
+      // Skip work when tab not visible — saves CPU/network.
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+
       const now = new Date();
       const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       const sevenDays = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7);
@@ -114,9 +117,9 @@ export default function NotificationBar() {
       const thirtyDaysStr = `${thirtyDays.getFullYear()}-${String(thirtyDays.getMonth() + 1).padStart(2, '0')}-${String(thirtyDays.getDate()).padStart(2, '0')}`;
 
       const [{ data: tasks }, { data: contracts }, { data: clients }] = await Promise.all([
-        supabase.from('operational_tasks').select('id, title, end_date, status').eq('user_id', user.id),
-        supabase.from('signed_contracts').select('id, title, client_name, expiry_date, status').eq('user_id', user.id),
-        supabase.from('clients').select('id, name, payment_day, status').eq('user_id', user.id),
+        supabase.from('operational_tasks').select('id, title, end_date, status').eq('user_id', user.id).limit(500),
+        supabase.from('signed_contracts').select('id, title, client_name, expiry_date, status').eq('user_id', user.id).limit(500),
+        supabase.from('clients').select('id, name, payment_day, status').eq('user_id', user.id).limit(500),
       ]);
 
       const notifs: Notification[] = [];
@@ -148,7 +151,6 @@ export default function NotificationBar() {
         }
       });
 
-      // Payment day notifications
       const currentDay = now.getDate();
       (clients || []).forEach(cl => {
         if (cl.status !== 'Ativo' || !cl.payment_day) return;
@@ -156,7 +158,6 @@ export default function NotificationBar() {
         if (payDay === currentDay) {
           notifs.push({ id: `payment-today-${cl.id}`, type: 'payment_today', title: `Pagamento de "${cl.name}" é hoje`, description: `Dia ${payDay} — verifique o recebimento.`, route: `/clientes/${cl.id}`, priority: 1 });
         } else {
-          // Check if payment is in the next 3 days
           const daysUntilPay = ((payDay - currentDay) + 31) % 31 || 31;
           if (daysUntilPay <= 3 && daysUntilPay > 0) {
             notifs.push({ id: `payment-soon-${cl.id}`, type: 'payment_soon', title: `Pagamento de "${cl.name}" em ${daysUntilPay} dia${daysUntilPay > 1 ? 's' : ''}`, description: `Dia ${payDay} de cada mês.`, route: `/clientes/${cl.id}`, priority: 2 });
@@ -182,14 +183,19 @@ export default function NotificationBar() {
 
     load();
     const interval = setInterval(load, 60000);
-    return () => clearInterval(interval);
+    const onVis = () => { if (document.visibilityState === 'visible') load(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVis);
+    };
   }, [user]);
 
-  const visible = notifications.filter(n => !dismissedIds.has(n.id));
-  const unreadList = visible.filter(n => !readIds.has(n.id));
-  const readList = visible.filter(n => readIds.has(n.id));
+  const visible = useMemo(() => notifications.filter(n => !dismissedIds.has(n.id)), [notifications, dismissedIds]);
+  const unreadList = useMemo(() => visible.filter(n => !readIds.has(n.id)), [visible, readIds]);
+  const readList = useMemo(() => visible.filter(n => readIds.has(n.id)), [visible, readIds]);
   const unreadCount = unreadList.length;
-  const overdueUnreadCount = unreadList.filter(n => n.type === 'task_overdue' || n.type === 'contract_expired').length;
+  const overdueUnreadCount = useMemo(() => unreadList.filter(n => n.type === 'task_overdue' || n.type === 'contract_expired').length, [unreadList]);
   const currentList = tab === 'unread' ? unreadList : readList;
 
   const toggleRead = (id: string, e: React.MouseEvent) => {
