@@ -37,6 +37,7 @@ interface Task {
   created_at: string;
   recurrence: string;
   recurrence_interval: number;
+  recurrence_days: number[];
 }
 
 const recurrenceLabels: Record<string, string> = {
@@ -47,14 +48,98 @@ const recurrenceLabels: Record<string, string> = {
   yearly: 'Anualmente',
 };
 
-function addRecurrence(dateStr: string, recurrence: string, interval: number): string {
+const weekDayLabels = [
+  { value: 0, label: 'Dom', full: 'Domingo' },
+  { value: 1, label: 'Seg', full: 'Segunda' },
+  { value: 2, label: 'Ter', full: 'Terça' },
+  { value: 3, label: 'Qua', full: 'Quarta' },
+  { value: 4, label: 'Qui', full: 'Quinta' },
+  { value: 5, label: 'Sex', full: 'Sexta' },
+  { value: 6, label: 'Sáb', full: 'Sábado' },
+];
+
+const monthLabels = [
+  'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+  'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez',
+];
+
+function fmt(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Computes the next occurrence date based on recurrence type and selected days.
+ * - weekly with days [1,3]: next selected weekday after current date
+ * - monthly with days [1,15]: next selected day-of-month
+ * - yearly with days (months) [0,5]: next selected month, same day
+ * - daily / no days selected: just advance by interval
+ */
+function addRecurrence(
+  dateStr: string,
+  recurrence: string,
+  interval: number,
+  days: number[] = [],
+): string {
   const d = new Date(dateStr + 'T00:00:00');
   const n = Math.max(1, interval || 1);
-  if (recurrence === 'daily') d.setDate(d.getDate() + n);
-  else if (recurrence === 'weekly') d.setDate(d.getDate() + 7 * n);
-  else if (recurrence === 'monthly') d.setMonth(d.getMonth() + n);
-  else if (recurrence === 'yearly') d.setFullYear(d.getFullYear() + n);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const sortedDays = [...days].sort((a, b) => a - b);
+
+  if (recurrence === 'daily') {
+    d.setDate(d.getDate() + n);
+    return fmt(d);
+  }
+
+  if (recurrence === 'weekly') {
+    if (sortedDays.length === 0) {
+      d.setDate(d.getDate() + 7 * n);
+      return fmt(d);
+    }
+    // Find next selected weekday strictly after current date
+    for (let i = 1; i <= 7 * n + 7; i++) {
+      const candidate = new Date(d);
+      candidate.setDate(d.getDate() + i);
+      if (sortedDays.includes(candidate.getDay())) {
+        return fmt(candidate);
+      }
+    }
+    d.setDate(d.getDate() + 7 * n);
+    return fmt(d);
+  }
+
+  if (recurrence === 'monthly') {
+    if (sortedDays.length === 0) {
+      d.setMonth(d.getMonth() + n);
+      return fmt(d);
+    }
+    // Find next selected day-of-month
+    const currentDay = d.getDate();
+    const futureDay = sortedDays.find((day) => day > currentDay);
+    if (futureDay) {
+      const candidate = new Date(d.getFullYear(), d.getMonth(), futureDay);
+      return fmt(candidate);
+    }
+    // Otherwise jump to first selected day in next month (advance by interval)
+    const candidate = new Date(d.getFullYear(), d.getMonth() + n, sortedDays[0]);
+    return fmt(candidate);
+  }
+
+  if (recurrence === 'yearly') {
+    if (sortedDays.length === 0) {
+      d.setFullYear(d.getFullYear() + n);
+      return fmt(d);
+    }
+    // days here are months (0-11). Keep day-of-month from original.
+    const currentMonth = d.getMonth();
+    const futureMonth = sortedDays.find((m) => m > currentMonth);
+    if (futureMonth !== undefined) {
+      const candidate = new Date(d.getFullYear(), futureMonth, d.getDate());
+      return fmt(candidate);
+    }
+    const candidate = new Date(d.getFullYear() + n, sortedDays[0], d.getDate());
+    return fmt(candidate);
+  }
+
+  return dateStr;
 }
 
 interface Client {
