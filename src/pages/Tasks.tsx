@@ -37,6 +37,7 @@ interface Task {
   created_at: string;
   recurrence: string;
   recurrence_interval: number;
+  recurrence_days: number[];
 }
 
 const recurrenceLabels: Record<string, string> = {
@@ -47,14 +48,98 @@ const recurrenceLabels: Record<string, string> = {
   yearly: 'Anualmente',
 };
 
-function addRecurrence(dateStr: string, recurrence: string, interval: number): string {
+const weekDayLabels = [
+  { value: 0, label: 'Dom', full: 'Domingo' },
+  { value: 1, label: 'Seg', full: 'Segunda' },
+  { value: 2, label: 'Ter', full: 'Terça' },
+  { value: 3, label: 'Qua', full: 'Quarta' },
+  { value: 4, label: 'Qui', full: 'Quinta' },
+  { value: 5, label: 'Sex', full: 'Sexta' },
+  { value: 6, label: 'Sáb', full: 'Sábado' },
+];
+
+const monthLabels = [
+  'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+  'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez',
+];
+
+function fmt(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Computes the next occurrence date based on recurrence type and selected days.
+ * - weekly with days [1,3]: next selected weekday after current date
+ * - monthly with days [1,15]: next selected day-of-month
+ * - yearly with days (months) [0,5]: next selected month, same day
+ * - daily / no days selected: just advance by interval
+ */
+function addRecurrence(
+  dateStr: string,
+  recurrence: string,
+  interval: number,
+  days: number[] = [],
+): string {
   const d = new Date(dateStr + 'T00:00:00');
   const n = Math.max(1, interval || 1);
-  if (recurrence === 'daily') d.setDate(d.getDate() + n);
-  else if (recurrence === 'weekly') d.setDate(d.getDate() + 7 * n);
-  else if (recurrence === 'monthly') d.setMonth(d.getMonth() + n);
-  else if (recurrence === 'yearly') d.setFullYear(d.getFullYear() + n);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const sortedDays = [...days].sort((a, b) => a - b);
+
+  if (recurrence === 'daily') {
+    d.setDate(d.getDate() + n);
+    return fmt(d);
+  }
+
+  if (recurrence === 'weekly') {
+    if (sortedDays.length === 0) {
+      d.setDate(d.getDate() + 7 * n);
+      return fmt(d);
+    }
+    // Find next selected weekday strictly after current date
+    for (let i = 1; i <= 7 * n + 7; i++) {
+      const candidate = new Date(d);
+      candidate.setDate(d.getDate() + i);
+      if (sortedDays.includes(candidate.getDay())) {
+        return fmt(candidate);
+      }
+    }
+    d.setDate(d.getDate() + 7 * n);
+    return fmt(d);
+  }
+
+  if (recurrence === 'monthly') {
+    if (sortedDays.length === 0) {
+      d.setMonth(d.getMonth() + n);
+      return fmt(d);
+    }
+    // Find next selected day-of-month
+    const currentDay = d.getDate();
+    const futureDay = sortedDays.find((day) => day > currentDay);
+    if (futureDay) {
+      const candidate = new Date(d.getFullYear(), d.getMonth(), futureDay);
+      return fmt(candidate);
+    }
+    // Otherwise jump to first selected day in next month (advance by interval)
+    const candidate = new Date(d.getFullYear(), d.getMonth() + n, sortedDays[0]);
+    return fmt(candidate);
+  }
+
+  if (recurrence === 'yearly') {
+    if (sortedDays.length === 0) {
+      d.setFullYear(d.getFullYear() + n);
+      return fmt(d);
+    }
+    // days here are months (0-11). Keep day-of-month from original.
+    const currentMonth = d.getMonth();
+    const futureMonth = sortedDays.find((m) => m > currentMonth);
+    if (futureMonth !== undefined) {
+      const candidate = new Date(d.getFullYear(), futureMonth, d.getDate());
+      return fmt(candidate);
+    }
+    const candidate = new Date(d.getFullYear() + n, sortedDays[0], d.getDate());
+    return fmt(candidate);
+  }
+
+  return dateStr;
 }
 
 interface Client {
@@ -109,6 +194,7 @@ export default function Tasks() {
     title: '', description: '', status: 'pendente', priority: 'média',
     start_date: '', end_date: '', client_id: '',
     recurrence: 'none', recurrence_interval: 1,
+    recurrence_days: [] as number[],
   });
 
   const load = async () => {
@@ -119,7 +205,13 @@ export default function Tasks() {
       supabase.from('task_attachments').select('*').eq('user_id', user.id),
       supabase.from('task_comments').select('*').eq('user_id', user.id).order('created_at', { ascending: true }),
     ]);
-    setTasks(tasksRes.data || []);
+    const normalized: Task[] = (tasksRes.data || []).map((t) => ({
+      ...t,
+      recurrence_days: Array.isArray(t.recurrence_days)
+        ? (t.recurrence_days as unknown[]).map((n) => Number(n)).filter((n) => !Number.isNaN(n))
+        : [],
+    }));
+    setTasks(normalized);
     setClients(clientsRes.data || []);
     setAttachments(attachRes.data || []);
     setComments(commentsRes.data || []);
@@ -129,7 +221,7 @@ export default function Tasks() {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ title: '', description: '', status: 'pendente', priority: 'média', start_date: '', end_date: '', client_id: '', recurrence: 'none', recurrence_interval: 1 });
+    setForm({ title: '', description: '', status: 'pendente', priority: 'média', start_date: '', end_date: '', client_id: '', recurrence: 'none', recurrence_interval: 1, recurrence_days: [] });
     setOpen(true);
   };
 
@@ -139,6 +231,7 @@ export default function Tasks() {
       title: t.title, description: t.description || '', status: t.status, priority: t.priority,
       start_date: t.start_date || '', end_date: t.end_date || '', client_id: t.client_id || '',
       recurrence: t.recurrence || 'none', recurrence_interval: t.recurrence_interval || 1,
+      recurrence_days: t.recurrence_days || [],
     });
     setOpen(true);
   };
@@ -151,6 +244,7 @@ export default function Tasks() {
       client_id: form.client_id && form.client_id !== 'none' ? form.client_id : null,
       recurrence: form.recurrence || 'none',
       recurrence_interval: Math.max(1, Number(form.recurrence_interval) || 1),
+      recurrence_days: form.recurrence === 'none' ? [] : [...form.recurrence_days].sort((a, b) => a - b),
     };
     if (editing) {
       await supabase.from('operational_tasks').update(payload).eq('id', editing.id);
@@ -175,8 +269,9 @@ export default function Tasks() {
     // If completing a recurring task, create the next occurrence
     if (newStatus === 'concluída' && t.recurrence && t.recurrence !== 'none' && user) {
       const interval = Math.max(1, t.recurrence_interval || 1);
-      const nextStart = t.start_date ? addRecurrence(t.start_date, t.recurrence, interval) : null;
-      const nextEnd = t.end_date ? addRecurrence(t.end_date, t.recurrence, interval) : null;
+      const days = t.recurrence_days || [];
+      const nextStart = t.start_date ? addRecurrence(t.start_date, t.recurrence, interval, days) : null;
+      const nextEnd = t.end_date ? addRecurrence(t.end_date, t.recurrence, interval, days) : null;
       if (nextStart || nextEnd) {
         await supabase.from('operational_tasks').insert({
           user_id: user.id,
@@ -189,6 +284,7 @@ export default function Tasks() {
           client_id: t.client_id,
           recurrence: t.recurrence,
           recurrence_interval: interval,
+          recurrence_days: days,
         });
         toast.success('Próxima recorrência criada!');
       }
@@ -730,8 +826,108 @@ export default function Tasks() {
                 </div>
               )}
             </div>
+            {form.recurrence === 'weekly' && (
+              <div>
+                <Label className="text-muted-foreground text-sm">Dias da semana</Label>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {weekDayLabels.map((wd) => {
+                    const active = form.recurrence_days.includes(wd.value);
+                    return (
+                      <button
+                        type="button"
+                        key={wd.value}
+                        onClick={() => {
+                          const next = active
+                            ? form.recurrence_days.filter((d) => d !== wd.value)
+                            : [...form.recurrence_days, wd.value];
+                          setForm({ ...form, recurrence_days: next });
+                        }}
+                        className={cn(
+                          'px-3 py-1.5 rounded-md text-xs font-medium border transition-all',
+                          active
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-secondary/50 text-muted-foreground border-border/50 hover:border-primary/50',
+                        )}
+                        title={wd.full}
+                      >
+                        {wd.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1.5">
+                  Selecione um ou mais dias. A próxima ocorrência cairá no próximo dia escolhido.
+                </p>
+              </div>
+            )}
+            {form.recurrence === 'monthly' && (
+              <div>
+                <Label className="text-muted-foreground text-sm">Dias do mês</Label>
+                <div className="grid grid-cols-7 gap-1.5 mt-2">
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
+                    const active = form.recurrence_days.includes(day);
+                    return (
+                      <button
+                        type="button"
+                        key={day}
+                        onClick={() => {
+                          const next = active
+                            ? form.recurrence_days.filter((d) => d !== day)
+                            : [...form.recurrence_days, day];
+                          setForm({ ...form, recurrence_days: next });
+                        }}
+                        className={cn(
+                          'h-8 rounded-md text-xs font-medium border transition-all',
+                          active
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-secondary/50 text-muted-foreground border-border/50 hover:border-primary/50',
+                        )}
+                      >
+                        {day}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1.5">
+                  Selecione um ou mais dias do mês para repetir.
+                </p>
+              </div>
+            )}
+            {form.recurrence === 'yearly' && (
+              <div>
+                <Label className="text-muted-foreground text-sm">Meses do ano</Label>
+                <div className="grid grid-cols-6 gap-1.5 mt-2">
+                  {monthLabels.map((m, idx) => {
+                    const active = form.recurrence_days.includes(idx);
+                    return (
+                      <button
+                        type="button"
+                        key={idx}
+                        onClick={() => {
+                          const next = active
+                            ? form.recurrence_days.filter((d) => d !== idx)
+                            : [...form.recurrence_days, idx];
+                          setForm({ ...form, recurrence_days: next });
+                        }}
+                        className={cn(
+                          'h-8 rounded-md text-xs font-medium border transition-all',
+                          active
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-secondary/50 text-muted-foreground border-border/50 hover:border-primary/50',
+                        )}
+                      >
+                        {m}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1.5">
+                  Selecione os meses em que a tarefa deve repetir.
+                </p>
+              </div>
+            )}
             {form.recurrence !== 'none' && (
-              <p className="text-xs text-muted-foreground -mt-2">
+              <p className="text-xs text-muted-foreground">
                 Ao marcar como concluída, uma nova ocorrência será criada automaticamente com as datas avançadas.
               </p>
             )}

@@ -795,6 +795,7 @@ export type Database = {
           id: string
           priority: string
           recurrence: string
+          recurrence_days: Json
           recurrence_interval: number
           start_date: string | null
           status: string
@@ -810,6 +811,7 @@ export type Database = {
           id?: string
           priority?: string
           recurrence?: string
+          recurrence_days?: Json
           recurrence_interval?: number
           start_date?: string | null
           status?: string
@@ -825,6 +827,7 @@ export type Database = {
           id?: string
           priority?: string
           recurrence?: string
+          recurrence_days?: Json
           recurrence_interval?: number
           start_date?: string | null
           status?: string
