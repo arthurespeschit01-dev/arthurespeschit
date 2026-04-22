@@ -15,7 +15,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import {
   Plus, Search, Calendar, Paperclip, Trash2, Edit2,
   CheckCircle2, Clock, AlertCircle, Upload, X, FileText, XCircle,
-  MessageSquare, Send, Eye, CalendarIcon, Filter
+  MessageSquare, Send, Eye, CalendarIcon, Filter, Repeat
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
@@ -35,6 +35,26 @@ interface Task {
   end_date: string | null;
   client_id: string | null;
   created_at: string;
+  recurrence: string;
+  recurrence_interval: number;
+}
+
+const recurrenceLabels: Record<string, string> = {
+  none: 'Não repetir',
+  daily: 'Diariamente',
+  weekly: 'Semanalmente',
+  monthly: 'Mensalmente',
+  yearly: 'Anualmente',
+};
+
+function addRecurrence(dateStr: string, recurrence: string, interval: number): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  const n = Math.max(1, interval || 1);
+  if (recurrence === 'daily') d.setDate(d.getDate() + n);
+  else if (recurrence === 'weekly') d.setDate(d.getDate() + 7 * n);
+  else if (recurrence === 'monthly') d.setMonth(d.getMonth() + n);
+  else if (recurrence === 'yearly') d.setFullYear(d.getFullYear() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 interface Client {
@@ -88,6 +108,7 @@ export default function Tasks() {
   const [form, setForm] = useState({
     title: '', description: '', status: 'pendente', priority: 'média',
     start_date: '', end_date: '', client_id: '',
+    recurrence: 'none', recurrence_interval: 1,
   });
 
   const load = async () => {
@@ -108,7 +129,7 @@ export default function Tasks() {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ title: '', description: '', status: 'pendente', priority: 'média', start_date: '', end_date: '', client_id: '' });
+    setForm({ title: '', description: '', status: 'pendente', priority: 'média', start_date: '', end_date: '', client_id: '', recurrence: 'none', recurrence_interval: 1 });
     setOpen(true);
   };
 
@@ -117,6 +138,7 @@ export default function Tasks() {
     setForm({
       title: t.title, description: t.description || '', status: t.status, priority: t.priority,
       start_date: t.start_date || '', end_date: t.end_date || '', client_id: t.client_id || '',
+      recurrence: t.recurrence || 'none', recurrence_interval: t.recurrence_interval || 1,
     });
     setOpen(true);
   };
@@ -126,7 +148,9 @@ export default function Tasks() {
     const payload = {
       title: form.title.trim(), description: form.description.trim(), status: form.status,
       priority: form.priority, start_date: form.start_date || null, end_date: form.end_date || null,
-      client_id: form.client_id || null,
+      client_id: form.client_id && form.client_id !== 'none' ? form.client_id : null,
+      recurrence: form.recurrence || 'none',
+      recurrence_interval: Math.max(1, Number(form.recurrence_interval) || 1),
     };
     if (editing) {
       await supabase.from('operational_tasks').update(payload).eq('id', editing.id);
@@ -147,6 +171,28 @@ export default function Tasks() {
 
   const changeStatus = async (t: Task, newStatus: string) => {
     await supabase.from('operational_tasks').update({ status: newStatus }).eq('id', t.id);
+
+    // If completing a recurring task, create the next occurrence
+    if (newStatus === 'concluída' && t.recurrence && t.recurrence !== 'none' && user) {
+      const interval = Math.max(1, t.recurrence_interval || 1);
+      const nextStart = t.start_date ? addRecurrence(t.start_date, t.recurrence, interval) : null;
+      const nextEnd = t.end_date ? addRecurrence(t.end_date, t.recurrence, interval) : null;
+      if (nextStart || nextEnd) {
+        await supabase.from('operational_tasks').insert({
+          user_id: user.id,
+          title: t.title,
+          description: t.description || '',
+          status: 'pendente',
+          priority: t.priority,
+          start_date: nextStart,
+          end_date: nextEnd,
+          client_id: t.client_id,
+          recurrence: t.recurrence,
+          recurrence_interval: interval,
+        });
+        toast.success('Próxima recorrência criada!');
+      }
+    }
     load();
   };
 
@@ -407,6 +453,13 @@ export default function Tasks() {
                               <div className="flex items-center gap-2 flex-wrap">
                                 <h3 className={`font-semibold text-foreground ${t.status === 'concluída' || t.status === 'cancelada' ? 'line-through opacity-60' : ''}`}>{t.title}</h3>
                                 <Badge variant="outline" className={`text-[10px] ${pc.color}`}>{pc.label}</Badge>
+                                {t.recurrence && t.recurrence !== 'none' && (
+                                  <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/20 gap-1">
+                                    <Repeat className="w-2.5 h-2.5" />
+                                    {recurrenceLabels[t.recurrence] || t.recurrence}
+                                    {t.recurrence_interval > 1 ? ` (${t.recurrence_interval}x)` : ''}
+                                  </Badge>
+                                )}
                               </div>
 
                               {t.description && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{t.description}</p>}
@@ -652,6 +705,36 @@ export default function Tasks() {
                 <Input type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" />
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-muted-foreground text-sm flex items-center gap-1.5"><Repeat className="w-3.5 h-3.5" /> Recorrência</Label>
+                <Select value={form.recurrence} onValueChange={(v) => setForm({ ...form, recurrence: v })}>
+                  <SelectTrigger className="bg-secondary/50 border-border/50 mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(recurrenceLabels).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {form.recurrence !== 'none' && (
+                <div>
+                  <Label className="text-muted-foreground text-sm">Intervalo (a cada)</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={form.recurrence_interval}
+                    onChange={(e) => setForm({ ...form, recurrence_interval: Math.max(1, Number(e.target.value) || 1) })}
+                    className="bg-secondary/50 border-border/50 mt-1"
+                  />
+                </div>
+              )}
+            </div>
+            {form.recurrence !== 'none' && (
+              <p className="text-xs text-muted-foreground -mt-2">
+                Ao marcar como concluída, uma nova ocorrência será criada automaticamente com as datas avançadas.
+              </p>
+            )}
             <Button onClick={save} className="w-full neon-glow">Salvar</Button>
           </div>
         </DialogContent>
