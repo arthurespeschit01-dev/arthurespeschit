@@ -1,76 +1,67 @@
 
-## Adicionar filtro completo de período nas campanhas
+## Otimizar fluidez do sistema sem remover funções
 
-Vou expandir o seletor de período da aba de campanhas para incluir todas as opções de análise que você precisa, igual ao Gerenciador de Anúncios da Meta.
+Encontrei a causa real da lentidão e dos "flashes" ao navegar. Vou corrigir tudo mantendo 100% das funcionalidades.
 
-## O que vou implementar
+## Problemas identificados (com base nos logs reais)
 
-### 1. Novo seletor de período em `src/components/DateRangePicker.tsx`
+1. **Requisições duplicadas a cada minuto**: as mesmas tabelas (`operational_tasks`, `clients`, `signed_contracts`, `notification_states`) são buscadas várias vezes seguidas porque `NotificationBar` faz polling a cada 60s e o `Dashboard` faz seu próprio fetch separado, sem cache compartilhado.
+2. **Tela "pisca" ao trocar de página**: o `RouteBoundary` usa `key={location.pathname}`, o que força desmontar e remontar tudo a cada navegação — perde estado, recarrega chunk, mostra fallback.
+3. **`useAccessCheck` falhando**: a chamada para `backend-centraldogestor.vercel.app` retorna `Failed to fetch` e isso pode atrapalhar o ciclo de render.
+4. **`React Query` instalado mas não usado**: temos `@tanstack/react-query` no provider, mas nenhuma página usa — ou seja, zero cache entre rotas.
+5. **Polling fixo de 60s**: roda mesmo com aba em background, gastando rede e CPU à toa.
+6. **Recarregamento por chunk error muito agressivo**: `ChunkErrorRecovery` pode disparar `window.location.reload()` causando "tela preta".
 
-Adicionar os presets que faltam:
+## O que vou fazer
 
-- **Hoje**
-- **Ontem**
-- **Últimos 7 dias** (já existe)
-- **Últimos 14 dias** (já existe)
-- **Últimos 30 dias** (já existe)
-- **Últimos 90 dias** (já existe)
-- **Esta semana**
-- **Semana passada**
-- **Este mês**
-- **Mês passado**
-- **Máximo / Tudo** (lifetime — desde o início da conta)
-- **Personalizado** (calendário com seleção de intervalo — já existe, vou melhorar)
+### 1. Migrar fetches críticos para React Query (cache global)
+- Criar hooks `useClients`, `useTasks`, `useContracts`, `useNotificationStates`, `useMensalidades`, `useTransacoes`.
+- `staleTime: 60s` e `gcTime: 5min` → ao trocar de página, dados aparecem instantaneamente do cache.
+- `Dashboard` e `NotificationBar` passam a compartilhar o mesmo cache (uma só requisição serve os dois).
 
-### 2. Atualizar tipos e mapeamento
+### 2. Estabilizar o `RouteBoundary`
+- Remover o `key={location.pathname}` para evitar desmontar a árvore a cada navegação.
+- Resetar o ErrorBoundary apenas quando ocorre erro real, não a cada rota.
 
-Em `DateRangePicker.tsx` o tipo `DatePreset` ganha:
-`'today' | 'yesterday' | 'last_7d' | 'last_14d' | 'last_30d' | 'last_90d' | 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'maximum' | 'custom'`
+### 3. Pausar polling quando a aba está oculta
+- `NotificationBar` só faz polling quando `document.visibilityState === 'visible'`.
+- Refazer fetch imediatamente ao voltar para a aba.
 
-### 3. Edge Functions reconhecerem os novos presets
+### 4. Tornar `useAccessCheck` realmente não-bloqueante
+- Manter cache de 5 min já existente.
+- Aumentar tolerância a falha (fail-open silencioso).
+- Não disparar nenhum re-render quando a verificação falha.
 
-Atualizar a lista `VALID_PRESETS` em:
-- `supabase/functions/meta-campaign-insights/index.ts`
-- `supabase/functions/meta-import-campaigns/index.ts`
-- `supabase/functions/meta-import-adsets/index.ts`
-- `supabase/functions/meta-import-creatives/index.ts`
+### 5. Suavizar o fallback de carregamento
+- Trocar o `PageFallback` (texto "Carregando...") por um skeleton sutil que ocupa o mesmo espaço da página → fim do "flash preto".
+- Garantir que a Suspense só apareça no primeiro carregamento de cada chunk (depois fica em cache).
 
-Para aceitar todos os presets oficiais da Meta:
-`today, yesterday, this_week_mon_sun, last_week_mon_sun, this_month, last_month, last_7d, last_14d, last_30d, last_90d, maximum`
+### 6. Refinar `ChunkErrorRecovery`
+- Só recarregar se o erro for confirmadamente de chunk (não qualquer erro).
+- Aumentar debounce e limitar a 1 reload por sessão.
 
-Mapeamento interno: `this_week → this_week_mon_sun`, `last_week → last_week_mon_sun`.
+### 7. Otimizar renders pesados
+- Memoizar cálculos em `Dashboard` (já usa `useMemo` parcialmente — ampliar).
+- `NotificationBar`: memoizar `visible`, `unreadList`, `readList` com `useMemo`.
+- Evitar recriar objetos em `mainNavItems` a cada render do `AppLayout`.
 
-### 4. Frontend (`src/pages/ClientDetail.tsx`)
-
-- Garantir que o `dateRange` selecionado é enviado em todas as chamadas (campanhas, conjuntos, criativos e PDF) — já está feito via `buildPeriodBody()`, só preciso confirmar que os novos presets passam por ele.
-- Atualizar o label exibido no PDF para refletir o novo período (ex.: "Hoje", "Ontem", "Este mês", "Máximo").
-
-### 5. Layout do popover
-
-Reorganizar o popover do `DateRangePicker` em duas colunas para caber bem todos os presets:
-
-```text
-┌──────────────────┬────────────────┐
-│ Hoje             │                │
-│ Ontem            │   Calendário   │
-│ Últimos 7 dias   │  Personalizado │
-│ Últimos 14 dias  │                │
-│ Últimos 30 dias  │                │
-│ Últimos 90 dias  │                │
-│ Esta semana      │                │
-│ Semana passada   │                │
-│ Este mês         │                │
-│ Mês passado      │                │
-│ Máximo           │                │
-└──────────────────┴────────────────┘
-```
+### 8. Reduzir payload do polling de notificações
+- Selecionar só os campos necessários (já feito em parte).
+- Adicionar limites razoáveis (`limit(100)`) onde faz sentido.
 
 ## Arquivos afetados
 
-- `src/components/DateRangePicker.tsx`
-- `src/pages/ClientDetail.tsx`
-- `src/lib/exportCampaignsPDF.ts` (label de período)
-- `supabase/functions/meta-campaign-insights/index.ts`
-- `supabase/functions/meta-import-campaigns/index.ts`
-- `supabase/functions/meta-import-adsets/index.ts`
-- `supabase/functions/meta-import-creatives/index.ts`
+- `src/App.tsx` (RouteBoundary, ChunkErrorRecovery, PageFallback, QueryClient config)
+- `src/components/NotificationBar.tsx` (React Query, visibilidade, memoização)
+- `src/components/AppLayout.tsx` (memoização de listas)
+- `src/pages/Dashboard.tsx` (React Query)
+- `src/hooks/useAccessCheck.ts` (silenciar falhas)
+- Novo: `src/hooks/queries/` com hooks compartilhados (`useClients`, `useTasks`, `useContracts`, `useNotificationStates`, `useMensalidades`, `useTransacoes`)
+
+## Resultado esperado
+
+- Navegação **instantânea** entre páginas (sem flash, sem refetch).
+- Notificações continuam atualizando, mas sem duplicar chamadas.
+- Sem mais "tela preta" durante a navegação.
+- Menos consumo de rede e CPU.
+- Zero funções removidas.
