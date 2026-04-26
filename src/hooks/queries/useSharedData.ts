@@ -3,8 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCallback } from 'react';
 
-const STALE = 60_000;
-const GC = 5 * 60_000;
+const STALE = 5 * 60_000; // 5 min — dados raramente mudam por segundo
+const GC = 15 * 60_000;   // 15 min em memória
 
 export function useClientsQuery() {
   const { user } = useAuth();
