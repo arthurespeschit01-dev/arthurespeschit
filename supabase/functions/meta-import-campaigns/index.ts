@@ -31,7 +31,14 @@ function parseActions(ins: any) {
     if (['onsite_conversion.messaging_conversation_started_7d', 'onsite_conversion.total_messaging_connection'].includes(a.action_type)) messages += v;
     if (a.action_type === 'link_click') link_clicks += v;
     if (a.action_type === 'video_view') video_views += v;
+    if ([
+  'onsite_conversion.messaging_conversation_started_7d',
+  'onsite_conversion.total_messaging_connection',
+  'onsite_conversion.messaging_first_reply',
+  'onsite_conversion.messaging_conversation_started',
+].includes(a.action_type)) messages += v;
   }
+  
   for (const a of (ins?.action_values || [])) {
     if (['purchase', 'omni_purchase', 'offsite_conversion.fb_pixel_purchase', 'onsite_web_purchase'].includes(a.action_type)) {
       revenue += parseFloat(a.value || '0') || 0;
@@ -44,7 +51,7 @@ function cpaForObjective(objective: string, spend: number, leads: number, purcha
   const o = (objective || '').toUpperCase();
   if (o.includes('LEAD')) return leads > 0 ? spend / leads : 0;
   if (o.includes('SALES') || o.includes('CONVERSIONS') || o.includes('PURCHASE')) return purchases > 0 ? spend / purchases : 0;
-  if (o.includes('MESSAGES') || o.includes('ENGAGEMENT')) return messages > 0 ? spend / messages : 0;
+  if (o.includes('MESSAGES')) return messages > 0 ? spend / messages : 0; // só MESSAGES, não ENGAGEMENT
   if (leads > 0) return spend / leads;
   if (purchases > 0) return spend / purchases;
   return 0;
