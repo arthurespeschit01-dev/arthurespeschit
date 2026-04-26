@@ -11,14 +11,36 @@ interface State {
   error: Error | null;
 }
 
+// Erros benignos de DOM causados por extensões do navegador (Google Translate,
+// Grammarly, etc.) ou por race conditions entre portals do Radix. Esses erros
+// não quebram a aplicação — apenas devem ser ignorados.
+const isBenignDomError = (error: unknown): boolean => {
+  const msg = (error as Error)?.message || String(error || '');
+  return (
+    /Failed to execute 'removeChild' on 'Node'/i.test(msg) ||
+    /Failed to execute 'insertBefore' on 'Node'/i.test(msg) ||
+    /The node to be removed is not a child of this node/i.test(msg) ||
+    /NotFoundError: The object can not be found here/i.test(msg) ||
+    /não é filho deste nó/i.test(msg)
+  );
+};
+
 export default class ErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false, error: null };
 
   static getDerivedStateFromError(error: Error): State {
+    if (isBenignDomError(error)) {
+      return { hasError: false, error: null };
+    }
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    if (isBenignDomError(error)) {
+      console.warn('[ErrorBoundary] Ignored benign DOM error:', error.message);
+      queueMicrotask(() => this.setState({ hasError: false, error: null }));
+      return;
+    }
     console.error('[ErrorBoundary] Caught error:', error, errorInfo);
   }
 

@@ -128,19 +128,30 @@ function ChunkErrorRecovery() {
     const key = "__chunk_reloaded_at__";
     const isChunkError = (msg?: string) =>
       !!msg && (/Loading chunk \d+ failed|Loading CSS chunk \d+ failed|Failed to fetch dynamically imported module|Importing a module script failed/i.test(msg));
+    const isBenignDom = (msg?: string) =>
+      !!msg && (/Failed to execute 'removeChild' on 'Node'|Failed to execute 'insertBefore' on 'Node'|The node to be removed is not a child of this node|não é filho deste nó/i.test(msg));
     const reloadIfNeeded = () => {
-      // Only reload once per session to avoid loops / black screen.
       if (sessionStorage.getItem(key)) return;
       sessionStorage.setItem(key, String(Date.now()));
       window.location.reload();
     };
     const handler = (event: ErrorEvent) => {
+      if (isBenignDom(event.message)) {
+        // Suprime erros benignos de DOM (extensões do navegador / race conditions de portals)
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return;
+      }
       if (isChunkError(event.message)) {
         reloadIfNeeded();
       }
     };
     const rejHandler = (event: PromiseRejectionEvent) => {
       const msg = event.reason?.message || String(event.reason || "");
+      if (isBenignDom(msg)) {
+        event.preventDefault();
+        return;
+      }
       if (isChunkError(msg)) {
         reloadIfNeeded();
       }
