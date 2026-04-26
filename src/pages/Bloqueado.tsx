@@ -39,7 +39,7 @@ export default function Bloqueado() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12">
       <div className="w-full max-w-xl">
         <div className="flex justify-center mb-8">
-          <img src={logoCentralGestor} alt="Central do Gestor" className="h-24 w-auto object-contain" />
+          <img src={logoCentralGestor} alt="Central do Gestor" className="h-16 w-auto object-contain" />
         </div>
 
         <Card className="p-8 md:p-12 border-border/60 shadow-2xl bg-card/80 backdrop-blur">
