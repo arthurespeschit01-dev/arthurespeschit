@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'no_selected_account' }), { status: 400, headers: corsHeaders });
     }
 
-    const fields = 'campaign_id,spend,impressions,clicks,ctr,cpc,cpm,reach,actions,action_values,cost_per_action_type';
+   const fields = 'campaign_id,spend,impressions,clicks,ctr,cpc,cpm,reach,actions,action_values';
     let timeParam = '';
     if (since && until) {
       timeParam = `&time_range=${encodeURIComponent(JSON.stringify({ since, until }))}`;
