@@ -41,25 +41,20 @@ export default function NotificationBar() {
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  // Load persisted states from DB
-  const loadStates = useCallback(async () => {
-    if (!user) return;
-    const { data } = await supabase
-      .from('notification_states')
-      .select('notification_id, status')
-      .eq('user_id', user.id);
-    if (data) {
-      const r = new Set<string>();
-      const d = new Set<string>();
-      data.forEach(row => {
-        if (row.status === 'read') r.add(row.notification_id);
-        if (row.status === 'dismissed') d.add(row.notification_id);
-      });
-      setReadIds(r);
-      setDismissedIds(d);
-    }
+  // Carrega estados via React Query (compartilhado com outras telas, sem refetch duplicado)
+  const { data: notifStates } = useNotificationStatesQuery();
+  useEffect(() => {
+    if (!notifStates) return;
+    const r = new Set<string>();
+    const d = new Set<string>();
+    notifStates.forEach(row => {
+      if (row.status === 'read') r.add(row.notification_id);
+      if (row.status === 'dismissed') d.add(row.notification_id);
+    });
+    setReadIds(r);
+    setDismissedIds(d);
     statesLoadedRef.current = true;
-  }, [user]);
+  }, [notifStates]);
 
   // Persist a state change
   const persistState = useCallback(async (notificationId: string, status: 'read' | 'dismissed') => {
@@ -93,8 +88,6 @@ export default function NotificationBar() {
       .eq('user_id', user.id)
       .in('notification_id', ids);
   }, [user]);
-
-  useEffect(() => { loadStates(); }, [loadStates]);
 
   // Keep latest read/dismissed sets in refs so the loader effect doesn't
   // re-subscribe (and re-query the DB) every time the user marks something.
