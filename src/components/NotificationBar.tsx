@@ -96,94 +96,85 @@ export default function NotificationBar() {
   useEffect(() => { readIdsRef.current = readIds; }, [readIds]);
   useEffect(() => { dismissedIdsRef.current = dismissedIds; }, [dismissedIds]);
 
+  // Usa hooks compartilhados — eliminam queries duplicadas com Dashboard/Tasks/Contratos/Clientes
+  const { data: tasksData } = useTasksQuery();
+  const { data: contractsData } = useContractsQuery();
+  const { data: clientsData } = useClientsQuery();
+
   useEffect(() => {
     if (!user) return;
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
 
-    const load = async () => {
-      // Skip work when tab not visible — saves CPU/network.
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const sevenDays = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7);
+    const sevenDaysStr = `${sevenDays.getFullYear()}-${String(sevenDays.getMonth() + 1).padStart(2, '0')}-${String(sevenDays.getDate()).padStart(2, '0')}`;
+    const thirtyDays = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30);
+    const thirtyDaysStr = `${thirtyDays.getFullYear()}-${String(thirtyDays.getMonth() + 1).padStart(2, '0')}-${String(thirtyDays.getDate()).padStart(2, '0')}`;
 
-      const now = new Date();
-      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      const sevenDays = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7);
-      const sevenDaysStr = `${sevenDays.getFullYear()}-${String(sevenDays.getMonth() + 1).padStart(2, '0')}-${String(sevenDays.getDate()).padStart(2, '0')}`;
-      const thirtyDays = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30);
-      const thirtyDaysStr = `${thirtyDays.getFullYear()}-${String(thirtyDays.getMonth() + 1).padStart(2, '0')}-${String(thirtyDays.getDate()).padStart(2, '0')}`;
+    const tasks = tasksData || [];
+    const contracts = contractsData || [];
+    const clients = clientsData || [];
 
-      const [{ data: tasks }, { data: contracts }, { data: clients }] = await Promise.all([
-        supabase.from('operational_tasks').select('id, title, end_date, status').eq('user_id', user.id).limit(500),
-        supabase.from('signed_contracts').select('id, title, client_name, expiry_date, status').eq('user_id', user.id).limit(500),
-        supabase.from('clients').select('id, name, payment_day, status').eq('user_id', user.id).limit(500),
-      ]);
+    const notifs: Notification[] = [];
+    const daysUntil = (dateStr: string) => {
+      const target = new Date(dateStr + 'T00:00:00');
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    };
 
-      const notifs: Notification[] = [];
-      const daysUntil = (dateStr: string) => {
-        const target = new Date(dateStr + 'T00:00:00');
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      };
+    tasks.forEach(t => {
+      if (t.status === 'concluída' || t.status === 'cancelada' || !t.end_date) return;
+      const days = daysUntil(t.end_date);
+      if (t.end_date < todayStr) {
+        notifs.push({ id: `task-overdue-${t.id}`, type: 'task_overdue', title: `Task "${t.title}" está vencida`, description: `Venceu em ${new Date(t.end_date + 'T00:00:00').toLocaleDateString('pt-BR')}`, route: '/tasks', priority: 0 });
+      } else if (t.end_date === todayStr) {
+        notifs.push({ id: `task-today-${t.id}`, type: 'task_due_today', title: `Task "${t.title}" vence hoje`, description: 'O prazo é hoje!', route: '/tasks', priority: 1 });
+      } else if (t.end_date <= sevenDaysStr) {
+        notifs.push({ id: `task-soon-${t.id}`, type: 'task_due_soon', title: `Task "${t.title}" vence em ${days} dia${days > 1 ? 's' : ''}`, description: `Vence em ${new Date(t.end_date + 'T00:00:00').toLocaleDateString('pt-BR')}`, route: '/tasks', priority: 2 });
+      }
+    });
 
-      (tasks || []).forEach(t => {
-        if (t.status === 'concluída' || t.status === 'cancelada' || !t.end_date) return;
-        const days = daysUntil(t.end_date);
-        if (t.end_date < todayStr) {
-          notifs.push({ id: `task-overdue-${t.id}`, type: 'task_overdue', title: `Task "${t.title}" está vencida`, description: `Venceu em ${new Date(t.end_date + 'T00:00:00').toLocaleDateString('pt-BR')}`, route: '/tasks', priority: 0 });
-        } else if (t.end_date === todayStr) {
-          notifs.push({ id: `task-today-${t.id}`, type: 'task_due_today', title: `Task "${t.title}" vence hoje`, description: 'O prazo é hoje!', route: '/tasks', priority: 1 });
-        } else if (t.end_date <= sevenDaysStr) {
-          notifs.push({ id: `task-soon-${t.id}`, type: 'task_due_soon', title: `Task "${t.title}" vence em ${days} dia${days > 1 ? 's' : ''}`, description: `Vence em ${new Date(t.end_date + 'T00:00:00').toLocaleDateString('pt-BR')}`, route: '/tasks', priority: 2 });
-        }
-      });
+    contracts.forEach(c => {
+      if (c.status === 'Cancelado' || c.status === 'Encerrado' || !c.expiry_date) return;
+      const days = daysUntil(c.expiry_date);
+      if (c.expiry_date < todayStr) {
+        notifs.push({ id: `contract-expired-${c.id}`, type: 'contract_expired', title: `Contrato "${c.title}" está vencido`, description: `Cliente: ${c.client_name} — venceu em ${new Date(c.expiry_date + 'T00:00:00').toLocaleDateString('pt-BR')}`, route: '/contratos', priority: 0 });
+      } else if (c.expiry_date <= thirtyDaysStr) {
+        notifs.push({ id: `contract-expiring-${c.id}`, type: 'contract_expiring', title: `Contrato "${c.title}" está vencendo`, description: `Cliente: ${c.client_name} — vence em ${days} dias (${new Date(c.expiry_date + 'T00:00:00').toLocaleDateString('pt-BR')})`, route: '/contratos', priority: 2 });
+      }
+    });
 
-      (contracts || []).forEach(c => {
-        if (c.status === 'Cancelado' || c.status === 'Encerrado' || !c.expiry_date) return;
-        const days = daysUntil(c.expiry_date);
-        if (c.expiry_date < todayStr) {
-          notifs.push({ id: `contract-expired-${c.id}`, type: 'contract_expired', title: `Contrato "${c.title}" está vencido`, description: `Cliente: ${c.client_name} — venceu em ${new Date(c.expiry_date + 'T00:00:00').toLocaleDateString('pt-BR')}`, route: '/contratos', priority: 0 });
-        } else if (c.expiry_date <= thirtyDaysStr) {
-          notifs.push({ id: `contract-expiring-${c.id}`, type: 'contract_expiring', title: `Contrato "${c.title}" está vencendo`, description: `Cliente: ${c.client_name} — vence em ${days} dias (${new Date(c.expiry_date + 'T00:00:00').toLocaleDateString('pt-BR')})`, route: '/contratos', priority: 2 });
-        }
-      });
-
-      const currentDay = now.getDate();
-      (clients || []).forEach(cl => {
-        if (cl.status !== 'Ativo' || !cl.payment_day) return;
-        const payDay = cl.payment_day;
-        if (payDay === currentDay) {
-          notifs.push({ id: `payment-today-${cl.id}`, type: 'payment_today', title: `Pagamento de "${cl.name}" é hoje`, description: `Dia ${payDay} — verifique o recebimento.`, route: `/clientes/${cl.id}`, priority: 1 });
-        } else {
-          const daysUntilPay = ((payDay - currentDay) + 31) % 31 || 31;
-          if (daysUntilPay <= 3 && daysUntilPay > 0) {
-            notifs.push({ id: `payment-soon-${cl.id}`, type: 'payment_soon', title: `Pagamento de "${cl.name}" em ${daysUntilPay} dia${daysUntilPay > 1 ? 's' : ''}`, description: `Dia ${payDay} de cada mês.`, route: `/clientes/${cl.id}`, priority: 2 });
-          }
-        }
-      });
-
-      notifs.sort((a, b) => a.priority - b.priority);
-      setNotifications(notifs);
-
-      if (!toastShownRef.current && statesLoadedRef.current && notifs.length > 0) {
-        toastShownRef.current = true;
-        const unread = notifs.filter(n => !readIdsRef.current.has(n.id) && !dismissedIdsRef.current.has(n.id));
-        const overdueUnread = unread.filter(n => n.priority === 0);
-        const todayUnread = unread.filter(n => n.priority === 1);
-        if (overdueUnread.length > 0) {
-          toast.error(`🚨 ${overdueUnread.length} item(ns) vencido(s)!`, { description: 'Verifique suas notificações.', duration: 6000 });
-        } else if (todayUnread.length > 0) {
-          toast.warning(`⏰ ${todayUnread.length} item(ns) vencem hoje!`, { description: 'Clique no sino para ver.', duration: 5000 });
+    const currentDay = now.getDate();
+    clients.forEach(cl => {
+      if (cl.status !== 'Ativo' || !cl.payment_day) return;
+      const payDay = cl.payment_day;
+      if (payDay === currentDay) {
+        notifs.push({ id: `payment-today-${cl.id}`, type: 'payment_today', title: `Pagamento de "${cl.name}" é hoje`, description: `Dia ${payDay} — verifique o recebimento.`, route: `/clientes/${cl.id}`, priority: 1 });
+      } else {
+        const daysUntilPay = ((payDay - currentDay) + 31) % 31 || 31;
+        if (daysUntilPay <= 3 && daysUntilPay > 0) {
+          notifs.push({ id: `payment-soon-${cl.id}`, type: 'payment_soon', title: `Pagamento de "${cl.name}" em ${daysUntilPay} dia${daysUntilPay > 1 ? 's' : ''}`, description: `Dia ${payDay} de cada mês.`, route: `/clientes/${cl.id}`, priority: 2 });
         }
       }
-    };
+    });
 
-    load();
-    const interval = setInterval(load, 60000);
-    const onVis = () => { if (document.visibilityState === 'visible') load(); };
-    document.addEventListener('visibilitychange', onVis);
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', onVis);
-    };
-  }, [user]);
+    notifs.sort((a, b) => a.priority - b.priority);
+    setNotifications(notifs);
+
+    if (!toastShownRef.current && statesLoadedRef.current && notifs.length > 0) {
+      toastShownRef.current = true;
+      const unread = notifs.filter(n => !readIdsRef.current.has(n.id) && !dismissedIdsRef.current.has(n.id));
+      const overdueUnread = unread.filter(n => n.priority === 0);
+      const todayUnread = unread.filter(n => n.priority === 1);
+      if (overdueUnread.length > 0) {
+        toast.error(`🚨 ${overdueUnread.length} item(ns) vencido(s)!`, { description: 'Verifique suas notificações.', duration: 6000 });
+      } else if (todayUnread.length > 0) {
+        toast.warning(`⏰ ${todayUnread.length} item(ns) vencem hoje!`, { description: 'Clique no sino para ver.', duration: 5000 });
+      }
+    }
+  }, [user, tasksData, contractsData, clientsData]);
+
 
   const visible = useMemo(() => notifications.filter(n => !dismissedIds.has(n.id)), [notifications, dismissedIds]);
   const unreadList = useMemo(() => visible.filter(n => !readIds.has(n.id)), [visible, readIds]);
