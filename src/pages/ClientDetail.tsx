@@ -31,8 +31,11 @@ interface Client {
 interface Campaign {
   id: string; name: string; platform: string; objective: string; status: string; start_date: string;
   budget: number; notes: string;
-  source?: string; meta_campaign_id?: string | null;
-  spend?: number; impressions?: number; clicks?: number; cpa?: number; roas?: number;
+  source?: string; meta_campaign_id?: string | null; meta_ad_account_id?: string | null;
+  // Adiciona estes:
+  spend?: number; impressions?: number; clicks?: number; ctr?: number; cpc?: number; cpm?: number;
+  reach?: number; leads?: number; purchases?: number; messages?: number; link_clicks?: number;
+  revenue?: number; cpa?: number; roas?: number;
   last_synced_at?: string | null;
 }
 interface Note {
