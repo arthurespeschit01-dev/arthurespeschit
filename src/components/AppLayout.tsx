@@ -43,7 +43,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       <aside className={`fixed lg:sticky top-0 left-0 z-50 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         <div className="p-4 flex items-center justify-center border-b border-sidebar-border relative">
-          <img src={logoCentralGestor} alt="Central do Gestor" className="h-16 w-auto object-contain" />
+          <img src={logoCentralGestor} alt="Central do Gestor" className="h-24 w-auto object-contain" />
           <button onClick={() => setSidebarOpen(false)} className="absolute right-3 top-3 lg:hidden text-muted-foreground">
             <X className="w-5 h-5" />
           </button>
