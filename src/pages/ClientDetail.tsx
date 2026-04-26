@@ -220,40 +220,70 @@ export default function ClientDetail() {
   useEffect(() => { loadClient(); loadCampaigns(); loadAttachments(); }, [id]);
 
   // Buscar insights da Meta para o período selecionado
- const mapped: Record<string, CampaignInsights> = {};
-for (const c of campaigns) {
-  // Tenta insights dinâmicos primeiro
-  if (c.meta_campaign_id && data.insights?.[c.meta_campaign_id]) {
-    mapped[c.id] = data.insights[c.meta_campaign_id];
-  } else if (c.source === 'meta') {
-    // Fallback: usa métricas salvas no banco durante o import
-    const spend = Number(c.spend) || 0;
-    const leads = Number((c as any).leads) || 0;
-    const purchases = Number((c as any).purchases) || 0;
-    const messages = Number((c as any).messages) || 0;
-    const revenue = Number((c as any).revenue) || 0;
-    mapped[c.id] = {
-      spend,
-      impressions: Number(c.impressions) || 0,
-      clicks: Number(c.clicks) || 0,
-      ctr: Number(c.ctr) || 0,
-      cpc: Number(c.cpc) || 0,
-      cpm: Number(c.cpm) || 0,
-      reach: Number((c as any).reach) || 0,
-      leads,
-      purchases,
-      messages,
-      link_clicks: Number((c as any).link_clicks) || 0,
-      revenue,
-      cpl: leads > 0 ? spend / leads : 0,
-      cpp: purchases > 0 ? spend / purchases : 0,
-      cpm_msg: messages > 0 ? spend / messages : 0,
-      roas: spend > 0 ? revenue / spend : 0,
+  const loadInsights = async () => {
+    if (!id) return;
+    const buildFallback = () => {
+      const fb: Record<string, CampaignInsights> = {};
+      for (const c of campaigns) {
+        if (c.source !== 'meta') continue;
+        const spend = Number(c.spend) || 0;
+        const leads = Number((c as any).leads) || 0;
+        const purchases = Number((c as any).purchases) || 0;
+        const messages = Number((c as any).messages) || 0;
+        const revenue = Number((c as any).revenue) || 0;
+        fb[c.id] = {
+          spend,
+          impressions: Number(c.impressions) || 0,
+          clicks: Number(c.clicks) || 0,
+          ctr: Number((c as any).ctr) || 0,
+          cpc: Number((c as any).cpc) || 0,
+          cpm: Number((c as any).cpm) || 0,
+          reach: Number((c as any).reach) || 0,
+          leads, purchases, messages,
+          link_clicks: Number((c as any).link_clicks) || 0,
+          revenue,
+          cpl: leads > 0 ? spend / leads : 0,
+          cpp: purchases > 0 ? spend / purchases : 0,
+          cpm_msg: messages > 0 ? spend / messages : 0,
+          roas: spend > 0 ? revenue / spend : 0,
+        };
+      }
+      return fb;
     };
-  }
-}
-setInsightsByCamp(mapped);
-  
+
+    const metaCampaigns = campaigns.filter(c => c.source === 'meta' && c.meta_campaign_id);
+    if (metaCampaigns.length === 0) {
+      setInsightsByCamp(buildFallback());
+      return;
+    }
+
+    setLoadingInsights(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('meta-campaign-insights', {
+        body: {
+          client_id: id,
+          campaign_ids: metaCampaigns.map(c => c.meta_campaign_id),
+          ...buildPeriodBody(),
+        },
+      });
+      if (error) throw error;
+
+      const fallback = buildFallback();
+      const mapped: Record<string, CampaignInsights> = { ...fallback };
+      for (const c of campaigns) {
+        if (c.meta_campaign_id && (data as any)?.insights?.[c.meta_campaign_id]) {
+          mapped[c.id] = (data as any).insights[c.meta_campaign_id];
+        }
+      }
+      setInsightsByCamp(mapped);
+    } catch (e) {
+      console.error('[loadInsights] erro:', e);
+      setInsightsByCamp(buildFallback());
+    } finally {
+      setLoadingInsights(false);
+    }
+  };
+
   useEffect(() => { loadInsights(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [campaigns.length, dateRange.preset, dateRange.since, dateRange.until]);
 
   const saveClient = async () => {
