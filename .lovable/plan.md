@@ -1,67 +1,124 @@
+# Diagnóstico
 
-## Otimizar fluidez do sistema sem remover funções
+O arquivo `src/pages/ClientDetail.tsx` está com erros de build:
 
-Encontrei a causa real da lentidão e dos "flashes" ao navegar. Vou corrigir tudo mantendo 100% das funcionalidades.
+```
+src/pages/ClientDetail.tsx(226,29): error TS2304: Cannot find name 'data'.
+src/pages/ClientDetail.tsx(227,20): error TS2304: Cannot find name 'data'.
+src/pages/ClientDetail.tsx(257,21): error TS2552: Cannot find name 'loadInsights'.
+```
 
-## Problemas identificados (com base nos logs reais)
+**Causa:** Em uma edição anterior, o **corpo** da função `loadInsights` foi colado solto dentro do componente (linhas ~222–255), **sem** o invólucro `const loadInsights = async () => { ... }` e **sem** a chamada `supabase.functions.invoke('meta-campaign-insights', ...)` que produzia o `data`.
 
-1. **Requisições duplicadas a cada minuto**: as mesmas tabelas (`operational_tasks`, `clients`, `signed_contracts`, `notification_states`) são buscadas várias vezes seguidas porque `NotificationBar` faz polling a cada 60s e o `Dashboard` faz seu próprio fetch separado, sem cache compartilhado.
-2. **Tela "pisca" ao trocar de página**: o `RouteBoundary` usa `key={location.pathname}`, o que força desmontar e remontar tudo a cada navegação — perde estado, recarrega chunk, mostra fallback.
-3. **`useAccessCheck` falhando**: a chamada para `backend-centraldogestor.vercel.app` retorna `Failed to fetch` e isso pode atrapalhar o ciclo de render.
-4. **`React Query` instalado mas não usado**: temos `@tanstack/react-query` no provider, mas nenhuma página usa — ou seja, zero cache entre rotas.
-5. **Polling fixo de 60s**: roda mesmo com aba em background, gastando rede e CPU à toa.
-6. **Recarregamento por chunk error muito agressivo**: `ChunkErrorRecovery` pode disparar `window.location.reload()` causando "tela preta".
+Resultado:
+- `data.insights[...]` referencia uma variável inexistente.
+- `useEffect(() => { loadInsights(); ... })` chama uma função que não existe mais.
+- Quando o componente monta, dá erro em runtime → ErrorBoundary mostra **"Algo deu errado"** em todas as abas que usam essa página.
 
-## O que vou fazer
+# Correção (sem remover nenhuma função)
 
-### 1. Migrar fetches críticos para React Query (cache global)
-- Criar hooks `useClients`, `useTasks`, `useContracts`, `useNotificationStates`, `useMensalidades`, `useTransacoes`.
-- `staleTime: 60s` e `gcTime: 5min` → ao trocar de página, dados aparecem instantaneamente do cache.
-- `Dashboard` e `NotificationBar` passam a compartilhar o mesmo cache (uma só requisição serve os dois).
+Refatorar o trecho entre as linhas ~222 e ~257 de `src/pages/ClientDetail.tsx` para reconstruir a função `loadInsights` corretamente:
 
-### 2. Estabilizar o `RouteBoundary`
-- Remover o `key={location.pathname}` para evitar desmontar a árvore a cada navegação.
-- Resetar o ErrorBoundary apenas quando ocorre erro real, não a cada rota.
+```ts
+// Buscar insights da Meta para o período selecionado
+const loadInsights = async () => {
+  if (!id) return;
+  const metaCampaigns = campaigns.filter(c => c.source === 'meta' && c.meta_campaign_id);
+  if (metaCampaigns.length === 0) {
+    // Mesmo sem chamada à API, ainda monta fallback a partir dos dados salvos
+    const fallback: Record<string, CampaignInsights> = {};
+    for (const c of campaigns) {
+      if (c.source === 'meta') {
+        const spend = Number(c.spend) || 0;
+        const leads = Number((c as any).leads) || 0;
+        const purchases = Number((c as any).purchases) || 0;
+        const messages = Number((c as any).messages) || 0;
+        const revenue = Number((c as any).revenue) || 0;
+        fallback[c.id] = {
+          spend,
+          impressions: Number(c.impressions) || 0,
+          clicks: Number(c.clicks) || 0,
+          ctr: Number((c as any).ctr) || 0,
+          cpc: Number((c as any).cpc) || 0,
+          cpm: Number((c as any).cpm) || 0,
+          reach: Number((c as any).reach) || 0,
+          leads, purchases, messages,
+          link_clicks: Number((c as any).link_clicks) || 0,
+          revenue,
+          cpl: leads > 0 ? spend / leads : 0,
+          cpp: purchases > 0 ? spend / purchases : 0,
+          cpm_msg: messages > 0 ? spend / messages : 0,
+          roas: spend > 0 ? revenue / spend : 0,
+        };
+      }
+    }
+    setInsightsByCamp(fallback);
+    return;
+  }
 
-### 3. Pausar polling quando a aba está oculta
-- `NotificationBar` só faz polling quando `document.visibilityState === 'visible'`.
-- Refazer fetch imediatamente ao voltar para a aba.
+  setLoadingInsights(true);
+  try {
+    const { data, error } = await supabase.functions.invoke('meta-campaign-insights', {
+      body: {
+        client_id: id,
+        campaign_ids: metaCampaigns.map(c => c.meta_campaign_id),
+        ...buildPeriodBody(),
+      },
+    });
+    if (error) throw error;
 
-### 4. Tornar `useAccessCheck` realmente não-bloqueante
-- Manter cache de 5 min já existente.
-- Aumentar tolerância a falha (fail-open silencioso).
-- Não disparar nenhum re-render quando a verificação falha.
+    const mapped: Record<string, CampaignInsights> = {};
+    for (const c of campaigns) {
+      if (c.meta_campaign_id && data?.insights?.[c.meta_campaign_id]) {
+        mapped[c.id] = data.insights[c.meta_campaign_id];
+      } else if (c.source === 'meta') {
+        // Fallback: usa métricas salvas no banco durante o import
+        const spend = Number(c.spend) || 0;
+        const leads = Number((c as any).leads) || 0;
+        const purchases = Number((c as any).purchases) || 0;
+        const messages = Number((c as any).messages) || 0;
+        const revenue = Number((c as any).revenue) || 0;
+        mapped[c.id] = {
+          spend,
+          impressions: Number(c.impressions) || 0,
+          clicks: Number(c.clicks) || 0,
+          ctr: Number((c as any).ctr) || 0,
+          cpc: Number((c as any).cpc) || 0,
+          cpm: Number((c as any).cpm) || 0,
+          reach: Number((c as any).reach) || 0,
+          leads, purchases, messages,
+          link_clicks: Number((c as any).link_clicks) || 0,
+          revenue,
+          cpl: leads > 0 ? spend / leads : 0,
+          cpp: purchases > 0 ? spend / purchases : 0,
+          cpm_msg: messages > 0 ? spend / messages : 0,
+          roas: spend > 0 ? revenue / spend : 0,
+        };
+      }
+    }
+    setInsightsByCamp(mapped);
+  } catch (e) {
+    console.error('[loadInsights] erro:', e);
+  } finally {
+    setLoadingInsights(false);
+  }
+};
 
-### 5. Suavizar o fallback de carregamento
-- Trocar o `PageFallback` (texto "Carregando...") por um skeleton sutil que ocupa o mesmo espaço da página → fim do "flash preto".
-- Garantir que a Suspense só apareça no primeiro carregamento de cada chunk (depois fica em cache).
+useEffect(() => {
+  loadInsights();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [campaigns.length, dateRange.preset, dateRange.since, dateRange.until]);
+```
 
-### 6. Refinar `ChunkErrorRecovery`
-- Só recarregar se o erro for confirmadamente de chunk (não qualquer erro).
-- Aumentar debounce e limitar a 1 reload por sessão.
+# O que isso resolve
 
-### 7. Otimizar renders pesados
-- Memoizar cálculos em `Dashboard` (já usa `useMemo` parcialmente — ampliar).
-- `NotificationBar`: memoizar `visible`, `unreadList`, `readList` com `useMemo`.
-- Evitar recriar objetos em `mainNavItems` a cada render do `AppLayout`.
+- ✅ Remove os 3 erros de TypeScript (`data` inexistente e `loadInsights` inexistente).
+- ✅ Volta a tela de detalhes do cliente a renderizar (sem mais "Algo deu errado").
+- ✅ Mantém intactas todas as outras funções (Meta Ads, criativos, anexos, campanhas, etc.).
+- ✅ Mantém o **fallback** com métricas salvas no banco para quando a edge function não retornar insights.
 
-### 8. Reduzir payload do polling de notificações
-- Selecionar só os campos necessários (já feito em parte).
-- Adicionar limites razoáveis (`limit(100)`) onde faz sentido.
+# Arquivos alterados
 
-## Arquivos afetados
+- `src/pages/ClientDetail.tsx` — apenas o bloco entre as linhas ~222 e ~257.
 
-- `src/App.tsx` (RouteBoundary, ChunkErrorRecovery, PageFallback, QueryClient config)
-- `src/components/NotificationBar.tsx` (React Query, visibilidade, memoização)
-- `src/components/AppLayout.tsx` (memoização de listas)
-- `src/pages/Dashboard.tsx` (React Query)
-- `src/hooks/useAccessCheck.ts` (silenciar falhas)
-- Novo: `src/hooks/queries/` com hooks compartilhados (`useClients`, `useTasks`, `useContracts`, `useNotificationStates`, `useMensalidades`, `useTransacoes`)
-
-## Resultado esperado
-
-- Navegação **instantânea** entre páginas (sem flash, sem refetch).
-- Notificações continuam atualizando, mas sem duplicar chamadas.
-- Sem mais "tela preta" durante a navegação.
-- Menos consumo de rede e CPU.
-- Zero funções removidas.
+Nenhum outro arquivo precisa ser tocado, e nenhuma funcionalidade existente é removida.
