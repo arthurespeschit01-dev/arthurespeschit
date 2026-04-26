@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { useClientsQuery, useTasksQuery, useContractsQuery, useNotificationStatesQuery } from '@/hooks/queries/useSharedData';
 
 interface Notification {
   id: string;
