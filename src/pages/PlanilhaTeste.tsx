@@ -507,7 +507,9 @@ function PlatformSheet({
             })}
 
             <tr className="bg-primary text-primary-foreground">
-              <td colSpan={15} className="px-3 py-2 font-semibold sticky left-0 bg-primary z-10">TAXAS DE CONVERSÃO</td>
+              <td colSpan={15} className="px-0 py-0 font-semibold bg-primary">
+                <div className="sticky left-0 px-3 py-2 inline-block">TAXAS DE CONVERSÃO</div>
+              </td>
             </tr>
             {conversionRows.map((row) => (
               <tr key={row.key} className="bg-card border-b border-border">
