@@ -429,10 +429,10 @@ function PlatformSheet({
     }
     return (
       <input
-        type="number"
-        step={isMoney ? "0.01" : "1"}
-        value={v === 0 ? "" : v}
-        onChange={(e) => setObjective(k, Number(e.target.value) || 0)}
+        type="text"
+        inputMode="decimal"
+        value={v === 0 ? "" : String(v)}
+        onChange={(e) => setObjective(k, parseNum(e.target.value))}
         className={`w-full bg-transparent text-right text-xs px-2 py-1.5 outline-none focus:bg-background focus:ring-2 focus:ring-primary rounded font-semibold ${color}`}
         placeholder={isMoney ? "R$ 0,00" : "0"}
       />
