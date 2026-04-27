@@ -530,3 +530,63 @@ function PlatformSheet({
     </>
   );
 }
+
+// =================== Download menu ===================
+function DownloadMenu({
+  disabled, clientName, year, facebook, google, geral, currentTab,
+}: {
+  disabled: boolean;
+  clientName: string;
+  year: number;
+  facebook: ExportPlatformData;
+  google: ExportPlatformData;
+  geral: ExportPlatformData;
+  currentTab: "facebook" | "google" | "geral";
+}) {
+  const slug = clientName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "cliente";
+
+  const platforms: { key: "facebook" | "google" | "geral"; label: string; data: ExportPlatformData }[] = [
+    { key: "facebook", label: "Facebook Ads", data: facebook },
+    { key: "google", label: "Google Ads", data: google },
+    { key: "geral", label: "Geral", data: geral },
+  ];
+
+  const handle = (format: "csv" | "xlsx" | "pdf", p: { key: string; label: string; data: ExportPlatformData }) => {
+    const filename = `planilha-${slug}-${p.key}-${year}`;
+    const title = `Planilha ${p.label} — ${clientName} — ${year}`;
+    try {
+      if (format === "csv") exportCSV(p.data, year, filename);
+      else if (format === "xlsx") exportXLSX(p.data, year, filename, p.label);
+      else exportPDF(p.data, year, filename, title);
+      toast.success(`Exportado: ${p.label} (${format.toUpperCase()})`);
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro ao exportar");
+    }
+  };
+
+  const current = platforms.find((p) => p.key === currentTab)!;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" disabled={disabled}>
+          <Download className="w-4 h-4 mr-1" /> Baixar
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64">
+        <DropdownMenuLabel>Aba atual: {current.label}</DropdownMenuLabel>
+        <DropdownMenuItem onClick={() => handle("csv", current)}>Baixar CSV</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handle("xlsx", current)}>Baixar XLSX</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handle("pdf", current)}>Baixar PDF</DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Outras abas</DropdownMenuLabel>
+        {platforms.filter((p) => p.key !== currentTab).flatMap((p) => [
+          <DropdownMenuItem key={`${p.key}-csv`} onClick={() => handle("csv", p)}>{p.label} — CSV</DropdownMenuItem>,
+          <DropdownMenuItem key={`${p.key}-xlsx`} onClick={() => handle("xlsx", p)}>{p.label} — XLSX</DropdownMenuItem>,
+          <DropdownMenuItem key={`${p.key}-pdf`} onClick={() => handle("pdf", p)}>{p.label} — PDF</DropdownMenuItem>,
+        ])}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
