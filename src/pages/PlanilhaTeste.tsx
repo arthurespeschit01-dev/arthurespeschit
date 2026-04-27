@@ -488,11 +488,14 @@ function PlatformSheet({
           <tbody>
             {rows.map((row) => {
               const isInput = row.type === "input-money" || row.type === "input-int";
-              const bg = isInput && !readOnly ? "bg-accent/40" : (isInput && readOnly ? "bg-muted/40" : "bg-card");
+              // Fundo da linha (semi-transparente, ok para colunas roláveis)
+              const rowBg = isInput && !readOnly ? "bg-accent/40" : (isInput && readOnly ? "bg-muted/40" : "bg-card");
+              // Fundo OPACO para as células sticky — evita ver as células dos meses passando por baixo
+              const stickyBg = isInput && !readOnly ? "bg-accent" : (isInput && readOnly ? "bg-muted" : "bg-card");
               return (
-                <tr key={row.key} className={`${bg} border-b border-border`}>
-                  <td className={`px-3 py-1 sticky left-0 ${bg} z-10 font-medium text-foreground border-r border-border min-w-[220px]`}>{row.label}</td>
-                  <td className={`sticky left-[220px] ${bg} z-10 border-r border-border min-w-[120px]`}>{renderObjectiveCell(row)}</td>
+                <tr key={row.key} className={`${rowBg} border-b border-border`}>
+                  <td className={`px-3 py-1 sticky left-0 ${stickyBg} z-10 font-medium text-foreground border-r border-border min-w-[220px]`}>{row.label}</td>
+                  <td className={`sticky left-[220px] ${stickyBg} z-10 border-r border-border min-w-[120px]`}>{renderObjectiveCell(row)}</td>
                   {Array.from({ length: 12 }).map((_, i) => (
                     <td key={i} className="text-right px-1 border-r border-border/60">
                       {isInput ? renderInputCell(row, i) : <div className="px-2 py-1.5">{renderCalcCell(row, i)}</div>}
