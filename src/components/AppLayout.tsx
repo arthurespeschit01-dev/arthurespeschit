@@ -17,7 +17,7 @@ const mainNavItems = [
   { to: '/clientes', label: 'Clientes', icon: Users },
   { to: '/tasks', label: 'Tasks', icon: ListTodo },
   { to: '/financeiro', label: 'Financeiro', icon: DollarSign },
-  { to: '/planilha', label: 'Planilha', icon: BarChart3 },
+  // { to: '/planilha', label: 'Planilha', icon: BarChart3 },
   { to: '/planilha-teste', label: 'Planilha acompanhamento', icon: BarChart3 },
   { to: '/contratos', label: 'Contratos', icon: FileText },
   { to: '/estrategias', label: 'Geração de Estratégia', icon: Sparkles },
