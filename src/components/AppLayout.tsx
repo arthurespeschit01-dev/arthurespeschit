@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import NotificationBar from '@/components/NotificationBar';
 import SupportFAB from '@/components/SupportFAB';
+import ThemeToggle from '@/components/ThemeToggle';
 
 import { NavLink } from 'react-router-dom';
 import {
@@ -122,6 +123,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Menu className="w-5 h-5" />
           </button>
           <div className="ml-auto flex items-center gap-3">
+            <ThemeToggle />
             <NotificationBar />
             <span className="text-sm text-muted-foreground">{user?.email}</span>
           </div>
