@@ -6,7 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { exportCSV, exportXLSX, exportPDF, type PlatformData as ExportPlatformData } from "@/lib/exportPlanilha";
 
 type Client = { id: string; name: string };
 
@@ -209,8 +212,21 @@ export default function PlanilhaTeste() {
           <h1 className="text-2xl font-bold">Planilha teste</h1>
           <p className="text-sm text-muted-foreground">Acompanhamento mensal de tráfego pago por cliente e plataforma.</p>
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          {saving && <><Loader2 className="w-3 h-3 animate-spin" /> Salvando...</>}
+        <div className="flex items-center gap-3">
+          {saving && (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Loader2 className="w-3 h-3 animate-spin" /> Salvando...
+            </span>
+          )}
+          <DownloadMenu
+            disabled={!clientId || loading}
+            clientName={clients.find((c) => c.id === clientId)?.name || "cliente"}
+            year={year}
+            facebook={facebook as unknown as ExportPlatformData}
+            google={google as unknown as ExportPlatformData}
+            geral={geral as unknown as ExportPlatformData}
+            currentTab={tab}
+          />
         </div>
       </div>
 
@@ -512,5 +528,65 @@ function PlatformSheet({
         </table>
       </div>
     </>
+  );
+}
+
+// =================== Download menu ===================
+function DownloadMenu({
+  disabled, clientName, year, facebook, google, geral, currentTab,
+}: {
+  disabled: boolean;
+  clientName: string;
+  year: number;
+  facebook: ExportPlatformData;
+  google: ExportPlatformData;
+  geral: ExportPlatformData;
+  currentTab: "facebook" | "google" | "geral";
+}) {
+  const slug = clientName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "cliente";
+
+  const platforms: { key: "facebook" | "google" | "geral"; label: string; data: ExportPlatformData }[] = [
+    { key: "facebook", label: "Facebook Ads", data: facebook },
+    { key: "google", label: "Google Ads", data: google },
+    { key: "geral", label: "Geral", data: geral },
+  ];
+
+  const handle = (format: "csv" | "xlsx" | "pdf", p: { key: string; label: string; data: ExportPlatformData }) => {
+    const filename = `planilha-${slug}-${p.key}-${year}`;
+    const title = `Planilha ${p.label} — ${clientName} — ${year}`;
+    try {
+      if (format === "csv") exportCSV(p.data, year, filename);
+      else if (format === "xlsx") exportXLSX(p.data, year, filename, p.label);
+      else exportPDF(p.data, year, filename, title);
+      toast.success(`Exportado: ${p.label} (${format.toUpperCase()})`);
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro ao exportar");
+    }
+  };
+
+  const current = platforms.find((p) => p.key === currentTab)!;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" disabled={disabled}>
+          <Download className="w-4 h-4 mr-1" /> Baixar
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64">
+        <DropdownMenuLabel>Aba atual: {current.label}</DropdownMenuLabel>
+        <DropdownMenuItem onClick={() => handle("csv", current)}>Baixar CSV</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handle("xlsx", current)}>Baixar XLSX</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handle("pdf", current)}>Baixar PDF</DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Outras abas</DropdownMenuLabel>
+        {platforms.filter((p) => p.key !== currentTab).flatMap((p) => [
+          <DropdownMenuItem key={`${p.key}-csv`} onClick={() => handle("csv", p)}>{p.label} — CSV</DropdownMenuItem>,
+          <DropdownMenuItem key={`${p.key}-xlsx`} onClick={() => handle("xlsx", p)}>{p.label} — XLSX</DropdownMenuItem>,
+          <DropdownMenuItem key={`${p.key}-pdf`} onClick={() => handle("pdf", p)}>{p.label} — PDF</DropdownMenuItem>,
+        ])}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
