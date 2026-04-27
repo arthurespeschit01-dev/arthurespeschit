@@ -212,8 +212,21 @@ export default function PlanilhaTeste() {
           <h1 className="text-2xl font-bold">Planilha teste</h1>
           <p className="text-sm text-muted-foreground">Acompanhamento mensal de tráfego pago por cliente e plataforma.</p>
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          {saving && <><Loader2 className="w-3 h-3 animate-spin" /> Salvando...</>}
+        <div className="flex items-center gap-3">
+          {saving && (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Loader2 className="w-3 h-3 animate-spin" /> Salvando...
+            </span>
+          )}
+          <DownloadMenu
+            disabled={!clientId || loading}
+            clientName={clients.find((c) => c.id === clientId)?.name || "cliente"}
+            year={year}
+            facebook={facebook as unknown as ExportPlatformData}
+            google={google as unknown as ExportPlatformData}
+            geral={geral as unknown as ExportPlatformData}
+            currentTab={tab}
+          />
         </div>
       </div>
 
