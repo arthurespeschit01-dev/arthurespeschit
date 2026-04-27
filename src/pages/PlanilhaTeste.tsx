@@ -427,30 +427,22 @@ function PlatformSheet({
   };
 
   const renderObjectiveCell = (row: RowDef) => {
-    if (row.type !== "input-money" && row.type !== "input-int") {
+    // Objetivo só existe na linha de "Investimento em mídia"
+    if (row.key !== "investment") {
       return <span className="text-xs text-muted-foreground">—</span>;
     }
-    const k = row.inputKey!;
-    const v = objectives[k] || 0;
-    const isMoney = row.type === "input-money";
-    const total = sum(monthly[k]);
-    let color = "";
-    if (v > 0) {
-      const better = row.higherIsBetter !== false;
-      const meets = better ? total >= v : total <= v;
-      color = meets ? "text-emerald-600" : "text-destructive";
-    }
+    const v = objectives.investment || 0;
     if (readOnly) {
-      return <span className={`text-xs font-semibold ${color}`}>{v === 0 ? "—" : isMoney ? fmtBRL(v) : fmtInt(v)}</span>;
+      return <span className="text-xs font-semibold">{v === 0 ? "—" : fmtBRL(v)}</span>;
     }
     return (
       <input
         type="text"
         inputMode="decimal"
         value={v === 0 ? "" : String(v)}
-        onChange={(e) => setObjective(k, parseNum(e.target.value))}
-        className={`w-full bg-transparent text-right text-xs px-2 py-1.5 outline-none focus:bg-background focus:ring-2 focus:ring-primary rounded font-semibold ${color}`}
-        placeholder={isMoney ? "R$ 0,00" : "0"}
+        onChange={(e) => setObjective("investment", parseNum(e.target.value))}
+        className="w-full bg-transparent text-right text-xs px-2 py-1.5 outline-none focus:bg-background focus:ring-2 focus:ring-primary rounded font-semibold"
+        placeholder="R$ 0,00"
       />
     );
   };
@@ -485,8 +477,8 @@ function PlatformSheet({
         <table className="w-full text-xs border-collapse min-w-[1200px]">
           <thead>
             <tr className="bg-primary text-primary-foreground">
-              <th className="text-left px-3 py-2 font-semibold sticky left-0 bg-primary z-10 min-w-[220px]">Métrica</th>
-              <th className="px-3 py-2 font-semibold min-w-[110px]">OBJETIVO</th>
+              <th className="text-left px-3 py-2 font-semibold sticky left-0 bg-primary z-20 min-w-[220px]">Métrica</th>
+              <th className="px-3 py-2 font-semibold sticky left-[220px] bg-primary z-20 min-w-[120px] border-l border-primary-foreground/20">OBJETIVO</th>
               {monthHeaders.map((m) => (
                 <th key={m} className="px-2 py-2 font-semibold min-w-[90px]">{m}</th>
               ))}
@@ -499,8 +491,8 @@ function PlatformSheet({
               const bg = isInput && !readOnly ? "bg-accent/40" : (isInput && readOnly ? "bg-muted/40" : "bg-card");
               return (
                 <tr key={row.key} className={`${bg} border-b border-border`}>
-                  <td className={`px-3 py-1 sticky left-0 ${bg} z-[1] font-medium text-foreground border-r border-border`}>{row.label}</td>
-                  <td className="border-r border-border">{renderObjectiveCell(row)}</td>
+                  <td className={`px-3 py-1 sticky left-0 ${bg} z-10 font-medium text-foreground border-r border-border min-w-[220px]`}>{row.label}</td>
+                  <td className={`sticky left-[220px] ${bg} z-10 border-r border-border min-w-[120px]`}>{renderObjectiveCell(row)}</td>
                   {Array.from({ length: 12 }).map((_, i) => (
                     <td key={i} className="text-right px-1 border-r border-border/60">
                       {isInput ? renderInputCell(row, i) : <div className="px-2 py-1.5">{renderCalcCell(row, i)}</div>}
@@ -512,12 +504,12 @@ function PlatformSheet({
             })}
 
             <tr className="bg-primary text-primary-foreground">
-              <td colSpan={15} className="px-3 py-2 font-semibold sticky left-0 bg-primary">TAXAS DE CONVERSÃO</td>
+              <td colSpan={15} className="px-3 py-2 font-semibold sticky left-0 bg-primary z-10">TAXAS DE CONVERSÃO</td>
             </tr>
             {conversionRows.map((row) => (
               <tr key={row.key} className="bg-card border-b border-border">
-                <td className="px-3 py-1.5 sticky left-0 bg-card z-[1] font-medium text-foreground border-r border-border">{row.label}</td>
-                <td className="border-r border-border text-center text-muted-foreground">—</td>
+                <td className="px-3 py-1.5 sticky left-0 bg-card z-10 font-medium text-foreground border-r border-border min-w-[220px]">{row.label}</td>
+                <td className="sticky left-[220px] bg-card z-10 border-r border-border text-center text-muted-foreground min-w-[120px]">—</td>
                 {Array.from({ length: 12 }).map((_, i) => (
                   <td key={i} className="text-right px-3 py-1.5 border-r border-border/60">{renderCalcCell(row, i)}</td>
                 ))}
