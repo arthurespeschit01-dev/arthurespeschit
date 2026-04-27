@@ -427,30 +427,22 @@ function PlatformSheet({
   };
 
   const renderObjectiveCell = (row: RowDef) => {
-    if (row.type !== "input-money" && row.type !== "input-int") {
+    // Objetivo só existe na linha de "Investimento em mídia"
+    if (row.key !== "investment") {
       return <span className="text-xs text-muted-foreground">—</span>;
     }
-    const k = row.inputKey!;
-    const v = objectives[k] || 0;
-    const isMoney = row.type === "input-money";
-    const total = sum(monthly[k]);
-    let color = "";
-    if (v > 0) {
-      const better = row.higherIsBetter !== false;
-      const meets = better ? total >= v : total <= v;
-      color = meets ? "text-emerald-600" : "text-destructive";
-    }
+    const v = objectives.investment || 0;
     if (readOnly) {
-      return <span className={`text-xs font-semibold ${color}`}>{v === 0 ? "—" : isMoney ? fmtBRL(v) : fmtInt(v)}</span>;
+      return <span className="text-xs font-semibold">{v === 0 ? "—" : fmtBRL(v)}</span>;
     }
     return (
       <input
         type="text"
         inputMode="decimal"
         value={v === 0 ? "" : String(v)}
-        onChange={(e) => setObjective(k, parseNum(e.target.value))}
-        className={`w-full bg-transparent text-right text-xs px-2 py-1.5 outline-none focus:bg-background focus:ring-2 focus:ring-primary rounded font-semibold ${color}`}
-        placeholder={isMoney ? "R$ 0,00" : "0"}
+        onChange={(e) => setObjective("investment", parseNum(e.target.value))}
+        className="w-full bg-transparent text-right text-xs px-2 py-1.5 outline-none focus:bg-background focus:ring-2 focus:ring-primary rounded font-semibold"
+        placeholder="R$ 0,00"
       />
     );
   };
