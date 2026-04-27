@@ -22,6 +22,7 @@ const Contratos = lazy(() => import("./pages/Contratos"));
 const Scripts = lazy(() => import("./pages/Scripts"));
 const Objecoes = lazy(() => import("./pages/Objecoes"));
 const Planilha = lazy(() => import("./pages/Planilha"));
+const PlanilhaTeste = lazy(() => import("./pages/PlanilhaTeste"));
 const Tasks = lazy(() => import("./pages/Tasks"));
 const UTMGenerator = lazy(() => import("./pages/UTMGenerator"));
 const Estrategias = lazy(() => import("./pages/Estrategias"));
@@ -110,6 +111,7 @@ function ProtectedRoutes() {
                 <Route path="/scripts" element={<Scripts />} />
                 <Route path="/objecoes" element={<Objecoes />} />
                 <Route path="/planilha" element={<Planilha />} />
+                <Route path="/planilha-teste" element={<PlanilhaTeste />} />
                 <Route path="/tasks" element={<Tasks />} />
                 <Route path="/estrategias" element={<Estrategias />} />
                 <Route path="/utm" element={<UTMGenerator />} />
