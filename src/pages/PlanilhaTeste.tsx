@@ -477,8 +477,8 @@ function PlatformSheet({
         <table className="w-full text-xs border-collapse min-w-[1200px]">
           <thead>
             <tr className="bg-primary text-primary-foreground">
-              <th className="text-left px-3 py-2 font-semibold sticky left-0 bg-primary z-10 min-w-[220px]">Métrica</th>
-              <th className="px-3 py-2 font-semibold min-w-[110px]">OBJETIVO</th>
+              <th className="text-left px-3 py-2 font-semibold sticky left-0 bg-primary z-20 min-w-[220px]">Métrica</th>
+              <th className="px-3 py-2 font-semibold sticky left-[220px] bg-primary z-20 min-w-[120px] border-l border-primary-foreground/20">OBJETIVO</th>
               {monthHeaders.map((m) => (
                 <th key={m} className="px-2 py-2 font-semibold min-w-[90px]">{m}</th>
               ))}
@@ -491,8 +491,8 @@ function PlatformSheet({
               const bg = isInput && !readOnly ? "bg-accent/40" : (isInput && readOnly ? "bg-muted/40" : "bg-card");
               return (
                 <tr key={row.key} className={`${bg} border-b border-border`}>
-                  <td className={`px-3 py-1 sticky left-0 ${bg} z-[1] font-medium text-foreground border-r border-border`}>{row.label}</td>
-                  <td className="border-r border-border">{renderObjectiveCell(row)}</td>
+                  <td className={`px-3 py-1 sticky left-0 ${bg} z-10 font-medium text-foreground border-r border-border min-w-[220px]`}>{row.label}</td>
+                  <td className={`sticky left-[220px] ${bg} z-10 border-r border-border min-w-[120px]`}>{renderObjectiveCell(row)}</td>
                   {Array.from({ length: 12 }).map((_, i) => (
                     <td key={i} className="text-right px-1 border-r border-border/60">
                       {isInput ? renderInputCell(row, i) : <div className="px-2 py-1.5">{renderCalcCell(row, i)}</div>}
@@ -504,12 +504,12 @@ function PlatformSheet({
             })}
 
             <tr className="bg-primary text-primary-foreground">
-              <td colSpan={15} className="px-3 py-2 font-semibold sticky left-0 bg-primary">TAXAS DE CONVERSÃO</td>
+              <td colSpan={15} className="px-3 py-2 font-semibold sticky left-0 bg-primary z-10">TAXAS DE CONVERSÃO</td>
             </tr>
             {conversionRows.map((row) => (
               <tr key={row.key} className="bg-card border-b border-border">
-                <td className="px-3 py-1.5 sticky left-0 bg-card z-[1] font-medium text-foreground border-r border-border">{row.label}</td>
-                <td className="border-r border-border text-center text-muted-foreground">—</td>
+                <td className="px-3 py-1.5 sticky left-0 bg-card z-10 font-medium text-foreground border-r border-border min-w-[220px]">{row.label}</td>
+                <td className="sticky left-[220px] bg-card z-10 border-r border-border text-center text-muted-foreground min-w-[120px]">—</td>
                 {Array.from({ length: 12 }).map((_, i) => (
                   <td key={i} className="text-right px-3 py-1.5 border-r border-border/60">{renderCalcCell(row, i)}</td>
                 ))}
