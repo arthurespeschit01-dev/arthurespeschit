@@ -1069,6 +1069,42 @@ export type Database = {
           },
         ]
       }
+      traffic_records: {
+        Row: {
+          client_id: string
+          created_at: string
+          funnel_config: Json
+          id: string
+          monthly_data: Json
+          objectives: Json
+          updated_at: string
+          user_id: string
+          year: number
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          funnel_config?: Json
+          id?: string
+          monthly_data?: Json
+          objectives?: Json
+          updated_at?: string
+          user_id: string
+          year: number
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          funnel_config?: Json
+          id?: string
+          monthly_data?: Json
+          objectives?: Json
+          updated_at?: string
+          user_id?: string
+          year?: number
+        }
+        Relationships: []
+      }
       transacoes: {
         Row: {
           categoria: string | null
