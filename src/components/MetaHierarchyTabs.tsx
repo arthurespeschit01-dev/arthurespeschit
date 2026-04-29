@@ -506,9 +506,6 @@ export default function MetaHierarchyTabs({
                       key={c.id}
                       className={`border-b border-border/40 hover:bg-secondary/30 transition-colors ${checked ? 'bg-primary/5' : ''}`}
                     >
-                      <td className="px-3 py-2">
-                        <Checkbox checked={checked} onCheckedChange={() => toggleCampaign(c.id)} />
-                      </td>
                       <td className="px-2 py-2">
                         {isMeta ? (
                           <EntityStatusToggle
