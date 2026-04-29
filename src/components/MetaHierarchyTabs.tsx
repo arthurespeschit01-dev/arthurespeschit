@@ -243,7 +243,9 @@ export default function MetaHierarchyTabs({
     cost_per_follower: Number(cr.followers) > 0 ? Number(cr.spend) / Number(cr.followers) : 0,
   });
 
-  const objectiveFor = (campId: string) => campaigns.find(c => c.id === campId)?.objective || '';
+  const campaignFor = (campId: string) => campaigns.find(c => c.id === campId);
+  const objectiveFor = (campId: string) => campaignFor(campId)?.objective || '';
+  const optGoalForCampaign = (campId: string) => campaignFor(campId)?.optimization_goal || '';
 
   // Filtros derivados
   const filteredCampaigns = useMemo(() => {
