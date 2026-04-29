@@ -645,8 +645,19 @@ export default function ClientDetail() {
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(c.status)}`}>{c.status}</span>
+                    {c.source === 'meta' && id && (
+                      <EntityActionsMenu
+                        clientId={id}
+                        entityType="campaign"
+                        metaId={c.meta_campaign_id}
+                        status={c.status}
+                        onChanged={(ns) => {
+                          setCampaigns(prev => prev.map(x => x.id === c.id ? { ...x, status: ns || x.status } : x));
+                        }}
+                      />
+                    )}
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       {c.source !== 'meta' && <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={(e) => openEditCampaign(c, e)}><Edit2 className="w-3 h-3" /></Button>}
                       <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:text-destructive" onClick={(e) => deleteCampaign(c.id, e)}><Trash2 className="w-3 h-3" /></Button>
