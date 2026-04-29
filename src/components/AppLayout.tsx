@@ -197,6 +197,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <button onClick={() => setSidebarOpen(true)} className="lg:hidden mr-3 text-muted-foreground hover:text-foreground">
               <Menu className="w-5 h-5" />
             </button>
+            <button
+              onClick={toggleCollapsed}
+              className="hidden lg:flex mr-3 text-muted-foreground hover:text-foreground items-center justify-center w-8 h-8 rounded-md hover:bg-accent"
+              aria-label={collapsed ? 'Expandir menu' : 'Minimizar menu'}
+              title={collapsed ? 'Expandir menu' : 'Minimizar menu'}
+            >
+              {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+            </button>
             <div className="ml-auto flex items-center gap-2 sm:gap-3 min-w-0">
               <ThemeToggle />
               <NotificationBar />
