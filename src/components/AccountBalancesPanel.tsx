@@ -78,7 +78,6 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
   const [loading, setLoading] = useState(false);
   const [accounts, setAccounts] = useState<AccountBalance[]>(initialAccounts || []);
   const [hasLoaded, setHasLoaded] = useState(!!initialAccounts?.length);
-  const [threshold, setThreshold] = useState<number>(getThreshold);
 
   useEffect(() => {
     if (initialAccounts && initialAccounts.length) {
