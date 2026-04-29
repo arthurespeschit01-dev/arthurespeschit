@@ -693,9 +693,21 @@ export default function ClientDetail() {
       {/* Campanhas Tab - Detail */}
       {tab === 'campanhas' && selectedCampaign && (
         <div className="space-y-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button variant="ghost" size="sm" onClick={() => setSelectedCampaign(null)}><ArrowLeft className="w-4 h-4 mr-1" /> Voltar</Button>
             <Button variant="outline" size="sm" onClick={() => openEditCampaign(selectedCampaign)} className="gap-1"><Edit2 className="w-3 h-3" /> Editar Campanha</Button>
+            {selectedCampaign.source === 'meta' && (
+              <div className="ml-auto flex items-center gap-2">
+                {reloadingCampaign && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+                <DateRangePicker
+                  value={campaignDateRange}
+                  onChange={(r) => {
+                    setCampaignDateRange(r);
+                    if (selectedCampaign) reloadCampaignForRange(selectedCampaign, r);
+                  }}
+                />
+              </div>
+            )}
           </div>
           <div className="glass-surface rounded-xl p-5">
             <h3 className="font-semibold text-foreground mb-2">{selectedCampaign.name}</h3>
