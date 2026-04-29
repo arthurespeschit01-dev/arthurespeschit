@@ -15,6 +15,7 @@ import MetaAdsTab from '@/components/MetaAdsTab';
 import { DateRangePicker, type DateRangeValue } from '@/components/DateRangePicker';
 import { metricsForObjective, type CampaignInsights } from '@/lib/campaignMetrics';
 import { exportCampaignsPDF } from '@/lib/exportCampaignsPDF';
+import EntityActionsMenu from '@/components/EntityActionsMenu';
 
 interface AccountIds {
   bm?: string;
