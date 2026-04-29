@@ -477,6 +477,7 @@ export default function MetaHierarchyTabs({
             <table className="w-full text-xs">
               <thead className="bg-secondary/40 border-b border-border/50">
                 <tr className="text-left">
+                  <th className="px-3 py-2 w-8"></th>
                   <th className="px-2 py-2 w-16 text-muted-foreground font-medium">Status</th>
                   <th className="px-3 py-2 text-muted-foreground font-medium min-w-[260px]">
                     <SortHeader label="Campanha" active={sort.key === 'name'} dir={sort.dir} onClick={() => toggleSort('name')} />
@@ -498,6 +499,9 @@ export default function MetaHierarchyTabs({
                       key={c.id}
                       className={`border-b border-border/40 hover:bg-secondary/30 transition-colors ${checked ? 'bg-primary/5' : ''}`}
                     >
+                      <td className="px-3 py-2">
+                        <Checkbox checked={checked} onCheckedChange={() => toggleCampaign(c.id)} />
+                      </td>
                       <td className="px-2 py-2">
                         {isMeta ? (
                           <EntityStatusToggle
@@ -563,7 +567,7 @@ export default function MetaHierarchyTabs({
               <table className="w-full text-xs">
                 <thead className="bg-secondary/40 border-b border-border/50">
                   <tr className="text-left">
-                    
+                    <th className="px-3 py-2 w-8"></th>
                     <th className="px-2 py-2 w-16 text-muted-foreground font-medium">Status</th>
                     <th className="px-3 py-2 text-muted-foreground font-medium min-w-[260px]">
                       <SortHeader label="Conjunto" active={sort.key === 'name'} dir={sort.dir} onClick={() => toggleSort('name')} />
@@ -587,7 +591,7 @@ export default function MetaHierarchyTabs({
                       : (a.lifetime_budget || 0) > 0 ? `R$ ${Number(a.lifetime_budget).toLocaleString('pt-BR')} total` : '—';
                     return (
                       <tr key={a.id} className={`border-b border-border/40 hover:bg-secondary/30 transition-colors ${checked ? 'bg-primary/5' : ''}`}>
-                        
+                        <td className="px-3 py-2"><Checkbox checked={checked} onCheckedChange={() => toggleAdSet(a.id)} /></td>
                         <td className="px-2 py-2">
                           <EntityStatusToggle
                             clientId={clientId} entityType="adset"
