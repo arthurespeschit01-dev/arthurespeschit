@@ -170,19 +170,6 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
       {/* Body */}
       {open && (
         <div className="border-t border-border/50 p-4 space-y-3">
-          <div className="flex flex-wrap items-end gap-3 p-3 bg-secondary/30 rounded-lg border border-border/50">
-            <div className="flex-1 min-w-[180px] max-w-[260px]">
-              <Label className="text-muted-foreground text-xs">Limite mínimo (R$)</Label>
-              <Input
-                type="number"
-                min={0}
-                value={threshold}
-                onChange={(e) => setThreshold(Number(e.target.value) || 0)}
-                className="bg-secondary/50 border-border/50 mt-1 text-sm h-9"
-              />
-              <p className="text-[10px] text-muted-foreground mt-1">Abaixo disso → "Saldo baixo"</p>
-            </div>
-          </div>
 
           {loading && accounts.length === 0 ? (
             <div className="space-y-2">
