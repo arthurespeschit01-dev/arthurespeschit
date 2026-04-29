@@ -190,6 +190,8 @@ export default function Tasks() {
   const [uploading, setUploading] = useState(false);
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [newComment, setNewComment] = useState('');
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
   const [form, setForm] = useState({
     title: '', description: '', status: 'pendente', priority: 'média',
     start_date: '', end_date: '', client_id: '',
@@ -504,7 +506,21 @@ export default function Tasks() {
               return (
                 <div
                   key={statusKey}
-                  className="w-80 lg:w-auto shrink-0 glass-surface rounded-xl border border-border/20 flex flex-col max-h-[calc(100vh-360px)] min-h-[300px]"
+                  onDragOver={(e) => { e.preventDefault(); if (dragOverStatus !== statusKey) setDragOverStatus(statusKey); }}
+                  onDragLeave={(e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverStatus(null);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const id = e.dataTransfer.getData('text/plain') || draggingId;
+                    const task = tasks.find(t => t.id === id);
+                    if (task && task.status !== statusKey) changeStatus(task, statusKey);
+                    setDraggingId(null);
+                    setDragOverStatus(null);
+                  }}
+                  className={`w-80 lg:w-auto shrink-0 glass-surface rounded-xl border flex flex-col max-h-[calc(100vh-360px)] min-h-[300px] transition-colors ${
+                    dragOverStatus === statusKey ? 'border-primary/60 bg-primary/5' : 'border-border/20'
+                  }`}
                 >
                   {/* Column header */}
                   <div className="px-4 py-3 border-b border-border/30 flex items-center gap-2 shrink-0">
@@ -519,7 +535,7 @@ export default function Tasks() {
                   <ScrollArea className="flex-1">
                     <div className="p-2 space-y-2">
                       {tasksInStatus.length === 0 ? (
-                        <p className="text-xs text-muted-foreground text-center py-8">Nenhuma task</p>
+                        <p className="text-xs text-muted-foreground text-center py-8">Solte aqui</p>
                       ) : (
                         tasksInStatus.map(t => {
                           const sc = statusConfig[t.status] || statusConfig.pendente;
@@ -532,7 +548,16 @@ export default function Tasks() {
                           return (
                             <div
                               key={t.id}
-                              className="rounded-lg p-3 bg-secondary/30 hover:bg-secondary/60 transition-all group border border-border/10"
+                              draggable
+                              onDragStart={(e) => {
+                                setDraggingId(t.id);
+                                e.dataTransfer.setData('text/plain', t.id);
+                                e.dataTransfer.effectAllowed = 'move';
+                              }}
+                              onDragEnd={() => { setDraggingId(null); setDragOverStatus(null); }}
+                              className={`rounded-lg p-3 bg-secondary/30 hover:bg-secondary/60 transition-all group border border-border/10 cursor-grab active:cursor-grabbing ${
+                                draggingId === t.id ? 'opacity-40' : ''
+                              }`}
                             >
                               <div className="flex items-start justify-between gap-2 mb-2">
                                 <div
