@@ -199,11 +199,12 @@ export default function ClientDetail() {
   };
   const buildPeriodBody = () => buildPeriodBodyFrom(dateRange);
 
-  const importAdSetsFor = async (camp: Campaign) => {
+  const importAdSetsFor = async (camp: Campaign, range?: DateRangeValue) => {
     setImportingAdSets(true);
     toast.loading('Carregando conjuntos de anúncios...', { id: 'adsets' });
+    const period = buildPeriodBodyFrom(range || dateRange);
     const { data, error } = await supabase.functions.invoke('meta-import-adsets', {
-      body: { client_id: id, campaign_id: camp.id, ...buildPeriodBody() },
+      body: { client_id: id, campaign_id: camp.id, ...period },
     });
     setImportingAdSets(false);
     if (error || data?.error) {
@@ -217,7 +218,29 @@ export default function ClientDetail() {
 
   const importAdSets = async () => {
     if (!selectedCampaign) return;
-    await importAdSetsFor(selectedCampaign);
+    await importAdSetsFor(selectedCampaign, campaignDateRange);
+  };
+
+  // Recarrega conjuntos + criativos da campanha selecionada para um período específico
+  const reloadCampaignForRange = async (camp: Campaign, range: DateRangeValue) => {
+    if (camp.source !== 'meta') return;
+    setReloadingCampaign(true);
+    const period = buildPeriodBodyFrom(range);
+    toast.loading('Atualizando métricas do período...', { id: 'camp-range' });
+    try {
+      // Conjuntos (já recarrega no estado dentro)
+      await importAdSetsFor(camp, range);
+      // Criativos do cliente (filtrados depois pela campanha)
+      await supabase.functions.invoke('meta-import-creatives', {
+        body: { client_id: id, ...period },
+      });
+      await loadCreatives(camp.id);
+      toast.success('Métricas atualizadas', { id: 'camp-range' });
+    } catch (e) {
+      toast.error('Falha ao atualizar métricas', { id: 'camp-range' });
+    } finally {
+      setReloadingCampaign(false);
+    }
   };
 
   useEffect(() => { loadClient(); loadCampaigns(); loadAttachments(); }, [id]);
