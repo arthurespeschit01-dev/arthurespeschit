@@ -16,6 +16,7 @@ import { DateRangePicker, type DateRangeValue } from '@/components/DateRangePick
 import { metricsForObjective, type CampaignInsights } from '@/lib/campaignMetrics';
 import { exportCampaignsPDF } from '@/lib/exportCampaignsPDF';
 import EntityActionsMenu from '@/components/EntityActionsMenu';
+import MetaHierarchyTabs from '@/components/MetaHierarchyTabs';
 
 interface AccountIds {
   bm?: string;
@@ -580,396 +581,49 @@ export default function ClientDetail() {
         </div>
       )}
 
-      {/* Campanhas Tab - List */}
-      {tab === 'campanhas' && !selectedCampaign && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div className="flex gap-1 p-1 bg-secondary/50 rounded-lg">
-              {['Todas', 'Ativa', 'Pausada', 'Encerrada'].map(f => (
-                <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${filter === f ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>{f}</button>
-              ))}
-            </div>
-            <div className="flex gap-2 items-center flex-wrap">
-              <DateRangePicker value={dateRange} onChange={setDateRange} />
-              <Button
-                onClick={() => {
-                  if (campaigns.length === 0) { toast.error('Nenhuma campanha para exportar'); return; }
-                  setExportStatusFilter('todas');
-                  setExportObjectives([]);
-                  setExportSelectedIds(Object.fromEntries(campaigns.map(c => [c.id, true])));
-                  setExportOpen(true);
-                }}
-                variant="outline"
-                size="sm"
-                className="gap-2"
-              >
-                <FileText className="w-3 h-3" /> Exportar PDF
-              </Button>
-              <Button
-                onClick={async () => {
-                  setImportingMeta(true);
-                  const { data, error } = await supabase.functions.invoke('meta-import-campaigns', {
-                    body: { client_id: id, ...buildPeriodBody() },
-                  });
-                  setImportingMeta(false);
-                  if (error || data?.error) {
-                    const msg = (data?.error || error?.message || '').toString();
-                    if (msg.includes('no_connection')) toast.error('Conecte a Meta Ads na aba "Meta Ads" primeiro');
-                    else if (msg.includes('no_selected_account')) toast.error('Selecione uma conta de anúncio na aba "Meta Ads"');
-                    else toast.error('Falha ao importar: ' + msg);
-                    return;
-                  }
-                  toast.success(`${data.imported} campanhas importadas da Meta`);
-                  loadCampaigns();
-                }}
-                disabled={importingMeta}
-                variant="outline"
-                size="sm"
-                className="gap-2"
-              >
-                {importingMeta ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                Importar da Meta
-              </Button>
-              <Button onClick={openNewCampaign} className="neon-glow gap-2" size="sm"><Plus className="w-3 h-3" /> Nova Campanha</Button>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filtered.map(c => (
-              <div key={c.id} onClick={() => openSelectedCampaign(c)} className="glass-surface rounded-xl p-4 cursor-pointer hover:border-primary/30 transition-all group">
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-semibold text-foreground text-sm">{c.name}</h3>
-                    {c.source === 'meta' && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 font-medium flex items-center gap-1">
-                        <Link2 className="w-2.5 h-2.5" /> Meta
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(c.status)}`}>{c.status}</span>
-                    {c.source === 'meta' && id && (
-                      <EntityActionsMenu
-                        clientId={id}
-                        entityType="campaign"
-                        metaId={c.meta_campaign_id}
-                        status={c.status}
-                        onChanged={(ns) => {
-                          setCampaigns(prev => prev.map(x => x.id === c.id ? { ...x, status: ns || x.status } : x));
-                        }}
-                      />
-                    )}
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {c.source !== 'meta' && <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={(e) => openEditCampaign(c, e)}><Edit2 className="w-3 h-3" /></Button>}
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:text-destructive" onClick={(e) => deleteCampaign(c.id, e)}><Trash2 className="w-3 h-3" /></Button>
-                    </div>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">{c.platform} • {c.objective}</p>
-                {c.source === 'meta' && (() => {
-                  const ins = insightsByCamp[c.id] || {
-                    spend: 0, impressions: 0, clicks: 0, ctr: 0, cpc: 0, cpm: 0, reach: 0,
-                    leads: 0, purchases: 0, messages: 0, link_clicks: 0, revenue: 0,
-                    cpl: 0, cpp: 0, cpm_msg: 0, roas: 0,
-                    engagements: 0, frequency: 0, cost_per_engagement: 0,
-                  };
-                  const cells = metricsForObjective(c.objective, ins, c.name);
-                  const hasData = !!insightsByCamp[c.id];
-                  return (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mt-3 pt-2 border-t border-border/50 text-xs">
-                      {cells.map((m, i) => (
-                        <div key={i}>
-                          <p className="text-muted-foreground">{m.label}</p>
-                          <p className={`font-semibold ${m.highlight ? 'text-primary' : 'text-foreground'} ${!hasData ? 'opacity-50' : ''}`}>{m.value}</p>
-                        </div>
-                      ))}
-                      {!hasData && !loadingInsights && (
-                        <p className="col-span-full text-[10px] text-muted-foreground italic">Sem dados no período</p>
-                      )}
-                      {loadingInsights && !hasData && (
-                        <p className="col-span-full text-[10px] text-muted-foreground">Carregando...</p>
-                      )}
-                    </div>
-                  );
-                })()}
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
-                  <span className="text-xs text-muted-foreground">{c.start_date || 'Sem data'}</span>
-                  {c.budget > 0 && <span className="text-xs font-semibold text-primary">R$ {c.budget.toLocaleString('pt-BR')}</span>}
-                </div>
-              </div>
-            ))}
-            {filtered.length === 0 && <p className="text-muted-foreground text-sm col-span-full text-center py-8">Nenhuma campanha encontrada.</p>}
-          </div>
-        </div>
-      )}
-
-      {/* Campanhas Tab - Detail */}
-      {tab === 'campanhas' && selectedCampaign && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button variant="ghost" size="sm" onClick={() => setSelectedCampaign(null)}><ArrowLeft className="w-4 h-4 mr-1" /> Voltar</Button>
-            <Button variant="outline" size="sm" onClick={() => openEditCampaign(selectedCampaign)} className="gap-1"><Edit2 className="w-3 h-3" /> Editar Campanha</Button>
-            {selectedCampaign.source === 'meta' && (
-              <div className="ml-auto flex items-center gap-2">
-                {reloadingCampaign && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
-                <DateRangePicker
-                  value={campaignDateRange}
-                  onChange={(r) => {
-                    setCampaignDateRange(r);
-                    if (selectedCampaign) reloadCampaignForRange(selectedCampaign, r);
-                  }}
-                />
-              </div>
-            )}
-          </div>
-          <div className="glass-surface rounded-xl p-5">
-            <h3 className="font-semibold text-foreground mb-2">{selectedCampaign.name}</h3>
-            <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-3">
-              <span>{selectedCampaign.platform}</span>
-              <span>{selectedCampaign.objective}</span>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(selectedCampaign.status)}`}>{selectedCampaign.status}</span>
-            </div>
-            {selectedCampaign.budget > 0 && (
-              <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 mb-3">
-                <p className="text-xs text-muted-foreground">Orçamento</p>
-                <p className="text-primary font-bold text-lg">R$ {selectedCampaign.budget.toLocaleString('pt-BR')}</p>
-              </div>
-            )}
-            {selectedCampaign.notes && (
-              <div className="bg-secondary/30 rounded-lg p-3">
-                <p className="text-xs text-muted-foreground mb-1">Observação / Estratégia</p>
-                <p className="text-sm text-foreground whitespace-pre-wrap">{selectedCampaign.notes}</p>
-              </div>
-            )}
-          </div>
-
-          {/* Conjuntos de Anúncio (Ad Sets) */}
-          {selectedCampaign.source === 'meta' && (
-            <div className="glass-surface rounded-xl p-5">
-              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-                <h4 className="font-medium text-foreground text-sm flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-primary" /> Conjuntos de Anúncio ({adSets.length})
-                </h4>
-                <Button onClick={importAdSets} size="sm" variant="outline" disabled={importingAdSets} className="gap-1">
-                  {importingAdSets ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                  {adSets.length > 0 ? 'Atualizar' : 'Buscar da Meta'}
-                </Button>
-              </div>
-              {loadingAdSets ? (
-                <div className="flex items-center justify-center py-6"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div>
-              ) : adSets.length === 0 ? (
-                <p className="text-muted-foreground text-xs text-center py-6">
-                  Nenhum conjunto carregado. Clique em "Buscar da Meta" para importar.
-                </p>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {adSets.map(a => {
-                    const budget = a.daily_budget > 0 ? `R$ ${Number(a.daily_budget).toLocaleString('pt-BR')}/dia` :
-                                   a.lifetime_budget > 0 ? `R$ ${Number(a.lifetime_budget).toLocaleString('pt-BR')} total` : '—';
-                    const ins: CampaignInsights = {
-                      spend: Number(a.spend) || 0,
-                      impressions: Number(a.impressions) || 0,
-                      clicks: Number(a.clicks) || 0,
-                      ctr: Number(a.ctr) || 0,
-                      cpc: Number(a.cpc) || 0,
-                      cpm: Number(a.cpm) || 0,
-                      reach: Number(a.reach) || 0,
-                      leads: Number(a.leads) || 0,
-                      purchases: Number(a.purchases) || 0,
-                      messages: Number(a.messages) || 0,
-                      link_clicks: Number(a.link_clicks) || 0,
-                      revenue: Number(a.revenue) || 0,
-                      cpl: Number(a.leads) > 0 ? Number(a.spend) / Number(a.leads) : 0,
-                      cpp: Number(a.purchases) > 0 ? Number(a.spend) / Number(a.purchases) : 0,
-                      cpm_msg: Number(a.messages) > 0 ? Number(a.spend) / Number(a.messages) : 0,
-                      roas: Number(a.roas) || 0,
-                      engagements: Number(a.engagements) || 0,
-                      frequency: Number(a.frequency) || 0,
-                      cost_per_engagement: Number(a.engagements) > 0 ? Number(a.spend) / Number(a.engagements) : 0,
-                    };
-                    const cells = metricsForObjective(selectedCampaign?.objective || '', ins, a.name || selectedCampaign?.name || '');
-                    const hasMetrics = ins.spend > 0 || ins.impressions > 0;
-                    return (
-                      <div key={a.id} className="bg-secondary/30 border border-border/50 rounded-lg p-3 hover:border-primary/30 transition-colors">
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <p className="text-sm font-medium text-foreground line-clamp-2 flex-1">{a.name}</p>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${statusColor(a.status)}`}>{a.status}</span>
-                            {id && (
-                              <EntityActionsMenu
-                                clientId={id}
-                                entityType="adset"
-                                metaId={a.meta_adset_id}
-                                status={a.status}
-                                onChanged={(ns) => {
-                                  setAdSets(prev => prev.map(x => x.id === a.id ? { ...x, status: ns || x.status } : x));
-                                }}
-                              />
-                            )}
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground mb-2">
-                          <div><span className="text-foreground/60">Orçamento:</span> <span className="text-foreground">{budget}</span></div>
-                          <div><span className="text-foreground/60">Otimização:</span> <span className="text-foreground">{a.optimization_goal || '—'}</span></div>
-                        </div>
-                        {hasMetrics && (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-2 border-t border-border/50 text-[11px]">
-                            {cells.map((m, i) => (
-                              <div key={i}>
-                                <p className="text-muted-foreground">{m.label}</p>
-                                <p className={`font-semibold ${m.highlight ? 'text-primary' : 'text-foreground'}`}>{m.value}</p>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {!hasMetrics && (
-                          <p className="text-[10px] text-muted-foreground italic pt-2 border-t border-border/50">Sem dados no período</p>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="glass-surface rounded-xl p-5">
-            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-              <h4 className="font-medium text-foreground text-sm flex items-center gap-2"><Sparkles className="w-4 h-4 text-primary" /> Criativos</h4>
-              <Button onClick={openNewCreative} size="sm" className="neon-glow gap-1"><Plus className="w-3 h-3" /> Novo Criativo</Button>
-            </div>
-
-            <div className="flex gap-1 p-1 bg-secondary/50 rounded-lg mb-3 w-fit flex-wrap">
-              <button onClick={() => setCreativeFilter('todos')} className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${creativeFilter === 'todos' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
-                Todos ({creatives.length})
-              </button>
-              {CREATIVE_STATUS.map(s => {
-                const count = creatives.filter(c => c.status === s.value).length;
-                return (
-                  <button key={s.value} onClick={() => setCreativeFilter(s.value as any)} className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${creativeFilter === s.value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
-                    {s.label} ({count})
-                  </button>
-                );
-              })}
-            </div>
-
-            {filteredCreatives.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {filteredCreatives.map(cr => {
-                  const TypeIco = getCreativeTypeIcon(cr.type);
-                  const stBadge = getCreativeStatusBadge(cr.status);
-                  const isMeta = cr.source === 'meta';
-                  const thumb = cr.thumbnail_url || (cr.link && /\.(jpg|jpeg|png|webp|gif)/i.test(cr.link) ? cr.link : null);
-                  return (
-                    <div key={cr.id} className="bg-secondary/30 border border-border/50 rounded-lg overflow-hidden group hover:border-primary/30 transition-colors flex flex-col">
-                      {thumb ? (
-                        <button type="button" onClick={() => setPreviewCreative(cr)} className="aspect-square bg-secondary/50 relative overflow-hidden block w-full">
-                          <img src={thumb} alt={cr.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
-                          {isMeta && <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-primary/90 text-primary-foreground font-semibold">Meta</span>}
-                        </button>
-                      ) : (
-                        <button type="button" onClick={() => setPreviewCreative(cr)} className="aspect-square bg-secondary/50 flex items-center justify-center relative w-full">
-                          <TypeIco className="w-8 h-8 text-muted-foreground/40" />
-                          {isMeta && <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-primary/90 text-primary-foreground font-semibold">Meta</span>}
-                        </button>
-                      )}
-                      <div className="p-3 flex-1 flex flex-col">
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <p className="text-sm font-medium text-foreground line-clamp-2 flex-1">{cr.title || cr.name}</p>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${stBadge?.color}`}>{stBadge?.label}</span>
-                            {isMeta && id && (
-                              <EntityActionsMenu
-                                clientId={id}
-                                entityType="ad"
-                                metaId={cr.meta_ad_id}
-                                status={cr.status}
-                                onChanged={(ns) => {
-                                  if (ns) setCreatives(prev => prev.map(x => x.id === cr.id ? { ...x, status: ns } : x));
-                                }}
-                              />
-                            )}
-                          </div>
-                        </div>
-                        {isMeta && (() => {
-                          const a: any = cr;
-                          const ins: CampaignInsights = {
-                            spend: Number(a.spend) || 0,
-                            impressions: Number(a.impressions) || 0,
-                            clicks: Number(a.clicks) || 0,
-                            ctr: Number(a.ctr) || 0,
-                            cpc: Number(a.cpc) || 0,
-                            cpm: Number(a.cpm) || 0,
-                            reach: Number(a.reach) || 0,
-                            leads: Number(a.leads) || 0,
-                            purchases: Number(a.purchases) || 0,
-                            messages: Number(a.messages) || 0,
-                            link_clicks: Number(a.link_clicks) || 0,
-                            revenue: Number(a.revenue) || 0,
-                            cpl: Number(a.leads) > 0 ? Number(a.spend) / Number(a.leads) : 0,
-                            cpp: Number(a.purchases) > 0 ? Number(a.spend) / Number(a.purchases) : 0,
-                            cpm_msg: Number(a.messages) > 0 ? Number(a.spend) / Number(a.messages) : 0,
-                            roas: Number(a.roas) || 0,
-                            engagements: Number(a.engagements) || 0,
-                            frequency: Number(a.frequency) || 0,
-                            cost_per_engagement: Number(a.engagements) > 0 ? Number(a.spend) / Number(a.engagements) : 0,
-                          };
-                          const cells = metricsForObjective(selectedCampaign?.objective || '', ins, a.name || selectedCampaign?.name || '');
-                          const hasMetrics = ins.spend > 0 || ins.impressions > 0;
-                          if (!hasMetrics) return null;
-                          return (
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mb-2 pb-2 border-b border-border/50 text-[10px]">
-                              {cells.map((m, i) => (
-                                <div key={i}>
-                                  <p className="text-muted-foreground">{m.label}</p>
-                                  <p className={`font-semibold ${m.highlight ? 'text-primary' : 'text-foreground'}`}>{m.value}</p>
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        })()}
-                        {!isMeta && cr.body && <p className="text-[11px] text-muted-foreground line-clamp-2 mb-2">{cr.body}</p>}
-                        <div className="flex items-center justify-between mt-auto pt-2 border-t border-border/50">
-                          <button type="button" onClick={() => setPreviewCreative(cr)} className="text-xs text-primary hover:underline flex items-center gap-1 truncate">
-                            <ExternalLink className="w-3 h-3 shrink-0" /> Ver criativo
-                          </button>
-                          {!isMeta && (
-                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => openEditCreative(cr)}><Edit2 className="w-3 h-3" /></Button>
-                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:text-destructive" onClick={() => deleteCreative(cr.id)}><Trash2 className="w-3 h-3" /></Button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-xs text-center py-6">Nenhum criativo {creativeFilter !== 'todos' ? `em "${getCreativeStatusBadge(creativeFilter)?.label}"` : 'cadastrado'}.</p>
-            )}
-          </div>
-
-          {/* Anotações */}
-          <div className="glass-surface rounded-xl p-5">
-            <h4 className="font-medium text-foreground mb-3 text-sm">Anotações</h4>
-            <div className="space-y-2 max-h-64 overflow-y-auto mb-3">
-              {notes.map(n => (
-                <div key={n.id} className="flex items-start justify-between bg-secondary/30 rounded-lg p-3">
-                  <div>
-                    <p className="text-sm text-foreground">{n.text}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{new Date(n.created_at).toLocaleString('pt-BR')}</p>
-                  </div>
-                  <button onClick={() => deleteNote(n.id)} className="text-muted-foreground hover:text-destructive"><Trash2 className="w-3 h-3" /></button>
-                </div>
-              ))}
-              {notes.length === 0 && <p className="text-muted-foreground text-xs">Nenhuma anotação.</p>}
-            </div>
-            <div className="flex gap-2">
-              <Input value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder="Escrever anotação..." className="bg-secondary/50 border-border/50" onKeyDown={(e) => e.key === 'Enter' && sendNote()} />
-              <Button onClick={sendNote} size="sm" className="neon-glow"><Send className="w-4 h-4" /></Button>
-            </div>
-          </div>
-        </div>
+      {/* Campanhas Tab - hierarquia Meta (Campanhas > Conjuntos > Anúncios) */}
+      {tab === 'campanhas' && id && (
+        <MetaHierarchyTabs
+          clientId={id}
+          campaigns={campaigns as any}
+          insightsByCamp={insightsByCamp}
+          loadingInsights={loadingInsights}
+          dateRange={dateRange}
+          onDateRangeChange={setDateRange}
+          onReloadCampaigns={loadCampaigns}
+          onOpenNewCampaign={openNewCampaign}
+          onOpenEditCampaign={(c) => openEditCampaign(c as any)}
+          onDeleteCampaign={(cid, e) => deleteCampaign(cid, e)}
+          onOpenNewCreative={() => openNewCreative()}
+          onOpenEditCreative={(cr) => openEditCreative(cr as any)}
+          onDeleteCreative={(crId) => deleteCreative(crId)}
+          onPreviewCreative={(cr) => setPreviewCreative(cr as any)}
+          buildPeriodBody={buildPeriodBody}
+          importingMeta={importingMeta}
+          onImportFromMeta={async () => {
+            setImportingMeta(true);
+            const { data, error } = await supabase.functions.invoke('meta-import-campaigns', {
+              body: { client_id: id, ...buildPeriodBody() },
+            });
+            setImportingMeta(false);
+            if (error || data?.error) {
+              const msg = (data?.error || error?.message || '').toString();
+              if (msg.includes('no_connection')) toast.error('Conecte a Meta Ads na aba "Meta Ads" primeiro');
+              else if (msg.includes('no_selected_account')) toast.error('Selecione uma conta de anúncio na aba "Meta Ads"');
+              else toast.error('Falha ao importar: ' + msg);
+              return;
+            }
+            toast.success(`${data.imported} campanhas importadas da Meta`);
+            loadCampaigns();
+          }}
+          onExportPDF={() => {
+            if (campaigns.length === 0) { toast.error('Nenhuma campanha para exportar'); return; }
+            setExportStatusFilter('todas');
+            setExportObjectives([]);
+            setExportSelectedIds(Object.fromEntries(campaigns.map(c => [c.id, true])));
+            setExportOpen(true);
+          }}
+        />
       )}
 
       {/* Anexos Tab */}
