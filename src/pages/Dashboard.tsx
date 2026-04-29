@@ -432,8 +432,8 @@ function KpiCard({ icon: Icon, label, value, sub, accent, onClick }: {
         <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{label}</span>
         <Icon className={`w-4 h-4 ${accent}`} />
       </div>
-      <div className={`text-2xl font-bold ${accent}`}>{value}</div>
-      {sub && <div className="text-xs text-muted-foreground mt-1">{sub}</div>}
+      <div className={`text-xl sm:text-2xl font-bold ${accent} break-words leading-tight`}>{value}</div>
+      {sub && <div className="text-xs text-muted-foreground mt-1 break-words">{sub}</div>}
     </div>
   );
 }
