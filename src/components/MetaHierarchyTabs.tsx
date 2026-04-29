@@ -700,7 +700,7 @@ export default function MetaHierarchyTabs({
                             </button>
                           </div>
                         </td>
-                        {renderMetricsCells(ins, objectiveFor(cr.campaign_id))}
+                        {renderMetricsCells(ins, objectiveFor(cr.campaign_id), cr.optimization_goal || optGoalForCampaign(cr.campaign_id))}
                         <td className="px-3 py-2 w-0"></td>
                         <td className="px-2 py-2 text-right">
                           {isMeta ? (
