@@ -792,7 +792,20 @@ export default function ClientDetail() {
                       <div key={a.id} className="bg-secondary/30 border border-border/50 rounded-lg p-3 hover:border-primary/30 transition-colors">
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <p className="text-sm font-medium text-foreground line-clamp-2 flex-1">{a.name}</p>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border shrink-0 ${statusColor(a.status)}`}>{a.status}</span>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${statusColor(a.status)}`}>{a.status}</span>
+                            {id && (
+                              <EntityActionsMenu
+                                clientId={id}
+                                entityType="adset"
+                                metaId={a.meta_adset_id}
+                                status={a.status}
+                                onChanged={(ns) => {
+                                  setAdSets(prev => prev.map(x => x.id === a.id ? { ...x, status: ns || x.status } : x));
+                                }}
+                              />
+                            )}
+                          </div>
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground mb-2">
                           <div><span className="text-foreground/60">Orçamento:</span> <span className="text-foreground">{budget}</span></div>
