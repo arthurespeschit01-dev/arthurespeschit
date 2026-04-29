@@ -91,36 +91,62 @@ Deno.serve(async (req) => {
       const reach = parseInt(ins.reach || '0') || 0;
       const frequency = parseFloat(ins.frequency || '0') || 0;
 
-      let leads = 0;
-      let purchases = 0;
+      // Parsing alinhado com as colunas oficiais do Gerenciador de Anúncios.
+      // Cada métrica usa UM action_type específico (com fallback) — nunca soma variações
+      // do mesmo evento, evitando dupla contagem.
       let messages = 0;
+      let messagesFallback = 0;
+      let postEng = 0;
+      let pageEng = 0;
+      let leadStd = 0;
+      let leadGrouped = 0;
+      let leadPixel = 0;
+      let purchaseStd = 0;
+      let purchaseOmni = 0;
+      let purchasePixel = 0;
       let link_clicks = 0;
-      let engagements = 0;
-      let revenue = 0;
-
-      const messageTypes = new Set([
-        'onsite_conversion.messaging_conversation_started_7d',
-        'onsite_conversion.total_messaging_connection',
-        'onsite_conversion.messaging_first_reply',
-        'onsite_conversion.messaging_conversation_started',
-      ]);
-      const engagementTypes = new Set([
-        'post_engagement', 'page_engagement', 'post_reaction', 'comment', 'like', 'post', 'post_save',
-      ]);
 
       for (const a of (ins.actions || [])) {
         const v = parseFloat(a.value || '0') || 0;
-        if (['lead', 'onsite_conversion.lead_grouped', 'offsite_conversion.fb_pixel_lead'].includes(a.action_type)) leads += v;
-        if (['purchase', 'omni_purchase', 'offsite_conversion.fb_pixel_purchase'].includes(a.action_type)) purchases += v;
-        if (messageTypes.has(a.action_type)) messages += v;
-        if (a.action_type === 'link_click') link_clicks += v;
-        if (engagementTypes.has(a.action_type)) engagements += v;
+        const t = a.action_type;
+
+        // Mensagens — métrica oficial = onsite_conversion.messaging_conversation_started_7d
+        if (t === 'onsite_conversion.messaging_conversation_started_7d') messages = v;
+        else if (t === 'onsite_conversion.messaging_conversation_started') messagesFallback = Math.max(messagesFallback, v);
+        else if (t === 'onsite_conversion.total_messaging_connection') messagesFallback = Math.max(messagesFallback, v);
+
+        // Engajamentos — post_engagement já é o total agregado
+        if (t === 'post_engagement') postEng = v;
+        if (t === 'page_engagement') pageEng = v;
+
+        // Leads — pegar o maior, não somar (são variações da mesma conversão)
+        if (t === 'lead') leadStd = v;
+        if (t === 'onsite_conversion.lead_grouped') leadGrouped = v;
+        if (t === 'offsite_conversion.fb_pixel_lead') leadPixel = v;
+
+        // Compras — pegar o maior
+        if (t === 'purchase') purchaseStd = v;
+        if (t === 'omni_purchase') purchaseOmni = v;
+        if (t === 'offsite_conversion.fb_pixel_purchase') purchasePixel = v;
+
+        // Cliques no link
+        if (t === 'link_click') link_clicks = v;
       }
+
+      if (messages === 0) messages = messagesFallback;
+      const engagements = postEng > 0 ? postEng : pageEng;
+      const leads = Math.max(leadStd, leadGrouped, leadPixel);
+      const purchases = Math.max(purchaseStd, purchaseOmni, purchasePixel);
+
+      // Receita — também pegar o maior entre as variações (mesma conversão por canais distintos)
+      let revenueStd = 0, revenueOmni = 0, revenuePixel = 0;
       for (const a of (ins.action_values || [])) {
-        if (['purchase', 'omni_purchase', 'offsite_conversion.fb_pixel_purchase'].includes(a.action_type)) {
-          revenue += parseFloat(a.value || '0') || 0;
-        }
+        const v = parseFloat(a.value || '0') || 0;
+        if (a.action_type === 'purchase') revenueStd = v;
+        if (a.action_type === 'omni_purchase') revenueOmni = v;
+        if (a.action_type === 'offsite_conversion.fb_pixel_purchase') revenuePixel = v;
       }
+      const revenue = Math.max(revenueStd, revenueOmni, revenuePixel);
 
       const cpl = leads > 0 ? spend / leads : 0;
       const cpp = purchases > 0 ? spend / purchases : 0;

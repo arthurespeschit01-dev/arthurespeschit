@@ -39,30 +39,46 @@ async function fetchAllPages(url: string): Promise<any[]> {
 }
 
 function parseActions(ins: any) {
-  let leads = 0, purchases = 0, messages = 0, link_clicks = 0, revenue = 0, engagements = 0, video_views = 0;
-  const messageTypes = new Set([
-    'onsite_conversion.messaging_conversation_started_7d',
-    'onsite_conversion.total_messaging_connection',
-    'onsite_conversion.messaging_first_reply',
-    'onsite_conversion.messaging_conversation_started',
-  ]);
-  const engagementTypes = new Set([
-    'post_engagement', 'page_engagement', 'post_reaction', 'comment', 'like', 'post', 'post_save',
-  ]);
+  // Parsing alinhado com as colunas oficiais do Gerenciador de Anúncios.
+  let messages = 0, messagesFallback = 0;
+  let postEng = 0, pageEng = 0;
+  let leadStd = 0, leadGrouped = 0, leadPixel = 0;
+  let purchaseStd = 0, purchaseOmni = 0, purchasePixel = 0, purchaseOnsite = 0;
+  let link_clicks = 0, video_views = 0;
+
   for (const a of (ins?.actions || [])) {
     const v = parseFloat(a.value || '0') || 0;
-    if (['lead', 'onsite_conversion.lead_grouped', 'offsite_conversion.fb_pixel_lead'].includes(a.action_type)) leads += v;
-    if (['purchase', 'omni_purchase', 'offsite_conversion.fb_pixel_purchase', 'onsite_web_purchase'].includes(a.action_type)) purchases += v;
-    if (messageTypes.has(a.action_type)) messages += v;
-    if (a.action_type === 'link_click') link_clicks += v;
-    if (a.action_type === 'video_view') video_views += v;
-    if (engagementTypes.has(a.action_type)) engagements += v;
+    const t = a.action_type;
+    if (t === 'onsite_conversion.messaging_conversation_started_7d') messages = v;
+    else if (t === 'onsite_conversion.messaging_conversation_started') messagesFallback = Math.max(messagesFallback, v);
+    else if (t === 'onsite_conversion.total_messaging_connection') messagesFallback = Math.max(messagesFallback, v);
+    if (t === 'post_engagement') postEng = v;
+    if (t === 'page_engagement') pageEng = v;
+    if (t === 'lead') leadStd = v;
+    if (t === 'onsite_conversion.lead_grouped') leadGrouped = v;
+    if (t === 'offsite_conversion.fb_pixel_lead') leadPixel = v;
+    if (t === 'purchase') purchaseStd = v;
+    if (t === 'omni_purchase') purchaseOmni = v;
+    if (t === 'offsite_conversion.fb_pixel_purchase') purchasePixel = v;
+    if (t === 'onsite_web_purchase') purchaseOnsite = v;
+    if (t === 'link_click') link_clicks = v;
+    if (t === 'video_view') video_views = v;
   }
+  if (messages === 0) messages = messagesFallback;
+  const engagements = postEng > 0 ? postEng : pageEng;
+  const leads = Math.max(leadStd, leadGrouped, leadPixel);
+  const purchases = Math.max(purchaseStd, purchaseOmni, purchasePixel, purchaseOnsite);
+
+  let revenueStd = 0, revenueOmni = 0, revenuePixel = 0, revenueOnsite = 0;
   for (const a of (ins?.action_values || [])) {
-    if (['purchase', 'omni_purchase', 'offsite_conversion.fb_pixel_purchase', 'onsite_web_purchase'].includes(a.action_type)) {
-      revenue += parseFloat(a.value || '0') || 0;
-    }
+    const v = parseFloat(a.value || '0') || 0;
+    if (a.action_type === 'purchase') revenueStd = v;
+    if (a.action_type === 'omni_purchase') revenueOmni = v;
+    if (a.action_type === 'offsite_conversion.fb_pixel_purchase') revenuePixel = v;
+    if (a.action_type === 'onsite_web_purchase') revenueOnsite = v;
   }
+  const revenue = Math.max(revenueStd, revenueOmni, revenuePixel, revenueOnsite);
+
   return { leads, purchases, messages, link_clicks, revenue, engagements, video_views };
 }
 
