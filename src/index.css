@@ -142,11 +142,11 @@
 }
 
 /* ===== Strategy chat markdown ===== */
-.strategy-md, .strategy-md * { color: #ffffff !important; }
+.strategy-md, .strategy-md * { color: hsl(var(--foreground)); }
 .strategy-md p { margin: 0.85rem 0; line-height: 1.65; }
-.strategy-md strong, .strategy-md b { color: hsl(var(--primary)) !important; font-weight: 700; }
+.strategy-md strong, .strategy-md b { color: hsl(var(--primary)); font-weight: 700; }
 .strategy-md h1, .strategy-md h2, .strategy-md h3, .strategy-md h4 {
-  color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary));
   font-weight: 700;
   margin-top: 1.4rem;
   margin-bottom: 0.6rem;
@@ -162,9 +162,10 @@
 .strategy-md li { margin: 0.35rem 0; line-height: 1.6; }
 .strategy-md li::marker { color: hsl(var(--primary)); }
 .strategy-md hr { border: none; border-top: 1px solid hsl(var(--primary) / 0.35); margin: 1.2rem 0; }
-.strategy-md a { color: hsl(var(--primary)) !important; text-decoration: underline; }
+.strategy-md a { color: hsl(var(--primary)); text-decoration: underline; }
 .strategy-md code {
-  background: hsl(232 20% 14%);
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
   padding: 0.1rem 0.35rem;
   border-radius: 4px;
   font-size: 0.85em;
@@ -174,4 +175,10 @@
   padding-left: 0.75rem;
   margin: 0.85rem 0;
   opacity: 0.95;
+  color: hsl(var(--foreground));
 }
+
+/* Scrollbar — light theme override */
+.light ::-webkit-scrollbar-track { background: hsl(220 14% 94%); }
+.light ::-webkit-scrollbar-thumb { background: hsl(220 13% 75%); }
+.light ::-webkit-scrollbar-thumb:hover { background: hsl(220 13% 65%); }
