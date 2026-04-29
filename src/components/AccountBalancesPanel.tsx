@@ -209,10 +209,10 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
                       </div>
                       {!a.error && (
                         <>
-                          <p className="text-sm font-bold text-foreground">{fmt(a.remaining, a.currency)}</p>
-                          {a.spend_cap && a.spend_cap > 0 && (
-                            <p className="text-[10px] text-muted-foreground">Cap: {fmt(a.spend_cap, a.currency)}</p>
-                          )}
+                          <p className="text-lg font-bold text-foreground leading-tight">{fmt(a.balance, a.currency)}</p>
+                          {a.spend_cap && a.spend_cap > 0 ? (
+                            <p className="text-[10px] text-muted-foreground mt-0.5">Limite da conta: {fmt(a.spend_cap, a.currency)}</p>
+                          ) : null}
                         </>
                       )}
                     </div>
