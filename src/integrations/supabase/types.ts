@@ -518,6 +518,7 @@ export type Database = {
           link_clicks: number | null
           messages: number | null
           meta_ad_id: string | null
+          meta_adset_id: string | null
           meta_creative_id: string | null
           name: string
           purchases: number | null
@@ -553,6 +554,7 @@ export type Database = {
           link_clicks?: number | null
           messages?: number | null
           meta_ad_id?: string | null
+          meta_adset_id?: string | null
           meta_creative_id?: string | null
           name: string
           purchases?: number | null
@@ -588,6 +590,7 @@ export type Database = {
           link_clicks?: number | null
           messages?: number | null
           meta_ad_id?: string | null
+          meta_adset_id?: string | null
           meta_creative_id?: string | null
           name?: string
           purchases?: number | null
