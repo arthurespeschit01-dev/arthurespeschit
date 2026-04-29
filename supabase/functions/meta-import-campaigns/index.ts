@@ -204,6 +204,7 @@ Deno.serve(async (req) => {
         spend, impressions, clicks, ctr, cpc, cpm, reach, frequency,
         leads: acts.leads, purchases: acts.purchases, revenue: acts.revenue,
         messages: acts.messages, link_clicks: acts.link_clicks, video_views: acts.video_views, engagements: acts.engagements,
+        followers: acts.followers, profile_visits: acts.profile_visits,
         cpa, roas,
         date_preset: usedPreset,
         last_synced_at: new Date().toISOString(),
