@@ -369,70 +369,80 @@ export default function MetaHierarchyTabs({
             return (
               <div
                 key={c.id}
-                className={`glass-surface rounded-xl p-4 transition-colors ${checked ? 'border-primary/50 bg-primary/5' : 'hover:border-primary/30'}`}
+                className={`glass-surface rounded-lg px-3 py-2.5 transition-colors ${checked ? 'border-primary/50 bg-primary/5' : 'hover:border-primary/30'}`}
               >
-                <div className="flex items-start gap-3">
+                <div className="flex items-center gap-3">
                   <Checkbox
                     checked={checked}
                     onCheckedChange={() => toggleCampaign(c.id)}
-                    className="mt-1 shrink-0"
+                    className="shrink-0"
                   />
+                  {c.source === 'meta' ? (
+                    <EntityStatusToggle
+                      clientId={clientId}
+                      entityType="campaign"
+                      metaId={c.meta_campaign_id}
+                      status={c.status}
+                      onChanged={() => onReloadCampaigns()}
+                    />
+                  ) : (
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${statusColor(c.status)}`}>{c.status}</span>
+                  )}
                   <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start mb-1 gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
                       <button
                         type="button"
-                        onClick={() => { toggleCampaign(c.id); }}
-                        className="text-left flex items-center gap-2 flex-wrap min-w-0"
+                        onClick={() => toggleCampaign(c.id)}
+                        className="text-left min-w-0"
                       >
-                        <h3 className="font-semibold text-foreground text-sm truncate">{c.name}</h3>
-                        {c.source === 'meta' && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 font-medium flex items-center gap-1 shrink-0">
-                            <Link2 className="w-2.5 h-2.5" /> Meta
-                          </span>
-                        )}
+                        <h3 className="font-medium text-foreground text-sm truncate">{c.name}</h3>
                       </button>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(c.status)}`}>{c.status}</span>
-                        {c.source === 'meta' && (
-                          <EntityActionsMenu
-                            clientId={clientId}
-                            entityType="campaign"
-                            metaId={c.meta_campaign_id}
-                            status={c.status}
-                            onChanged={() => onReloadCampaigns()}
-                          />
-                        )}
-                        {c.source !== 'meta' && (
-                          <>
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={(e) => onOpenEditCampaign(c)}><Edit2 className="w-3 h-3" /></Button>
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:text-destructive" onClick={(e) => onDeleteCampaign(c.id, e)}><Trash2 className="w-3 h-3" /></Button>
-                          </>
-                        )}
-                      </div>
+                      {c.source === 'meta' && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 font-medium flex items-center gap-1 shrink-0">
+                          <Link2 className="w-2.5 h-2.5" /> Meta
+                        </span>
+                      )}
                     </div>
-                    <p className="text-xs text-muted-foreground">{c.platform} • {c.objective}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">
+                      {c.platform} • {c.objective}
+                      {c.start_date && ` • ${c.start_date}`}
+                      {c.budget > 0 && ` • R$ ${c.budget.toLocaleString('pt-BR')}`}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
                     {c.source === 'meta' && (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mt-3 pt-2 border-t border-border/50 text-xs">
-                        {cells.map((m, i) => (
-                          <div key={i}>
-                            <p className="text-muted-foreground">{m.label}</p>
-                            <p className={`font-semibold ${m.highlight ? 'text-primary' : 'text-foreground'} ${!hasData ? 'opacity-50' : ''}`}>{m.value}</p>
-                          </div>
-                        ))}
-                        {!hasData && !loadingInsights && (
-                          <p className="col-span-full text-[10px] text-muted-foreground italic">Sem dados no período</p>
-                        )}
-                        {loadingInsights && !hasData && (
-                          <p className="col-span-full text-[10px] text-muted-foreground">Carregando...</p>
-                        )}
-                      </div>
+                      <EntityActionsMenu
+                        clientId={clientId}
+                        entityType="campaign"
+                        metaId={c.meta_campaign_id}
+                        status={c.status}
+                        onChanged={() => onReloadCampaigns()}
+                      />
                     )}
-                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
-                      <span className="text-xs text-muted-foreground">{c.start_date || 'Sem data'}</span>
-                      {c.budget > 0 && <span className="text-xs font-semibold text-primary">R$ {c.budget.toLocaleString('pt-BR')}</span>}
-                    </div>
+                    {c.source !== 'meta' && (
+                      <>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onOpenEditCampaign(c)}><Edit2 className="w-3 h-3" /></Button>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:text-destructive" onClick={(e) => onDeleteCampaign(c.id, e)}><Trash2 className="w-3 h-3" /></Button>
+                      </>
+                    )}
                   </div>
                 </div>
+                {c.source === 'meta' && (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-x-3 gap-y-1 mt-2 pt-2 border-t border-border/50 text-[11px] pl-[68px]">
+                    {cells.map((m, i) => (
+                      <div key={i} className="min-w-0">
+                        <p className="text-muted-foreground truncate">{m.label}</p>
+                        <p className={`font-semibold truncate ${m.highlight ? 'text-primary' : 'text-foreground'} ${!hasData ? 'opacity-50' : ''}`}>{m.value}</p>
+                      </div>
+                    ))}
+                    {!hasData && !loadingInsights && (
+                      <p className="col-span-full text-[10px] text-muted-foreground italic">Sem dados no período</p>
+                    )}
+                    {loadingInsights && !hasData && (
+                      <p className="col-span-full text-[10px] text-muted-foreground">Carregando...</p>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
