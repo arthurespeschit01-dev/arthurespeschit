@@ -68,8 +68,9 @@ function parseActions(ins: any) {
   }
   if (messages === 0) messages = messagesFallback;
   const engagements = postEng > 0 ? postEng : pageEng;
-  const leads = Math.max(leadStd, leadGrouped, leadPixel);
-  const purchases = Math.max(purchaseStd, purchaseOmni, purchasePixel, purchaseOnsite);
+  // Paridade com Ads Manager: prioridade entre variações da mesma conversão
+  const leads = leadGrouped || leadStd || leadPixel;
+  const purchases = purchaseOmni || purchaseStd || purchasePixel || purchaseOnsite;
 
   let revenueStd = 0, revenueOmni = 0, revenuePixel = 0, revenueOnsite = 0;
   for (const a of (ins?.action_values || [])) {
@@ -79,7 +80,7 @@ function parseActions(ins: any) {
     if (a.action_type === 'offsite_conversion.fb_pixel_purchase') revenuePixel = v;
     if (a.action_type === 'onsite_web_purchase') revenueOnsite = v;
   }
-  const revenue = Math.max(revenueStd, revenueOmni, revenuePixel, revenueOnsite);
+  const revenue = revenueOmni || revenueStd || revenuePixel || revenueOnsite;
 
   return { leads, purchases, messages, link_clicks, revenue, engagements, followers, profile_visits };
 }
