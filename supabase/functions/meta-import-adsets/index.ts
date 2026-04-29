@@ -199,6 +199,7 @@ Deno.serve(async (req) => {
           spend, impressions, clicks, ctr, cpc, cpm, reach, frequency,
           leads: acts.leads, purchases: acts.purchases, messages: acts.messages,
           link_clicks: acts.link_clicks, revenue: acts.revenue, engagements: acts.engagements,
+          followers: acts.followers, profile_visits: acts.profile_visits,
           cpa, roas,
           last_synced_at: new Date().toISOString(),
         };
