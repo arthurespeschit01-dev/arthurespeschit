@@ -54,9 +54,8 @@ export function useAccountBalancesCount() {
     if (error) return;
     const list: AccountBalance[] = data?.accounts || [];
     setAccounts(list);
-    const threshold = getThreshold();
     const count = list.filter(a => {
-      const s = getBalanceStatus(a, threshold);
+      const s = getBalanceStatus(a);
       return s === 'low' || s === 'empty' || s === 'error';
     }).length;
     setProblemCount(count);
