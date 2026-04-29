@@ -142,7 +142,7 @@ Deno.serve(async (req) => {
     }
 
     // 1) Buscar ads com creative completo
-    const adFields = 'id,name,status,campaign_id,preview_shareable_link,creative{id,thumbnail_url,image_url,image_hash,object_story_spec,asset_feed_spec,video_id,effective_object_story_id,instagram_permalink_url}';
+    const adFields = 'id,name,status,campaign_id,adset_id,preview_shareable_link,creative{id,thumbnail_url,image_url,image_hash,object_story_spec,asset_feed_spec,video_id,effective_object_story_id,instagram_permalink_url}';
     const adsUrl = `${GRAPH}/${accountId}/ads?fields=${encodeURIComponent(adFields)}&limit=50&access_token=${accessToken}`;
     const ads = await fetchAllPages(adsUrl);
 
@@ -224,6 +224,7 @@ Deno.serve(async (req) => {
         source: 'meta',
         meta_ad_id: ad.id,
         meta_creative_id: cr.id || null,
+        meta_adset_id: ad.adset_id || null,
         thumbnail_url: thumb,
         title: ad.name,
         body: spend > 0
