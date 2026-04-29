@@ -731,6 +731,9 @@ export default function ClientDetail() {
                       cpp: Number(a.purchases) > 0 ? Number(a.spend) / Number(a.purchases) : 0,
                       cpm_msg: Number(a.messages) > 0 ? Number(a.spend) / Number(a.messages) : 0,
                       roas: Number(a.roas) || 0,
+                      engagements: Number(a.engagements) || 0,
+                      frequency: Number(a.frequency) || 0,
+                      cost_per_engagement: Number(a.engagements) > 0 ? Number(a.spend) / Number(a.engagements) : 0,
                     };
                     const cells = metricsForObjective(selectedCampaign?.objective || '', ins);
                     const hasMetrics = ins.spend > 0 || ins.impressions > 0;
@@ -745,7 +748,7 @@ export default function ClientDetail() {
                           <div><span className="text-foreground/60">Otimização:</span> <span className="text-foreground">{a.optimization_goal || '—'}</span></div>
                         </div>
                         {hasMetrics && (
-                          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border/50 text-[11px]">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-2 border-t border-border/50 text-[11px]">
                             {cells.map((m, i) => (
                               <div key={i}>
                                 <p className="text-muted-foreground">{m.label}</p>
