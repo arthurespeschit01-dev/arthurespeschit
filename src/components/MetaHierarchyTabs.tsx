@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import EntityActionsMenu from '@/components/EntityActionsMenu';
+import EntityStatusToggle from '@/components/EntityStatusToggle';
 import { DateRangePicker, type DateRangeValue } from '@/components/DateRangePicker';
 import { metricsForObjective, type CampaignInsights } from '@/lib/campaignMetrics';
 
