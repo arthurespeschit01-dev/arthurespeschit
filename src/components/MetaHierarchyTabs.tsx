@@ -544,7 +544,7 @@ export default function MetaHierarchyTabs({
                           </div>
                         </button>
                       </td>
-                      {renderMetricsCells(ins, c.objective)}
+                      {renderMetricsCells(ins, c.objective, c.optimization_goal || '')}
                       <td className="px-3 py-2 w-0"></td>
                       <td className="px-2 py-2 text-right">
                         {isMeta ? (
