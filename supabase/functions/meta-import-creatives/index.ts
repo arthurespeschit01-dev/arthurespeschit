@@ -158,7 +158,7 @@ Deno.serve(async (req) => {
     }
 
     const statusMap: Record<string, string> = {
-      ACTIVE: 'escalando', PAUSED: 'teste', DELETED: 'morto', ARCHIVED: 'morto',
+      ACTIVE: 'Ativo', PAUSED: 'Pausado', DELETED: 'Encerrada', ARCHIVED: 'Encerrada',
     };
 
     // 3) Buscar TODOS os creatives existentes dessas campanhas em uma única query
