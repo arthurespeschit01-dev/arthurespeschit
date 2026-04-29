@@ -85,6 +85,23 @@ Deno.serve(async (req) => {
       console.log('[meta-campaign-insights] sample action_types:', (insights[0].actions || []).map((a: any) => a.action_type));
     }
 
+    // Buscar optimization_goal por campanha a partir dos adsets oficiais (paridade com Ads Manager).
+    // CONVERSATIONS tem prioridade — assim campanhas WhatsApp/Direct (OUTCOME_ENGAGEMENT) viram "Mensagens".
+    const optGoalByCampaign: Record<string, string> = {};
+    try {
+      const adsetsUrl = `${GRAPH}/${conn.selected_ad_account_id}/adsets?fields=id,campaign_id,optimization_goal&limit=200&access_token=${conn.access_token}`;
+      const adsets = await fetchAllPages(adsetsUrl);
+      for (const a of adsets) {
+        const cid = a.campaign_id;
+        const og = (a.optimization_goal || '').toString();
+        if (!cid || !og) continue;
+        const cur = optGoalByCampaign[cid];
+        if (!cur || og === 'CONVERSATIONS') optGoalByCampaign[cid] = og;
+      }
+    } catch (e) {
+      console.warn('[meta-campaign-insights] adsets fetch failed:', String(e));
+    }
+
     // Agregar por campaign_id (Meta retorna 1 linha/campanha)
     const result: Record<string, any> = {};
     for (const ins of insights) {
