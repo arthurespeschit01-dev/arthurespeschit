@@ -193,6 +193,7 @@ Deno.serve(async (req) => {
       const cpc = parseFloat(ins.cpc || '0') || 0;
       const cpm = parseFloat(ins.cpm || '0') || 0;
       const reach = parseInt(ins.reach || '0') || 0;
+      const frequency = parseFloat(ins.frequency || '0') || 0;
       const acts = parseActions(ins);
       const cpa = cpaForObjective(camp.objective, spend, acts.leads, acts.purchases, acts.messages);
       const roas = spend > 0 ? acts.revenue / spend : 0;
@@ -212,9 +213,10 @@ Deno.serve(async (req) => {
         body: spend > 0
           ? `Gasto: R$ ${spend.toFixed(2)} • CTR: ${ctr.toFixed(2)}% • CPA: R$ ${cpa.toFixed(2)}`
           : '',
-        spend, impressions, clicks, ctr, cpc, cpm, reach,
+        spend, impressions, clicks, ctr, cpc, cpm, reach, frequency,
         leads: acts.leads, purchases: acts.purchases, messages: acts.messages,
         link_clicks: acts.link_clicks, revenue: acts.revenue,
+        engagements: acts.engagements, video_views: acts.video_views,
         cpa, roas,
         last_synced_at: now,
       };
