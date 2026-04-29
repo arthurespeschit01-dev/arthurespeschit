@@ -23,7 +23,7 @@ function getAvailableFunds(account: any): number {
   const spendCap = toMoney(account.spend_cap);
   const amountSpent = toMoney(account.amount_spent);
   const remainingCap = spendCap > 0 ? Math.max(spendCap - amountSpent, 0) : 0;
-  return Number((billBalance + remainingCap).toFixed(2));
+  return Number((spendCap > 0 ? remainingCap : billBalance).toFixed(2));
 }
 
 Deno.serve(async (req) => {
