@@ -17,9 +17,10 @@ type Cell = MetricCell & { _v: number; _alwaysShow?: boolean };
 const c = (label: string, value: string, v: number, opts: { highlight?: boolean; alwaysShow?: boolean } = {}): Cell =>
   ({ label, value, _v: v, highlight: opts.highlight, _alwaysShow: opts.alwaysShow });
 
-export function metricsForObjective(objective: string, ins?: CampaignInsights): MetricCell[] {
+export function metricsForObjective(objective: string, ins?: CampaignInsights, campaignName: string = ''): MetricCell[] {
   if (!ins) return [];
   const obj = (objective || '').toUpperCase();
+  const name = (campaignName || '').toUpperCase();
 
   const spend = ins.spend || 0;
   const reach = ins.reach || 0;
@@ -31,10 +32,16 @@ export function metricsForObjective(objective: string, ins?: CampaignInsights): 
   const frequency = ins.frequency || (reach > 0 ? (ins.impressions || 0) / reach : 0);
 
   // Decide o "objetivo efetivo" pelos dados reais retornados pela Meta.
-  // Isso corrige campanhas OUTCOME_ENGAGEMENT otimizadas para CONVERSATIONS (WhatsApp/Messenger),
-  // onde o nome do objetivo é "engajamento" mas a métrica real é "mensagens iniciadas".
-  // Prioridade: dados reais > nome do objective.
-  const dataDrivenIsMessages = messages > 0 && messages >= engagements;
+  // Campanhas OUTCOME_ENGAGEMENT otimizadas para CONVERSATIONS (WhatsApp/Messenger)
+  // retornam tanto "messages" (conversas iniciadas) quanto "post_engagement"
+  // (cliques/reações que normalmente são MUITO maiores que as mensagens).
+  // Por isso NÃO comparamos magnitudes — basta haver mensagens + sinal semântico.
+  const nameSuggestsMessages = /WHATS|MENSAGEM|MENSAGENS|MESSAGE|CONVERSA|CHAT|\bDM\b|INBOX/i.test(name);
+  const dataDrivenIsMessages = messages > 0 && (
+    nameSuggestsMessages ||
+    obj.includes('MESSAGES') ||
+    obj.includes('ENGAGEMENT') // ENGAGEMENT no Meta é guarda-chuva pra conversations
+  );
   const dataDrivenIsSales = purchases > 0;
   const dataDrivenIsLeads = leads > 0 && leads > purchases && obj.includes('LEAD');
 
