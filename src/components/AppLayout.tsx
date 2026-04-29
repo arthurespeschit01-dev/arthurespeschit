@@ -122,10 +122,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <button onClick={() => setSidebarOpen(true)} className="lg:hidden mr-3 text-muted-foreground hover:text-foreground">
             <Menu className="w-5 h-5" />
           </button>
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-2 sm:gap-3 min-w-0">
             <ThemeToggle />
             <NotificationBar />
-            <span className="text-sm text-muted-foreground">{user?.email}</span>
+            <span className="text-sm text-muted-foreground truncate max-w-[140px] sm:max-w-[220px] md:max-w-none">{user?.email}</span>
           </div>
         </header>
         <main className="flex-1 min-w-0 p-4 lg:p-6">
