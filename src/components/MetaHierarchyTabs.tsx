@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import EntityActionsMenu from '@/components/EntityActionsMenu';
+import EntityStatusToggle from '@/components/EntityStatusToggle';
 import { DateRangePicker, type DateRangeValue } from '@/components/DateRangePicker';
 import { metricsForObjective, type CampaignInsights } from '@/lib/campaignMetrics';
 
@@ -368,70 +369,80 @@ export default function MetaHierarchyTabs({
             return (
               <div
                 key={c.id}
-                className={`glass-surface rounded-xl p-4 transition-colors ${checked ? 'border-primary/50 bg-primary/5' : 'hover:border-primary/30'}`}
+                className={`glass-surface rounded-lg px-3 py-2.5 transition-colors ${checked ? 'border-primary/50 bg-primary/5' : 'hover:border-primary/30'}`}
               >
-                <div className="flex items-start gap-3">
+                <div className="flex items-center gap-3">
                   <Checkbox
                     checked={checked}
                     onCheckedChange={() => toggleCampaign(c.id)}
-                    className="mt-1 shrink-0"
+                    className="shrink-0"
                   />
+                  {c.source === 'meta' ? (
+                    <EntityStatusToggle
+                      clientId={clientId}
+                      entityType="campaign"
+                      metaId={c.meta_campaign_id}
+                      status={c.status}
+                      onChanged={() => onReloadCampaigns()}
+                    />
+                  ) : (
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${statusColor(c.status)}`}>{c.status}</span>
+                  )}
                   <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start mb-1 gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
                       <button
                         type="button"
-                        onClick={() => { toggleCampaign(c.id); }}
-                        className="text-left flex items-center gap-2 flex-wrap min-w-0"
+                        onClick={() => toggleCampaign(c.id)}
+                        className="text-left min-w-0"
                       >
-                        <h3 className="font-semibold text-foreground text-sm truncate">{c.name}</h3>
-                        {c.source === 'meta' && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 font-medium flex items-center gap-1 shrink-0">
-                            <Link2 className="w-2.5 h-2.5" /> Meta
-                          </span>
-                        )}
+                        <h3 className="font-medium text-foreground text-sm truncate">{c.name}</h3>
                       </button>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(c.status)}`}>{c.status}</span>
-                        {c.source === 'meta' && (
-                          <EntityActionsMenu
-                            clientId={clientId}
-                            entityType="campaign"
-                            metaId={c.meta_campaign_id}
-                            status={c.status}
-                            onChanged={() => onReloadCampaigns()}
-                          />
-                        )}
-                        {c.source !== 'meta' && (
-                          <>
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={(e) => onOpenEditCampaign(c)}><Edit2 className="w-3 h-3" /></Button>
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:text-destructive" onClick={(e) => onDeleteCampaign(c.id, e)}><Trash2 className="w-3 h-3" /></Button>
-                          </>
-                        )}
-                      </div>
+                      {c.source === 'meta' && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 font-medium flex items-center gap-1 shrink-0">
+                          <Link2 className="w-2.5 h-2.5" /> Meta
+                        </span>
+                      )}
                     </div>
-                    <p className="text-xs text-muted-foreground">{c.platform} • {c.objective}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">
+                      {c.platform} • {c.objective}
+                      {c.start_date && ` • ${c.start_date}`}
+                      {c.budget > 0 && ` • R$ ${c.budget.toLocaleString('pt-BR')}`}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
                     {c.source === 'meta' && (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mt-3 pt-2 border-t border-border/50 text-xs">
-                        {cells.map((m, i) => (
-                          <div key={i}>
-                            <p className="text-muted-foreground">{m.label}</p>
-                            <p className={`font-semibold ${m.highlight ? 'text-primary' : 'text-foreground'} ${!hasData ? 'opacity-50' : ''}`}>{m.value}</p>
-                          </div>
-                        ))}
-                        {!hasData && !loadingInsights && (
-                          <p className="col-span-full text-[10px] text-muted-foreground italic">Sem dados no período</p>
-                        )}
-                        {loadingInsights && !hasData && (
-                          <p className="col-span-full text-[10px] text-muted-foreground">Carregando...</p>
-                        )}
-                      </div>
+                      <EntityActionsMenu
+                        clientId={clientId}
+                        entityType="campaign"
+                        metaId={c.meta_campaign_id}
+                        status={c.status}
+                        onChanged={() => onReloadCampaigns()}
+                      />
                     )}
-                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
-                      <span className="text-xs text-muted-foreground">{c.start_date || 'Sem data'}</span>
-                      {c.budget > 0 && <span className="text-xs font-semibold text-primary">R$ {c.budget.toLocaleString('pt-BR')}</span>}
-                    </div>
+                    {c.source !== 'meta' && (
+                      <>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onOpenEditCampaign(c)}><Edit2 className="w-3 h-3" /></Button>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:text-destructive" onClick={(e) => onDeleteCampaign(c.id, e)}><Trash2 className="w-3 h-3" /></Button>
+                      </>
+                    )}
                   </div>
                 </div>
+                {c.source === 'meta' && (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-x-3 gap-y-1 mt-2 pt-2 border-t border-border/50 text-[11px] pl-[68px]">
+                    {cells.map((m, i) => (
+                      <div key={i} className="min-w-0">
+                        <p className="text-muted-foreground truncate">{m.label}</p>
+                        <p className={`font-semibold truncate ${m.highlight ? 'text-primary' : 'text-foreground'} ${!hasData ? 'opacity-50' : ''}`}>{m.value}</p>
+                      </div>
+                    ))}
+                    {!hasData && !loadingInsights && (
+                      <p className="col-span-full text-[10px] text-muted-foreground italic">Sem dados no período</p>
+                    )}
+                    {loadingInsights && !hasData && (
+                      <p className="col-span-full text-[10px] text-muted-foreground">Carregando...</p>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -459,48 +470,49 @@ export default function MetaHierarchyTabs({
               return (
                 <div
                   key={a.id}
-                  className={`glass-surface rounded-xl p-4 transition-colors ${checked ? 'border-primary/50 bg-primary/5' : 'hover:border-primary/30'}`}
+                  className={`glass-surface rounded-lg px-3 py-2.5 transition-colors ${checked ? 'border-primary/50 bg-primary/5' : 'hover:border-primary/30'}`}
                 >
-                  <div className="flex items-start gap-3">
-                    <Checkbox checked={checked} onCheckedChange={() => toggleAdSet(a.id)} className="mt-1 shrink-0" />
+                  <div className="flex items-center gap-3">
+                    <Checkbox checked={checked} onCheckedChange={() => toggleAdSet(a.id)} className="shrink-0" />
+                    <EntityStatusToggle
+                      clientId={clientId}
+                      entityType="adset"
+                      metaId={a.meta_adset_id}
+                      status={a.status}
+                      onChanged={() => loadAllAdsets()}
+                    />
                     <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start gap-2 mb-1">
-                        <button
-                          type="button"
-                          onClick={() => toggleAdSet(a.id)}
-                          className="text-left text-sm font-medium text-foreground line-clamp-2 flex-1"
-                        >
-                          {a.name}
-                        </button>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${statusColor(a.status)}`}>{a.status}</span>
-                          <EntityActionsMenu
-                            clientId={clientId}
-                            entityType="adset"
-                            metaId={a.meta_adset_id}
-                            status={a.status}
-                            onChanged={() => loadAllAdsets()}
-                          />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground mb-2">
-                        <div><span className="text-foreground/60">Orçamento:</span> <span className="text-foreground">{budget}</span></div>
-                        <div><span className="text-foreground/60">Otimização:</span> <span className="text-foreground">{a.optimization_goal || '—'}</span></div>
-                      </div>
-                      {hasMetrics ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-2 border-t border-border/50 text-[11px]">
-                          {cells.map((m, i) => (
-                            <div key={i}>
-                              <p className="text-muted-foreground">{m.label}</p>
-                              <p className={`font-semibold ${m.highlight ? 'text-primary' : 'text-foreground'}`}>{m.value}</p>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-[10px] text-muted-foreground italic pt-2 border-t border-border/50">Sem dados no período</p>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => toggleAdSet(a.id)}
+                        className="text-left text-sm font-medium text-foreground truncate block w-full"
+                      >
+                        {a.name}
+                      </button>
+                      <p className="text-[11px] text-muted-foreground truncate">
+                        {budget} • {a.optimization_goal || '—'}
+                      </p>
                     </div>
+                    <EntityActionsMenu
+                      clientId={clientId}
+                      entityType="adset"
+                      metaId={a.meta_adset_id}
+                      status={a.status}
+                      onChanged={() => loadAllAdsets()}
+                    />
                   </div>
+                  {hasMetrics ? (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-x-3 gap-y-1 mt-2 pt-2 border-t border-border/50 text-[11px] pl-[68px]">
+                      {cells.map((m, i) => (
+                        <div key={i} className="min-w-0">
+                          <p className="text-muted-foreground truncate">{m.label}</p>
+                          <p className={`font-semibold truncate ${m.highlight ? 'text-primary' : 'text-foreground'}`}>{m.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground italic mt-2 pt-2 border-t border-border/50 pl-[68px]">Sem dados no período</p>
+                  )}
                 </div>
               );
             })
@@ -517,7 +529,7 @@ export default function MetaHierarchyTabs({
               Nenhum anúncio encontrado. Clique em "Importar anúncios" acima.
             </p>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="space-y-2">
               {visibleAds.map(cr => {
                 const isMeta = cr.source === 'meta';
                 const thumb = cr.thumbnail_url || (cr.link && /\.(jpg|jpeg|png|webp|gif)/i.test(cr.link) ? cr.link : null);
@@ -545,57 +557,75 @@ export default function MetaHierarchyTabs({
                 const cells = metricsForObjective(objectiveFor(cr.campaign_id), ins, cr.name);
                 const hasMetrics = ins.spend > 0 || ins.impressions > 0;
                 return (
-                  <div key={cr.id} className="bg-secondary/30 border border-border/50 rounded-lg overflow-hidden group hover:border-primary/30 transition-colors flex flex-col">
-                    {thumb ? (
-                      <button type="button" onClick={() => onPreviewCreative(cr)} className="aspect-square bg-secondary/50 relative overflow-hidden block w-full">
-                        <img src={thumb} alt={cr.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
-                        {isMeta && <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-primary/90 text-primary-foreground font-semibold">Meta</span>}
-                      </button>
-                    ) : (
-                      <button type="button" onClick={() => onPreviewCreative(cr)} className="aspect-square bg-secondary/50 flex items-center justify-center relative w-full">
-                        <ImageIcon className="w-8 h-8 text-muted-foreground/40" />
-                        {isMeta && <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-primary/90 text-primary-foreground font-semibold">Meta</span>}
-                      </button>
-                    )}
-                    <div className="p-3 flex-1 flex flex-col">
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <p className="text-sm font-medium text-foreground line-clamp-2 flex-1">{cr.title || cr.name}</p>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${statusColor(cr.status)}`}>{cr.status}</span>
-                          {isMeta && (
-                            <EntityActionsMenu
-                              clientId={clientId}
-                              entityType="ad"
-                              metaId={cr.meta_ad_id}
-                              status={cr.status}
-                              onChanged={() => loadAllCreatives()}
-                            />
-                          )}
-                        </div>
-                      </div>
-                      {hasMetrics && (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mb-2 pb-2 border-b border-border/50 text-[10px]">
-                          {cells.map((m, i) => (
-                            <div key={i}>
-                              <p className="text-muted-foreground">{m.label}</p>
-                              <p className={`font-semibold ${m.highlight ? 'text-primary' : 'text-foreground'}`}>{m.value}</p>
-                            </div>
-                          ))}
-                        </div>
+                  <div key={cr.id} className="glass-surface rounded-lg px-3 py-2.5 hover:border-primary/30 transition-colors group">
+                    <div className="flex items-center gap-3">
+                      {isMeta ? (
+                        <EntityStatusToggle
+                          clientId={clientId}
+                          entityType="ad"
+                          metaId={cr.meta_ad_id}
+                          status={cr.status}
+                          onChanged={() => loadAllCreatives()}
+                        />
+                      ) : (
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${statusColor(cr.status)}`}>{cr.status}</span>
                       )}
-                      {!isMeta && cr.body && <p className="text-[11px] text-muted-foreground line-clamp-2 mb-2">{cr.body}</p>}
-                      <div className="flex items-center justify-between mt-auto pt-2 border-t border-border/50">
-                        <button type="button" onClick={() => onPreviewCreative(cr)} className="text-xs text-primary hover:underline flex items-center gap-1 truncate">
-                          <ExternalLink className="w-3 h-3 shrink-0" /> Ver criativo
+                      <button
+                        type="button"
+                        onClick={() => onPreviewCreative(cr)}
+                        className="w-10 h-10 rounded-md overflow-hidden bg-secondary/50 shrink-0 flex items-center justify-center"
+                      >
+                        {thumb ? (
+                          <img src={thumb} alt={cr.name} className="w-full h-full object-cover" loading="lazy" />
+                        ) : (
+                          <ImageIcon className="w-4 h-4 text-muted-foreground/40" />
+                        )}
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <button
+                          type="button"
+                          onClick={() => onPreviewCreative(cr)}
+                          className="text-left text-sm font-medium text-foreground truncate block w-full hover:text-primary transition-colors"
+                        >
+                          {cr.title || cr.name}
                         </button>
+                        {!isMeta && cr.body && (
+                          <p className="text-[11px] text-muted-foreground truncate">{cr.body}</p>
+                        )}
+                        {isMeta && (
+                          <p className="text-[11px] text-muted-foreground truncate flex items-center gap-1">
+                            <ExternalLink className="w-2.5 h-2.5" /> Ver criativo
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {isMeta && (
+                          <EntityActionsMenu
+                            clientId={clientId}
+                            entityType="ad"
+                            metaId={cr.meta_ad_id}
+                            status={cr.status}
+                            onChanged={() => loadAllCreatives()}
+                          />
+                        )}
                         {!isMeta && (
                           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => onOpenEditCreative(cr)}><Edit2 className="w-3 h-3" /></Button>
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:text-destructive" onClick={() => onDeleteCreative(cr.id)}><Trash2 className="w-3 h-3" /></Button>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onOpenEditCreative(cr)}><Edit2 className="w-3 h-3" /></Button>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:text-destructive" onClick={() => onDeleteCreative(cr.id)}><Trash2 className="w-3 h-3" /></Button>
                           </div>
                         )}
                       </div>
                     </div>
+                    {hasMetrics && (
+                      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-x-3 gap-y-1 mt-2 pt-2 border-t border-border/50 text-[11px] pl-[88px]">
+                        {cells.map((m, i) => (
+                          <div key={i} className="min-w-0">
+                            <p className="text-muted-foreground truncate">{m.label}</p>
+                            <p className={`font-semibold truncate ${m.highlight ? 'text-primary' : 'text-foreground'}`}>{m.value}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}
