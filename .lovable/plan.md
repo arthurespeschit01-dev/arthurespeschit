@@ -1,64 +1,75 @@
-## Problema
+## Causa do problema
 
-Olhando a screenshot:
-
-- **Campanha PAUSADA** (`OUTCOME_AWARENESS`) → mostra Gasto, Alcance, Impressões, CPM, Frequência ✅
-- **Campanha ATIVA** `01 - [ENGAJAMENTO] [WHATSAPP]...` (`OUTCOME_ENGAGEMENT`) → mostra **Engajamentos / Custo/Engaj. / CPM** ❌
-  - Deveria mostrar **Mensagens / Custo/Msg / CPM**, igual à campanha do meio (que está funcionando).
-
-## Causa raiz
-
-A heurística atual em `src/lib/campaignMetrics.ts` (linha 37):
+No edge function `meta-campaign-insights`, a contagem de **mensagens** soma 4 action_types de uma vez:
 
 ```ts
-const dataDrivenIsMessages = messages > 0 && messages >= engagements;
+'onsite_conversion.messaging_conversation_started_7d',
+'onsite_conversion.total_messaging_connection',
+'onsite_conversion.messaging_first_reply',
+'onsite_conversion.messaging_conversation_started',
 ```
 
-Em campanhas **ativas** de WhatsApp, a Meta retorna **dois action_types simultâneos**:
+A Meta retorna vários desses simultaneamente para o MESMO evento — `messaging_conversation_started` e `messaging_conversation_started_7d` referem-se à mesma conversa apenas com janelas de atribuição diferentes, e `total_messaging_connection` agrega outros eventos. Isso causa **dupla/tripla contagem** de mensagens, inflando "Mensagens" e deflando o "Custo/Msg" em relação ao Gerenciador de Anúncios.
 
-1. `onsite_conversion.messaging_conversation_started_7d` → conta como `messages` (ex: 1.969)
-2. `post_engagement` / `page_engagement` → conta como `engagements` (ex: 41.982 — toda interação com o anúncio: clique, reação, comentário, visualização de perfil etc.)
+O Gerenciador da Meta exibe a coluna "Conversas iniciadas por mensagens" usando **apenas** `onsite_conversion.messaging_conversation_started_7d` (a métrica oficial padrão).
 
-Como `post_engagement` quase sempre é muito maior que `messages` (cada mensagem gera múltiplos engajamentos antes), a condição `messages >= engagements` **falha** e o sistema cai no branch de "Engajamento". Em campanhas pausadas há muito tempo, o `engagements` no período selecionado costuma ser 0 ou baixo, então a condição passa — por isso parecem corretas.
+O mesmo problema afeta `engagements`, que soma `post_engagement` + `page_engagement` + reações/comentários/likes individuais — quando `post_engagement` no Meta **já é o total agregado** desses eventos. Isso gera dupla contagem de engajamento também.
 
-A campanha do meio na screenshot (`R$ 976,53 / 41.982 engaj.`) na verdade também está exibindo "Engajamentos" — só que o usuário aceitou aquele caso. O caso real quebrado é a 3ª (WhatsApp ativa).
+## Mudanças
 
-## Solução
+### 1. `supabase/functions/meta-campaign-insights/index.ts`
 
-Mudar a heurística para detectar **intenção de mensagens** quando há QUALQUER volume relevante de mensagens, independentemente de `engagements`:
+**Mensagens** — usar APENAS o action_type oficial do Gerenciador (com fallback se ele não vier):
 
 ```ts
-// Suficiente para considerar campanha de mensagens:
-// - há mensagens registradas, E
-// - o nome sugere mensagens/whatsapp/conversas OU não há sinal forte de outro objetivo
-const nameSuggestsMessages = /WHATS|MENSAGEM|MENSAGENS|MESSAGE|CONVERSA|CHAT|DM|INBOX/i.test(campaignName);
-const dataDrivenIsMessages = messages > 0 && (
-  nameSuggestsMessages ||
-  obj.includes('MESSAGES') ||
-  // Se o objetivo for ENGAGEMENT e existem mensagens, mensagens vencem
-  // (já que ENGAGEMENT no Meta é guarda-chuva pra conversations também)
-  obj.includes('ENGAGEMENT')
-);
+let messages = 0;
+let messagesFallback = 0;
+for (const a of (ins.actions || [])) {
+  if (a.action_type === 'onsite_conversion.messaging_conversation_started_7d') {
+    messages = parseFloat(a.value || '0') || 0; // métrica oficial
+  }
+  if (a.action_type === 'onsite_conversion.messaging_conversation_started') {
+    messagesFallback = Math.max(messagesFallback, parseFloat(a.value || '0') || 0);
+  }
+}
+if (messages === 0) messages = messagesFallback;
 ```
 
-Ou seja: **se o objetivo é ENGAGEMENT e a Meta retornou mensagens > 0 → é uma campanha de conversas**, exibe métricas de mensagem. Engajamento "puro" (post_engagement sem mensagens) continua caindo no branch de Engajamento.
+**Engajamentos** — usar `post_engagement` se existir (já é o total agregado da Meta), senão `page_engagement`, sem somar reações individuais:
 
-### Mudanças
+```ts
+let postEng = 0, pageEng = 0;
+for (const a of (ins.actions || [])) {
+  if (a.action_type === 'post_engagement') postEng = parseFloat(a.value || '0') || 0;
+  if (a.action_type === 'page_engagement') pageEng = parseFloat(a.value || '0') || 0;
+}
+const engagements = postEng > 0 ? postEng : pageEng;
+```
 
-**1. `src/lib/campaignMetrics.ts`**
-- Aceitar parâmetro extra `campaignName?: string` em `metricsForObjective`.
-- Substituir `messages >= engagements` por: `messages > 0 && (obj.includes('MESSAGES') || obj.includes('ENGAGEMENT') || nameSuggestsMessages)`.
-- Remover a regra restritiva que comparava magnitudes; manter apenas a verificação semântica.
+**Leads** — manter, mas evitar dupla contagem entre `lead` e `onsite_conversion.lead_grouped`:
 
-**2. `src/pages/ClientDetail.tsx`**
-- Passar `c.name` como 3º argumento nas 3 chamadas existentes a `metricsForObjective(...)` (cards de campanha, ad sets e creatives).
+```ts
+let leadStd = 0, leadGrouped = 0, leadPixel = 0;
+for (const a of (ins.actions || [])) {
+  if (a.action_type === 'lead') leadStd = v;
+  if (a.action_type === 'onsite_conversion.lead_grouped') leadGrouped = v;
+  if (a.action_type === 'offsite_conversion.fb_pixel_lead') leadPixel = v;
+}
+const leads = Math.max(leadStd, leadGrouped, leadPixel); // pega o maior, não soma
+```
 
-Sem migração de banco, sem mudança em edge functions — só a lógica de exibição.
+**Purchases** — mesma lógica (pegar o maior entre `purchase`, `omni_purchase`, `offsite_conversion.fb_pixel_purchase` — eles representam a mesma conversão por canais distintos).
+
+**Revenue** — mesma lógica em `action_values` (pegar o maior).
+
+### 2. Aplicar a mesma correção em `meta-import-campaigns/index.ts`, `meta-import-adsets/index.ts` e `meta-import-creatives/index.ts`
+
+Essas funções persistem dados no banco com a mesma lógica defeituosa. Replicar o parsing corrigido nelas também.
 
 ## Resultado esperado
 
-A campanha `01 - [ENGAJAMENTO] [WHATSAPP] [HORARIO COMERCIAL]` (ativa, `OUTCOME_ENGAGEMENT`, com 1.969 mensagens) passará a exibir:
+Os valores de Mensagens, Engajamentos, Leads, Conversões e Receita passarão a bater com o Gerenciador de Anúncios da Meta (tolerância pequena por janelas de atribuição). O `Custo/Msg`, `CPL`, `CPA` e `ROAS` ficam consistentes.
 
-`Gasto R$ 1.147,76 • Alcance 48.391 • Mensagens 1.969 • Custo/Msg R$ 0,58 • CPM R$ 12,61`
+Métricas que já estavam corretas (Gasto, Alcance, Impressões, CPM, CTR, CPC, Frequência, Cliques no link) **não são tocadas** — o parsing delas vem direto dos campos top-level da Meta e não muda.
 
-Campanhas de Engajamento "puras" (sem mensagens) continuam exibindo Engajamentos normalmente.
+A heurística de seleção de objetivo em `src/lib/campaignMetrics.ts` permanece como está (correta).
