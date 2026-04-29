@@ -470,48 +470,49 @@ export default function MetaHierarchyTabs({
               return (
                 <div
                   key={a.id}
-                  className={`glass-surface rounded-xl p-4 transition-colors ${checked ? 'border-primary/50 bg-primary/5' : 'hover:border-primary/30'}`}
+                  className={`glass-surface rounded-lg px-3 py-2.5 transition-colors ${checked ? 'border-primary/50 bg-primary/5' : 'hover:border-primary/30'}`}
                 >
-                  <div className="flex items-start gap-3">
-                    <Checkbox checked={checked} onCheckedChange={() => toggleAdSet(a.id)} className="mt-1 shrink-0" />
+                  <div className="flex items-center gap-3">
+                    <Checkbox checked={checked} onCheckedChange={() => toggleAdSet(a.id)} className="shrink-0" />
+                    <EntityStatusToggle
+                      clientId={clientId}
+                      entityType="adset"
+                      metaId={a.meta_adset_id}
+                      status={a.status}
+                      onChanged={() => loadAllAdsets()}
+                    />
                     <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start gap-2 mb-1">
-                        <button
-                          type="button"
-                          onClick={() => toggleAdSet(a.id)}
-                          className="text-left text-sm font-medium text-foreground line-clamp-2 flex-1"
-                        >
-                          {a.name}
-                        </button>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${statusColor(a.status)}`}>{a.status}</span>
-                          <EntityActionsMenu
-                            clientId={clientId}
-                            entityType="adset"
-                            metaId={a.meta_adset_id}
-                            status={a.status}
-                            onChanged={() => loadAllAdsets()}
-                          />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground mb-2">
-                        <div><span className="text-foreground/60">Orçamento:</span> <span className="text-foreground">{budget}</span></div>
-                        <div><span className="text-foreground/60">Otimização:</span> <span className="text-foreground">{a.optimization_goal || '—'}</span></div>
-                      </div>
-                      {hasMetrics ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-2 border-t border-border/50 text-[11px]">
-                          {cells.map((m, i) => (
-                            <div key={i}>
-                              <p className="text-muted-foreground">{m.label}</p>
-                              <p className={`font-semibold ${m.highlight ? 'text-primary' : 'text-foreground'}`}>{m.value}</p>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-[10px] text-muted-foreground italic pt-2 border-t border-border/50">Sem dados no período</p>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => toggleAdSet(a.id)}
+                        className="text-left text-sm font-medium text-foreground truncate block w-full"
+                      >
+                        {a.name}
+                      </button>
+                      <p className="text-[11px] text-muted-foreground truncate">
+                        {budget} • {a.optimization_goal || '—'}
+                      </p>
                     </div>
+                    <EntityActionsMenu
+                      clientId={clientId}
+                      entityType="adset"
+                      metaId={a.meta_adset_id}
+                      status={a.status}
+                      onChanged={() => loadAllAdsets()}
+                    />
                   </div>
+                  {hasMetrics ? (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-x-3 gap-y-1 mt-2 pt-2 border-t border-border/50 text-[11px] pl-[68px]">
+                      {cells.map((m, i) => (
+                        <div key={i} className="min-w-0">
+                          <p className="text-muted-foreground truncate">{m.label}</p>
+                          <p className={`font-semibold truncate ${m.highlight ? 'text-primary' : 'text-foreground'}`}>{m.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground italic mt-2 pt-2 border-t border-border/50 pl-[68px]">Sem dados no período</p>
+                  )}
                 </div>
               );
             })
