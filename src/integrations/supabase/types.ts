@@ -193,6 +193,7 @@ export type Database = {
           name: string
           notes: string | null
           objective: string | null
+          optimization_goal: string
           platform: string | null
           profile_visits: number
           purchases: number | null
@@ -231,6 +232,7 @@ export type Database = {
           name: string
           notes?: string | null
           objective?: string | null
+          optimization_goal?: string
           platform?: string | null
           profile_visits?: number
           purchases?: number | null
@@ -269,6 +271,7 @@ export type Database = {
           name?: string
           notes?: string | null
           objective?: string | null
+          optimization_goal?: string
           platform?: string | null
           profile_visits?: number
           purchases?: number | null
@@ -534,6 +537,7 @@ export type Database = {
           meta_adset_id: string | null
           meta_creative_id: string | null
           name: string
+          optimization_goal: string
           profile_visits: number
           purchases: number | null
           reach: number | null
@@ -572,6 +576,7 @@ export type Database = {
           meta_adset_id?: string | null
           meta_creative_id?: string | null
           name: string
+          optimization_goal?: string
           profile_visits?: number
           purchases?: number | null
           reach?: number | null
@@ -610,6 +615,7 @@ export type Database = {
           meta_adset_id?: string | null
           meta_creative_id?: string | null
           name?: string
+          optimization_goal?: string
           profile_visits?: number
           purchases?: number | null
           reach?: number | null

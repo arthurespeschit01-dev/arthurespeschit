@@ -1,106 +1,80 @@
+Identifiquei a causa do erro no caso do print: a campanha aparece no banco como `OUTCOME_ENGAGEMENT`, mas os conjuntos vinculados dessa campanha estão com `optimization_goal = CONVERSATIONS`. Ou seja, no modelo atual da Meta, “Mensagens/WhatsApp” pode vir dentro do objetivo amplo `OUTCOME_ENGAGEMENT`; usar somente o objetivo da campanha não é granular o suficiente para diferenciar “engajamento comum” de “mensagens”. A correção precisa continuar sem usar nome da campanha, mas deve usar os campos oficiais da Meta no nível correto.
 
-# Paridade total com o Gerenciador da Meta (campanhas, conjuntos e anúncios)
+Plano de correção:
 
-Hoje a detecção já usa o `objective`, mas (a) ainda há vestígio do parâmetro `_campaignName`, e (b) as chamadas à Graph API não fixam a janela de atribuição/atribuição unificada que o Gerenciador usa por padrão — por isso números (compras, leads, mensagens, ROAS, engajamentos) não batem exatamente.
+1. Criar uma classificação oficial de tipo de métrica Meta
+   - Centralizar a regra em uma função única, usada por campanhas, conjuntos e anúncios.
+   - Não usar nome da campanha, nome do conjunto ou nome do anúncio.
+   - Classificar como “Mensagens” quando os campos oficiais indicarem isso, principalmente:
+     - objetivo legado contendo `MESSAGES`;
+     - `optimization_goal = CONVERSATIONS` nos conjuntos;
+     - campos oficiais de destino/mensagem quando disponíveis, como WhatsApp, Instagram Direct ou Messenger.
+   - Classificar `OUTCOME_ENGAGEMENT` sozinho como “engajamento/reconhecimento” somente quando não houver configuração oficial de mensagens nos conjuntos.
 
-Vamos travar duas coisas: **detecção 100% por objetivo** e **chamadas à Meta com a MESMA configuração de atribuição que o Gerenciador usa**, nos três níveis (campanha, conjunto, anúncio).
+2. Corrigir a exibição de métricas para campanhas de mensagens
+   - Para campanhas de mensagens, exibir métricas de mensagem em vez de engajamento genérico:
+     - Gasto
+     - Alcance
+     - Impressões
+     - CPM
+     - Frequência
+     - Mensagens
+     - Custo por mensagem
+     - CTR
+   - Remover “Engajamentos” como métrica principal para campanhas cujo conjunto está otimizado para conversas.
+   - O caso do print (`OUTCOME_ENGAGEMENT` + conjuntos `CONVERSATIONS`) passará a mostrar “Mensagens” e “Custo/Msg”, não “Engajamentos”.
 
----
+3. Aplicar a mesma regra em campanhas, conjuntos e anúncios
+   - Campanhas: a classificação será baseada no objetivo da campanha + configuração oficial dos conjuntos vinculados.
+   - Conjuntos: usar diretamente `optimization_goal` e demais campos oficiais do próprio conjunto.
+   - Anúncios: herdar a classificação oficial do conjunto ao qual o anúncio pertence, usando o `adset_id`, não o nome do anúncio.
 
-## 1. Remover qualquer inferência por nome (frontend)
+4. Persistir campos oficiais adicionais da Meta
+   - Adicionar campos no banco para guardar a classificação/otimização oficial necessária, por exemplo:
+     - objetivo oficial da campanha;
+     - objetivo/otimização primária da campanha derivada dos conjuntos oficiais;
+     - `optimization_goal` também nos anúncios ou uma referência resolvida via conjunto;
+     - campos oficiais de destino/promoted object quando retornados pela Meta.
+   - Isso evita depender de texto digitado no nome e mantém consistência após importações.
 
-`src/lib/campaignMetrics.ts`
-- Remover o parâmetro `_campaignName` da função `metricsForObjective`.
-- Assinatura final: `metricsForObjective(objective: string, ins?: CampaignInsights)`.
-- Mantém o switch baseado SOMENTE em `objective` (já está assim, só limpa a sobra).
+5. Atualizar as funções de importação Meta
+   - `meta-import-campaigns`: além de importar campanhas, buscar os conjuntos oficiais para detectar quando uma campanha `OUTCOME_ENGAGEMENT` é na prática uma campanha de mensagens.
+   - `meta-import-adsets`: continuar salvando `optimization_goal`, e ampliar com campos oficiais de destino se disponíveis.
+   - `meta-import-creatives`: salvar ou resolver o `optimization_goal` do conjunto pai para que os anúncios também exibam métricas corretas.
+   - Manter os parâmetros de atribuição já alinhados ao Gerenciador da Meta.
 
-`src/components/MetaHierarchyTabs.tsx`
-- Atualizar `renderMetricsCells` para chamar `metricsForObjective(objective, ins)` (sem `name`).
-- Os 3 chamadores (campanhas, conjuntos, anúncios) continuam passando o `objective` da campanha pai — nenhum lê o nome.
+6. Atualizar a função de insights em tempo real
+   - Hoje a aba Campanhas busca métricas em tempo real, mas a classificação visual ainda depende do objetivo armazenado.
+   - Vou ajustar a função de insights para também retornar a classificação oficial da Meta para cada campanha, considerando os conjuntos vinculados.
+   - Assim, mesmo sem reimportar tudo, a aba Campanhas conseguirá identificar campanhas de mensagens corretamente pelo período selecionado.
 
-Resultado: impossível um nome influenciar quais métricas aparecem.
+7. Revisar o cálculo/parse das ações de mensagem
+   - Manter a prioridade para `onsite_conversion.messaging_conversation_started_7d`.
+   - Usar fallbacks oficiais apenas quando esse campo não vier.
+   - Não somar variações do mesmo evento para evitar inflar número.
+   - O número de “Mensagens” e “Custo/Msg” será calculado com base no mesmo evento oficial usado no Gerenciador.
 
----
+8. Ajustar o frontend para usar a nova classificação
+   - Substituir `metricsForObjective(objective, insights)` por uma função que recebe a classificação oficial resolvida.
+   - Campanhas, conjuntos e anúncios usarão o mesmo motor de decisão.
+   - O objetivo exibido pode continuar mostrando `OUTCOME_ENGAGEMENT`, mas as métricas exibidas serão de “Mensagens” quando a configuração oficial da Meta for conversas.
 
-## 2. Alinhar as chamadas à Meta com o padrão do Gerenciador
+9. Conferência no caso real
+   - Após implementar, usar a campanha do print como validação:
+     - campanha: `01 - [ENGAJAMENTO] [WHATSAPP] [HORARIO COMERCIAL] [06/04/26]`
+     - objetivo: `OUTCOME_ENGAGEMENT`
+     - conjuntos: `optimization_goal = CONVERSATIONS`
+   - Resultado esperado: a linha da campanha deixa de mostrar “Engajamentos” como métrica principal e passa a mostrar “Mensagens” e “Custo/Msg”, com os dados vindos das actions oficiais da Meta.
 
-O Gerenciador, por padrão, usa **atribuição unificada** com janela `7d_click,1d_view`. Sem isso, conversões (compras, leads, mensagens) e ROAS divergem.
+Arquivos que serão alterados:
 
-Aplicar nas 4 edge functions, em TODA URL de `/insights`:
-
-```
-&use_unified_attribution_setting=true
-&action_attribution_windows=["7d_click","1d_view"]
-&action_report_time=mixed
-```
-
-Arquivos:
-- `supabase/functions/meta-campaign-insights/index.ts` (campanhas em tempo real)
+- `src/lib/campaignMetrics.ts`
+- `src/components/MetaHierarchyTabs.tsx`
+- `src/pages/ClientDetail.tsx`
+- `supabase/functions/meta-campaign-insights/index.ts`
 - `supabase/functions/meta-import-campaigns/index.ts`
 - `supabase/functions/meta-import-adsets/index.ts`
 - `supabase/functions/meta-import-creatives/index.ts`
+- nova migration do banco para os campos oficiais necessários
 
-Isso é o que faz o número da tela bater com o número que o usuário vê no Gerenciador.
-
----
-
-## 3. Refatorar o `parseActions` para refletir as colunas oficiais
-
-Hoje o parser está bom, mas vou consolidar três pontos para garantir paridade exata:
-
-a) **Compras**: o Gerenciador soma 1 vez por evento de compra. Hoje pegamos `Math.max(purchase, omni_purchase, fb_pixel_purchase, onsite_web_purchase)`. Vamos manter, mas priorizar nesta ordem: `omni_purchase` → `purchase` → `offsite_conversion.fb_pixel_purchase` → `onsite_web_purchase`. (omni_purchase é a métrica unificada que o Gerenciador usa na coluna "Compras".)
-
-b) **Leads**: priorizar `onsite_conversion.lead_grouped` quando existir (é o que o Gerenciador chama de "Leads"), depois `lead`, depois pixel. Sem somar.
-
-c) **Mensagens**: já priorizamos `onsite_conversion.messaging_conversation_started_7d` (a coluna "Conversas iniciadas por mensagem"). OK.
-
-d) **Engajamentos**: `post_engagement` é o total agregado da coluna "Engajamento da publicação" do Ads Manager. OK.
-
-e) **Seguidores (IG)**: action_type correto é `onsite_conversion.follow`. `page_likes` é específico do Facebook, não Instagram. Atualmente fazemos Math.max — vamos manter, mas separar em duas colunas internas para diagnóstico no log.
-
-f) **Visitas no perfil (IG)**: `onsite_conversion.profile_visit`. OK.
-
-g) **CTR**: Meta Ads Manager mostra "CTR (todos)" — equivale ao `ctr` que já usamos. OK.
-
-h) **CPC**: Meta usa `cpc` (custo por clique em qualquer lugar). OK.
-
-Centralizar `parseActions` e `cpaForObjective` em um único helper para os 3 imports usarem o mesmo código (evita drift). Como edge functions Lovable não suportam imports cross-folder, vamos copiar-colar versões idênticas e validadas nos três arquivos (que é o que já fazemos), só com a melhora acima.
-
----
-
-## 4. Logs de diagnóstico
-
-Em cada import, logar para a primeira linha de cada nível:
-```ts
-console.log('[meta-import-campaigns] sample action_types:', (ins.actions||[]).map(a=>a.action_type));
-```
-Assim, se algum cliente tiver objetivo exótico (ex: `OUTCOME_LEADS` vs `LEAD_GENERATION`), conseguimos ver na hora qual action_type está vindo e ajustar o parser.
-
----
-
-## 5. Não mexer
-
-- `src/pages/ClientDetail.tsx`: já não faz inferência por nome. Sem mudanças.
-- Schema do banco: as colunas `followers` e `profile_visits` já existem. Sem migração.
-- `campaignMetrics.ts` switch: já é 100% por objetivo. Só remove o parâmetro `_campaignName`.
-
----
-
-## Como validar (passos do usuário após o deploy)
-
-1. Na aba **Campanhas**, selecionar o mesmo período do Gerenciador (ex.: "Últimos 30 dias").
-2. Na aba **Conjuntos** e **Anúncios**, clicar em **Importar** para puxar com a nova janela de atribuição.
-3. Comparar campanha por campanha. Os números devem bater **exatamente** com as colunas: Gasto, Alcance, Impressões, CPM, Frequência, Cliques no link, CTR, Resultados (seguidores/engajamento/leads/compras conforme objetivo), Custo por resultado, ROAS.
-
-Se ainda houver divergência em alguma campanha específica, o log vai mostrar quais `action_type` a Meta está retornando para essa campanha — aí ajustamos pontualmente o mapeamento.
-
----
-
-## Arquivos editados
-
-- `src/lib/campaignMetrics.ts` (remove `_campaignName`)
-- `src/components/MetaHierarchyTabs.tsx` (remove `name` da chamada)
-- `supabase/functions/meta-campaign-insights/index.ts` (atribuição + parser)
-- `supabase/functions/meta-import-campaigns/index.ts` (atribuição + parser + log)
-- `supabase/functions/meta-import-adsets/index.ts` (atribuição + parser + log)
-- `supabase/functions/meta-import-creatives/index.ts` (atribuição + parser + log)
+Ponto principal: vou corrigir a regra para usar os campos oficiais da Meta no nível correto. Não será por nome. Para campanhas `OUTCOME_ENGAGEMENT`, a decisão entre “Engajamento” e “Mensagens” virá dos conjuntos oficiais da Meta, especialmente `optimization_goal = CONVERSATIONS`.
