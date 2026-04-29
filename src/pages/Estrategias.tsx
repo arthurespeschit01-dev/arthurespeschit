@@ -238,7 +238,7 @@ export default function Estrategias() {
                   }`}
                 >
                   {m.role === 'assistant' ? (
-                    <div className="strategy-md max-w-none text-white leading-relaxed text-sm">
+                    <div className="strategy-md max-w-none text-foreground leading-relaxed text-sm">
                       <ReactMarkdown>{m.content || '...'}</ReactMarkdown>
                     </div>
                   ) : (
