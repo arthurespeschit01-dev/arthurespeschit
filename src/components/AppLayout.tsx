@@ -79,10 +79,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   key={item.to}
                   to={item.to}
                   end={item.to === '/'}
-                  onClick={() => setSidebarOpen(false)}
+                  onClick={() => { if (!collapsed) setSidebarOpen(false); }}
                   className={({ isActive }) =>
                     `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 ${
-                      collapsed ? 'lg:justify-center lg:px-2' : ''
+                      collapsed ? 'justify-center px-2' : ''
                     } ${
                       isActive
                         ? 'bg-primary/15 text-primary font-medium'
@@ -91,7 +91,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   }
                 >
                   <item.icon className="w-4 h-4 shrink-0" />
-                  <span className={collapsed ? 'lg:hidden' : ''}>{item.label}</span>
+                  <span className={collapsed ? 'hidden' : ''}>{item.label}</span>
                 </NavLink>
               );
               if (collapsed) {
