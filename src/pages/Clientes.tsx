@@ -193,8 +193,7 @@ export default function Clientes() {
 
       {/* Painel de Saldos das Contas de Anúncio */}
       <AccountBalancesPanel onAccountsChange={setBalanceAccounts} />
-
-
+      <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="bg-card border-border max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
