@@ -76,8 +76,14 @@ Deno.serve(async (req) => {
       timeParam = `&date_preset=${preset}`;
     }
 
-    const url = `${GRAPH}/${conn.selected_ad_account_id}/insights?level=campaign&fields=${fields}${timeParam}&limit=200&access_token=${conn.access_token}`;
+    // Paridade com o Gerenciador da Meta: atribuição unificada 7d_click/1d_view (padrão do Ads Manager)
+    const attribParam = `&use_unified_attribution_setting=true&action_attribution_windows=${encodeURIComponent('["7d_click","1d_view"]')}&action_report_time=mixed`;
+
+    const url = `${GRAPH}/${conn.selected_ad_account_id}/insights?level=campaign&fields=${fields}${timeParam}${attribParam}&limit=200&access_token=${conn.access_token}`;
     const insights = await fetchAllPages(url);
+    if (insights[0]) {
+      console.log('[meta-campaign-insights] sample action_types:', (insights[0].actions || []).map((a: any) => a.action_type));
+    }
 
     // Agregar por campaign_id (Meta retorna 1 linha/campanha)
     const result: Record<string, any> = {};
