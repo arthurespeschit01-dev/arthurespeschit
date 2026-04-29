@@ -430,9 +430,9 @@ export default function MetaHierarchyTabs({
         })}
       </div>
 
-      {/* Toolbar dependente do nível */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        {level === 'campaigns' ? (
+      {/* Toolbar dependente do nível — tudo numa fileira */}
+      <div className="flex items-center flex-wrap gap-3">
+        {level === 'campaigns' && (
           <div className="flex gap-1 p-1 bg-secondary/50 rounded-lg">
             {(['todas', 'Ativa', 'Pausada', 'Encerrada'] as const).map(f => (
               <button
@@ -446,22 +446,14 @@ export default function MetaHierarchyTabs({
               </button>
             ))}
           </div>
-        ) : <div />}
-        <div className="flex gap-2 items-center flex-wrap ml-auto">
+        )}
+        {/* Espaço de separação entre grupos */}
+        <div className="flex gap-2 items-center flex-wrap ml-6">
           <DateRangePicker value={dateRange} onChange={onDateRangeChange} />
           {level === 'campaigns' && (
-            <>
-              <Button onClick={onExportPDF} variant="outline" size="sm" className="gap-2">
-                <FileText className="w-3 h-3" /> Exportar PDF
-              </Button>
-              <Button onClick={onImportFromMeta} disabled={importingMeta} variant="outline" size="sm" className="gap-2">
-                {importingMeta ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                Importar da Meta
-              </Button>
-              <Button onClick={onOpenNewCampaign} className="neon-glow gap-2" size="sm">
-                <Plus className="w-3 h-3" /> Nova Campanha
-              </Button>
-            </>
+            <Button onClick={onExportPDF} variant="outline" size="sm" className="gap-2">
+              <FileText className="w-3 h-3" /> Exportar PDF
+            </Button>
           )}
           {level === 'adsets' && (
             <Button onClick={importAdsetsForSelection} disabled={importingAdsets} variant="outline" size="sm" className="gap-2">
