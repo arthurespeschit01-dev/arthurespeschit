@@ -296,11 +296,23 @@ export default function ClientDetail() {
       });
       if (error) throw error;
 
-      const fallback = buildFallback();
-      const mapped: Record<string, CampaignInsights> = { ...fallback };
+      // IMPORTANTE: quando a Meta responde para o período selecionado, NÃO usamos o
+      // fallback (gasto cumulativo armazenado no banco). Campanhas sem insight no
+      // período devem ficar zeradas, caso contrário aparecem gastos "fantasma" de
+      // campanhas pausadas que não tiveram entrega no período filtrado.
+      const ZERO: CampaignInsights = {
+        spend: 0, impressions: 0, clicks: 0, ctr: 0, cpc: 0, cpm: 0, reach: 0,
+        leads: 0, purchases: 0, messages: 0, link_clicks: 0, revenue: 0,
+        cpl: 0, cpp: 0, cpm_msg: 0, roas: 0,
+        engagements: 0, frequency: 0, cost_per_engagement: 0,
+      };
+      const mapped: Record<string, CampaignInsights> = {};
       for (const c of campaigns) {
+        if (c.source !== 'meta') continue;
         if (c.meta_campaign_id && (data as any)?.insights?.[c.meta_campaign_id]) {
           mapped[c.id] = (data as any).insights[c.meta_campaign_id];
+        } else {
+          mapped[c.id] = ZERO;
         }
       }
       setInsightsByCamp(mapped);
