@@ -26,6 +26,8 @@ export type Database = {
           ctr: number | null
           daily_budget: number | null
           end_time: string | null
+          engagements: number
+          frequency: number
           id: string
           impressions: number | null
           last_synced_at: string | null
@@ -59,6 +61,8 @@ export type Database = {
           ctr?: number | null
           daily_budget?: number | null
           end_time?: string | null
+          engagements?: number
+          frequency?: number
           id?: string
           impressions?: number | null
           last_synced_at?: string | null
@@ -92,6 +96,8 @@ export type Database = {
           ctr?: number | null
           daily_budget?: number | null
           end_time?: string | null
+          engagements?: number
+          frequency?: number
           id?: string
           impressions?: number | null
           last_synced_at?: string | null
@@ -167,6 +173,7 @@ export type Database = {
           created_at: string
           ctr: number | null
           date_preset: string | null
+          engagements: number
           frequency: number | null
           id: string
           impressions: number | null
@@ -202,6 +209,7 @@ export type Database = {
           created_at?: string
           ctr?: number | null
           date_preset?: string | null
+          engagements?: number
           frequency?: number | null
           id?: string
           impressions?: number | null
@@ -237,6 +245,7 @@ export type Database = {
           created_at?: string
           ctr?: number | null
           date_preset?: string | null
+          engagements?: number
           frequency?: number | null
           id?: string
           impressions?: number | null
@@ -499,6 +508,8 @@ export type Database = {
           cpm: number | null
           created_at: string
           ctr: number | null
+          engagements: number
+          frequency: number
           id: string
           impressions: number | null
           last_synced_at: string | null
@@ -521,6 +532,7 @@ export type Database = {
           type: string
           updated_at: string
           user_id: string
+          video_views: number
         }
         Insert: {
           body?: string | null
@@ -531,6 +543,8 @@ export type Database = {
           cpm?: number | null
           created_at?: string
           ctr?: number | null
+          engagements?: number
+          frequency?: number
           id?: string
           impressions?: number | null
           last_synced_at?: string | null
@@ -553,6 +567,7 @@ export type Database = {
           type?: string
           updated_at?: string
           user_id: string
+          video_views?: number
         }
         Update: {
           body?: string | null
@@ -563,6 +578,8 @@ export type Database = {
           cpm?: number | null
           created_at?: string
           ctr?: number | null
+          engagements?: number
+          frequency?: number
           id?: string
           impressions?: number | null
           last_synced_at?: string | null
@@ -585,6 +602,7 @@ export type Database = {
           type?: string
           updated_at?: string
           user_id?: string
+          video_views?: number
         }
         Relationships: [
           {

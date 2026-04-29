@@ -1,124 +1,66 @@
-# Diagnóstico
+## Goal
 
-O arquivo `src/pages/ClientDetail.tsx` está com erros de build:
+Replace the current fixed metric set (Gasto / Alcance / CPM) with **dynamic metrics tailored to each campaign's `objective`** returned by the Meta API. Apply the same logic to campaign cards, Ad Set cards and Creative cards.
 
-```
-src/pages/ClientDetail.tsx(226,29): error TS2304: Cannot find name 'data'.
-src/pages/ClientDetail.tsx(227,20): error TS2304: Cannot find name 'data'.
-src/pages/ClientDetail.tsx(257,21): error TS2552: Cannot find name 'loadInsights'.
-```
+## Mapping by objective
 
-**Causa:** Em uma edição anterior, o **corpo** da função `loadInsights` foi colado solto dentro do componente (linhas ~222–255), **sem** o invólucro `const loadInsights = async () => { ... }` e **sem** a chamada `supabase.functions.invoke('meta-campaign-insights', ...)` que produzia o `data`.
+| Objective (Meta) | Métricas exibidas |
+|---|---|
+| `OUTCOME_TRAFFIC` / `LINK_CLICKS` | Gasto, Alcance, Cliques no link, CTR, CPC |
+| `OUTCOME_ENGAGEMENT` / `POST_ENGAGEMENT` | Gasto, Alcance, Engajamentos, Custo por Engajamento, CPM |
+| `OUTCOME_LEADS` / `LEAD_GENERATION` | Gasto, Alcance, Leads, Custo por Lead, CTR |
+| `OUTCOME_SALES` / `OUTCOME_APP_PROMOTION` / `CONVERSIONS` | Gasto, Alcance, Conversões, Custo por Conversão, ROAS, Valor convertido |
+| `OUTCOME_AWARENESS` / `BRAND_AWARENESS` / `REACH` | Gasto, Alcance, Impressões, CPM, Frequência |
+| `MESSAGES` / `OUTCOME_MESSAGES` | Gasto, Alcance, Mensagens iniciadas, Custo por Mensagem, CPM |
+| Fallback | Gasto, Impressões, CTR, CPC |
 
-Resultado:
-- `data.insights[...]` referencia uma variável inexistente.
-- `useEffect(() => { loadInsights(); ... })` chama uma função que não existe mais.
-- Quando o componente monta, dá erro em runtime → ErrorBoundary mostra **"Algo deu errado"** em todas as abas que usam essa página.
+Regras de exibição:
+- Valores monetários em `R$ 0,00` (pt-BR).
+- Métricas indisponíveis (zero ou ausentes) são **omitidas** — não renderizar `—` nem placeholder.
+- `highlight: true` no KPI principal de cada objetivo (CPL, CPC, ROAS, Custo/Conv, etc.).
 
-# Correção (sem remover nenhuma função)
+## Backend changes (Edge Functions)
 
-Refatorar o trecho entre as linhas ~222 e ~257 de `src/pages/ClientDetail.tsx` para reconstruir a função `loadInsights` corretamente:
+### `supabase/functions/meta-import-campaigns/index.ts`
+- Adicionar à `parseActions` os tipos:
+  - `post_engagement` (e variantes `page_engagement`) → `engagements`
+  - `frequency` já vem em insights — capturar.
+- Salvar novas colunas em `campaigns`: `engagements` (já não existe — usar JSONB? não — adicionar coluna numérica via migration).
+- Reaproveitar `frequency` (já existe na tabela).
 
-```ts
-// Buscar insights da Meta para o período selecionado
-const loadInsights = async () => {
-  if (!id) return;
-  const metaCampaigns = campaigns.filter(c => c.source === 'meta' && c.meta_campaign_id);
-  if (metaCampaigns.length === 0) {
-    // Mesmo sem chamada à API, ainda monta fallback a partir dos dados salvos
-    const fallback: Record<string, CampaignInsights> = {};
-    for (const c of campaigns) {
-      if (c.source === 'meta') {
-        const spend = Number(c.spend) || 0;
-        const leads = Number((c as any).leads) || 0;
-        const purchases = Number((c as any).purchases) || 0;
-        const messages = Number((c as any).messages) || 0;
-        const revenue = Number((c as any).revenue) || 0;
-        fallback[c.id] = {
-          spend,
-          impressions: Number(c.impressions) || 0,
-          clicks: Number(c.clicks) || 0,
-          ctr: Number((c as any).ctr) || 0,
-          cpc: Number((c as any).cpc) || 0,
-          cpm: Number((c as any).cpm) || 0,
-          reach: Number((c as any).reach) || 0,
-          leads, purchases, messages,
-          link_clicks: Number((c as any).link_clicks) || 0,
-          revenue,
-          cpl: leads > 0 ? spend / leads : 0,
-          cpp: purchases > 0 ? spend / purchases : 0,
-          cpm_msg: messages > 0 ? spend / messages : 0,
-          roas: spend > 0 ? revenue / spend : 0,
-        };
-      }
-    }
-    setInsightsByCamp(fallback);
-    return;
-  }
+### `supabase/functions/meta-import-adsets/index.ts` e `meta-import-creatives/index.ts`
+- Mesmo tratamento: incluir `engagements` e garantir `frequency`, `link_clicks`, `messages`, `revenue`, `purchases` no payload.
 
-  setLoadingInsights(true);
-  try {
-    const { data, error } = await supabase.functions.invoke('meta-campaign-insights', {
-      body: {
-        client_id: id,
-        campaign_ids: metaCampaigns.map(c => c.meta_campaign_id),
-        ...buildPeriodBody(),
-      },
-    });
-    if (error) throw error;
+### `supabase/functions/meta-campaign-insights/index.ts`
+- Retornar também `engagements` e `frequency` no `result[campaign_id]`, além de `cost_per_engagement = spend/engagements`.
 
-    const mapped: Record<string, CampaignInsights> = {};
-    for (const c of campaigns) {
-      if (c.meta_campaign_id && data?.insights?.[c.meta_campaign_id]) {
-        mapped[c.id] = data.insights[c.meta_campaign_id];
-      } else if (c.source === 'meta') {
-        // Fallback: usa métricas salvas no banco durante o import
-        const spend = Number(c.spend) || 0;
-        const leads = Number((c as any).leads) || 0;
-        const purchases = Number((c as any).purchases) || 0;
-        const messages = Number((c as any).messages) || 0;
-        const revenue = Number((c as any).revenue) || 0;
-        mapped[c.id] = {
-          spend,
-          impressions: Number(c.impressions) || 0,
-          clicks: Number(c.clicks) || 0,
-          ctr: Number((c as any).ctr) || 0,
-          cpc: Number((c as any).cpc) || 0,
-          cpm: Number((c as any).cpm) || 0,
-          reach: Number((c as any).reach) || 0,
-          leads, purchases, messages,
-          link_clicks: Number((c as any).link_clicks) || 0,
-          revenue,
-          cpl: leads > 0 ? spend / leads : 0,
-          cpp: purchases > 0 ? spend / purchases : 0,
-          cpm_msg: messages > 0 ? spend / messages : 0,
-          roas: spend > 0 ? revenue / spend : 0,
-        };
-      }
-    }
-    setInsightsByCamp(mapped);
-  } catch (e) {
-    console.error('[loadInsights] erro:', e);
-  } finally {
-    setLoadingInsights(false);
-  }
-};
+## Database migration
 
-useEffect(() => {
-  loadInsights();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [campaigns.length, dateRange.preset, dateRange.since, dateRange.until]);
-```
+Adicionar colunas (apenas as que faltam):
+- `campaigns.engagements bigint default 0`
+- `ad_sets.engagements bigint default 0`, `ad_sets.frequency numeric default 0`
+- `creatives.engagements bigint default 0`, `creatives.frequency numeric default 0`, `creatives.video_views bigint default 0`
 
-# O que isso resolve
+## Frontend changes
 
-- ✅ Remove os 3 erros de TypeScript (`data` inexistente e `loadInsights` inexistente).
-- ✅ Volta a tela de detalhes do cliente a renderizar (sem mais "Algo deu errado").
-- ✅ Mantém intactas todas as outras funções (Meta Ads, criativos, anexos, campanhas, etc.).
-- ✅ Mantém o **fallback** com métricas salvas no banco para quando a edge function não retornar insights.
+### `src/lib/campaignMetrics.ts` (refatorar)
+- Estender `CampaignInsights` com `engagements`, `frequency`, `cost_per_engagement`.
+- Reescrever `metricsForObjective` para retornar a lista completa por objetivo conforme tabela acima.
+- Filtrar células com valor zero antes de retornar (exceto Gasto, sempre exibir).
+- Normalizar nomes de objetivo (uppercase + tratamento de prefixo `OUTCOME_`).
 
-# Arquivos alterados
+### `src/pages/ClientDetail.tsx`
+- Atualizar os 3 pontos onde `metricsForObjective` é chamado para popular o `CampaignInsights` com os novos campos (`engagements`, `frequency`).
+- Trocar `grid-cols-3` fixo por grid responsivo (`grid-cols-2 sm:grid-cols-3 lg:grid-cols-5`) já que agora pode haver até 6 métricas.
+- Manter destaque visual para a célula `highlight: true`.
 
-- `src/pages/ClientDetail.tsx` — apenas o bloco entre as linhas ~222 e ~257.
+## Out of scope
+- Não alterar o layout geral, filtros de período ou fluxo OAuth.
+- Não tocar em `MetaAdsTab.tsx` (apenas conexão).
 
-Nenhum outro arquivo precisa ser tocado, e nenhuma funcionalidade existente é removida.
+## Acceptance
+- Card de campanha "Tráfego" mostra Cliques no link, CTR, CPC.
+- Card de campanha "Vendas" mostra Conversões, CPA, ROAS, Receita.
+- Card de campanha "Mensagens" mostra Mensagens iniciadas, Custo por Mensagem.
+- Mesmo comportamento aplicado em Conjuntos de Anúncios e Criativos.
+- Métricas zeradas/indisponíveis não aparecem no card.

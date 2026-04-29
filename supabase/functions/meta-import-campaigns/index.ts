@@ -23,28 +23,31 @@ function normalizePreset(p: string | undefined): string {
 }
 
 function parseActions(ins: any) {
-  let leads = 0, purchases = 0, messages = 0, link_clicks = 0, video_views = 0, revenue = 0;
+  let leads = 0, purchases = 0, messages = 0, link_clicks = 0, video_views = 0, revenue = 0, engagements = 0;
+  const messageTypes = new Set([
+    'onsite_conversion.messaging_conversation_started_7d',
+    'onsite_conversion.total_messaging_connection',
+    'onsite_conversion.messaging_first_reply',
+    'onsite_conversion.messaging_conversation_started',
+  ]);
+  const engagementTypes = new Set([
+    'post_engagement', 'page_engagement', 'post_reaction', 'comment', 'like', 'post', 'post_save',
+  ]);
   for (const a of (ins?.actions || [])) {
     const v = parseFloat(a.value || '0') || 0;
     if (['lead', 'onsite_conversion.lead_grouped', 'offsite_conversion.fb_pixel_lead'].includes(a.action_type)) leads += v;
     if (['purchase', 'omni_purchase', 'offsite_conversion.fb_pixel_purchase', 'onsite_web_purchase'].includes(a.action_type)) purchases += v;
-    if (['onsite_conversion.messaging_conversation_started_7d', 'onsite_conversion.total_messaging_connection'].includes(a.action_type)) messages += v;
+    if (messageTypes.has(a.action_type)) messages += v;
     if (a.action_type === 'link_click') link_clicks += v;
     if (a.action_type === 'video_view') video_views += v;
-    if ([
-  'onsite_conversion.messaging_conversation_started_7d',
-  'onsite_conversion.total_messaging_connection',
-  'onsite_conversion.messaging_first_reply',
-  'onsite_conversion.messaging_conversation_started',
-].includes(a.action_type)) messages += v;
+    if (engagementTypes.has(a.action_type)) engagements += v;
   }
-  
   for (const a of (ins?.action_values || [])) {
     if (['purchase', 'omni_purchase', 'offsite_conversion.fb_pixel_purchase', 'onsite_web_purchase'].includes(a.action_type)) {
       revenue += parseFloat(a.value || '0') || 0;
     }
   }
-  return { leads, purchases, messages, link_clicks, video_views, revenue };
+  return { leads, purchases, messages, link_clicks, video_views, revenue, engagements };
 }
 
 function cpaForObjective(objective: string, spend: number, leads: number, purchases: number, messages: number) {
@@ -180,7 +183,7 @@ Deno.serve(async (req) => {
         meta_ad_account_id: accountId,
         spend, impressions, clicks, ctr, cpc, cpm, reach, frequency,
         leads: acts.leads, purchases: acts.purchases, revenue: acts.revenue,
-        messages: acts.messages, link_clicks: acts.link_clicks, video_views: acts.video_views,
+        messages: acts.messages, link_clicks: acts.link_clicks, video_views: acts.video_views, engagements: acts.engagements,
         cpa, roas,
         date_preset: usedPreset,
         last_synced_at: new Date().toISOString(),

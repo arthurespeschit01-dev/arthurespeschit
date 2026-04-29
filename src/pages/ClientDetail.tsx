@@ -631,11 +631,12 @@ export default function ClientDetail() {
                     spend: 0, impressions: 0, clicks: 0, ctr: 0, cpc: 0, cpm: 0, reach: 0,
                     leads: 0, purchases: 0, messages: 0, link_clicks: 0, revenue: 0,
                     cpl: 0, cpp: 0, cpm_msg: 0, roas: 0,
+                    engagements: 0, frequency: 0, cost_per_engagement: 0,
                   };
                   const cells = metricsForObjective(c.objective, ins);
                   const hasData = !!insightsByCamp[c.id];
                   return (
-                    <div className="grid grid-cols-3 gap-2 mt-3 pt-2 border-t border-border/50 text-xs">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mt-3 pt-2 border-t border-border/50 text-xs">
                       {cells.map((m, i) => (
                         <div key={i}>
                           <p className="text-muted-foreground">{m.label}</p>
@@ -643,10 +644,10 @@ export default function ClientDetail() {
                         </div>
                       ))}
                       {!hasData && !loadingInsights && (
-                        <p className="col-span-3 text-[10px] text-muted-foreground italic">Sem dados no período</p>
+                        <p className="col-span-full text-[10px] text-muted-foreground italic">Sem dados no período</p>
                       )}
                       {loadingInsights && !hasData && (
-                        <p className="col-span-3 text-[10px] text-muted-foreground">Carregando...</p>
+                        <p className="col-span-full text-[10px] text-muted-foreground">Carregando...</p>
                       )}
                     </div>
                   );
@@ -730,6 +731,9 @@ export default function ClientDetail() {
                       cpp: Number(a.purchases) > 0 ? Number(a.spend) / Number(a.purchases) : 0,
                       cpm_msg: Number(a.messages) > 0 ? Number(a.spend) / Number(a.messages) : 0,
                       roas: Number(a.roas) || 0,
+                      engagements: Number(a.engagements) || 0,
+                      frequency: Number(a.frequency) || 0,
+                      cost_per_engagement: Number(a.engagements) > 0 ? Number(a.spend) / Number(a.engagements) : 0,
                     };
                     const cells = metricsForObjective(selectedCampaign?.objective || '', ins);
                     const hasMetrics = ins.spend > 0 || ins.impressions > 0;
@@ -744,7 +748,7 @@ export default function ClientDetail() {
                           <div><span className="text-foreground/60">Otimização:</span> <span className="text-foreground">{a.optimization_goal || '—'}</span></div>
                         </div>
                         {hasMetrics && (
-                          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border/50 text-[11px]">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-2 border-t border-border/50 text-[11px]">
                             {cells.map((m, i) => (
                               <div key={i}>
                                 <p className="text-muted-foreground">{m.label}</p>
@@ -828,12 +832,15 @@ export default function ClientDetail() {
                             cpp: Number(a.purchases) > 0 ? Number(a.spend) / Number(a.purchases) : 0,
                             cpm_msg: Number(a.messages) > 0 ? Number(a.spend) / Number(a.messages) : 0,
                             roas: Number(a.roas) || 0,
+                            engagements: Number(a.engagements) || 0,
+                            frequency: Number(a.frequency) || 0,
+                            cost_per_engagement: Number(a.engagements) > 0 ? Number(a.spend) / Number(a.engagements) : 0,
                           };
                           const cells = metricsForObjective(selectedCampaign?.objective || '', ins);
                           const hasMetrics = ins.spend > 0 || ins.impressions > 0;
                           if (!hasMetrics) return null;
                           return (
-                            <div className="grid grid-cols-3 gap-1.5 mb-2 pb-2 border-b border-border/50 text-[10px]">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mb-2 pb-2 border-b border-border/50 text-[10px]">
                               {cells.map((m, i) => (
                                 <div key={i}>
                                   <p className="text-muted-foreground">{m.label}</p>

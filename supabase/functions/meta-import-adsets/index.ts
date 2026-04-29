@@ -39,20 +39,30 @@ async function fetchAllPages(url: string): Promise<any[]> {
 }
 
 function parseActions(ins: any) {
-  let leads = 0, purchases = 0, messages = 0, link_clicks = 0, revenue = 0;
+  let leads = 0, purchases = 0, messages = 0, link_clicks = 0, revenue = 0, engagements = 0;
+  const messageTypes = new Set([
+    'onsite_conversion.messaging_conversation_started_7d',
+    'onsite_conversion.total_messaging_connection',
+    'onsite_conversion.messaging_first_reply',
+    'onsite_conversion.messaging_conversation_started',
+  ]);
+  const engagementTypes = new Set([
+    'post_engagement', 'page_engagement', 'post_reaction', 'comment', 'like', 'post', 'post_save',
+  ]);
   for (const a of (ins?.actions || [])) {
     const v = parseFloat(a.value || '0') || 0;
     if (['lead', 'onsite_conversion.lead_grouped', 'offsite_conversion.fb_pixel_lead'].includes(a.action_type)) leads += v;
     if (['purchase', 'omni_purchase', 'offsite_conversion.fb_pixel_purchase', 'onsite_web_purchase'].includes(a.action_type)) purchases += v;
-    if (['onsite_conversion.messaging_conversation_started_7d', 'onsite_conversion.total_messaging_connection'].includes(a.action_type)) messages += v;
+    if (messageTypes.has(a.action_type)) messages += v;
     if (a.action_type === 'link_click') link_clicks += v;
+    if (engagementTypes.has(a.action_type)) engagements += v;
   }
   for (const a of (ins?.action_values || [])) {
     if (['purchase', 'omni_purchase', 'offsite_conversion.fb_pixel_purchase', 'onsite_web_purchase'].includes(a.action_type)) {
       revenue += parseFloat(a.value || '0') || 0;
     }
   }
-  return { leads, purchases, messages, link_clicks, revenue };
+  return { leads, purchases, messages, link_clicks, revenue, engagements };
 }
 
 function cpaForObjective(objective: string, spend: number, leads: number, purchases: number, messages: number) {
@@ -120,7 +130,7 @@ Deno.serve(async (req) => {
     };
 
     const fields = 'id,name,status,daily_budget,lifetime_budget,bid_strategy,optimization_goal,start_time,end_time,campaign_id';
-    const insightFields = 'adset_id,spend,impressions,clicks,ctr,cpc,cpm,reach,actions,action_values';
+    const insightFields = 'adset_id,spend,impressions,clicks,ctr,cpc,cpm,reach,frequency,actions,action_values';
     let imported = 0;
 
     for (const camp of campaigns) {
@@ -148,6 +158,7 @@ Deno.serve(async (req) => {
         const cpc = parseFloat(ins.cpc || '0') || 0;
         const cpm = parseFloat(ins.cpm || '0') || 0;
         const reach = parseInt(ins.reach || '0') || 0;
+        const frequency = parseFloat(ins.frequency || '0') || 0;
         const acts = parseActions(ins);
         const cpa = cpaForObjective(camp.objective || '', spend, acts.leads, acts.purchases, acts.messages);
         const roas = spend > 0 ? acts.revenue / spend : 0;
@@ -166,9 +177,9 @@ Deno.serve(async (req) => {
           start_time: a.start_time || null,
           end_time: a.end_time || null,
           source: 'meta',
-          spend, impressions, clicks, ctr, cpc, cpm, reach,
+          spend, impressions, clicks, ctr, cpc, cpm, reach, frequency,
           leads: acts.leads, purchases: acts.purchases, messages: acts.messages,
-          link_clicks: acts.link_clicks, revenue: acts.revenue,
+          link_clicks: acts.link_clicks, revenue: acts.revenue, engagements: acts.engagements,
           cpa, roas,
           last_synced_at: new Date().toISOString(),
         };
