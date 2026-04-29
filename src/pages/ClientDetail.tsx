@@ -84,6 +84,8 @@ export default function ClientDetail() {
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
   const [campForm, setCampForm] = useState({ name: '', platform: 'Facebook Ads', objective: '', status: 'Ativa', start_date: '', budget: 0, notes: '' });
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
+  const [campaignDateRange, setCampaignDateRange] = useState<DateRangeValue>({ preset: 'last_30d' });
+  const [reloadingCampaign, setReloadingCampaign] = useState(false);
   const [notes, setNotes] = useState<Note[]>([]);
   const [noteText, setNoteText] = useState('');
   const [editClient, setEditClient] = useState(false);
@@ -185,22 +187,24 @@ export default function ClientDetail() {
     }
   };
 
-  const buildPeriodBody = () => {
+  const buildPeriodBodyFrom = (r: DateRangeValue) => {
     const body: any = {};
-    if (dateRange.preset === 'custom' && dateRange.since && dateRange.until) {
-      body.since = dateRange.since;
-      body.until = dateRange.until;
+    if (r.preset === 'custom' && r.since && r.until) {
+      body.since = r.since;
+      body.until = r.until;
     } else {
-      body.date_preset = dateRange.preset;
+      body.date_preset = r.preset;
     }
     return body;
   };
+  const buildPeriodBody = () => buildPeriodBodyFrom(dateRange);
 
-  const importAdSetsFor = async (camp: Campaign) => {
+  const importAdSetsFor = async (camp: Campaign, range?: DateRangeValue) => {
     setImportingAdSets(true);
     toast.loading('Carregando conjuntos de anúncios...', { id: 'adsets' });
+    const period = buildPeriodBodyFrom(range || dateRange);
     const { data, error } = await supabase.functions.invoke('meta-import-adsets', {
-      body: { client_id: id, campaign_id: camp.id, ...buildPeriodBody() },
+      body: { client_id: id, campaign_id: camp.id, ...period },
     });
     setImportingAdSets(false);
     if (error || data?.error) {
@@ -214,7 +218,29 @@ export default function ClientDetail() {
 
   const importAdSets = async () => {
     if (!selectedCampaign) return;
-    await importAdSetsFor(selectedCampaign);
+    await importAdSetsFor(selectedCampaign, campaignDateRange);
+  };
+
+  // Recarrega conjuntos + criativos da campanha selecionada para um período específico
+  const reloadCampaignForRange = async (camp: Campaign, range: DateRangeValue) => {
+    if (camp.source !== 'meta') return;
+    setReloadingCampaign(true);
+    const period = buildPeriodBodyFrom(range);
+    toast.loading('Atualizando métricas do período...', { id: 'camp-range' });
+    try {
+      // Conjuntos (já recarrega no estado dentro)
+      await importAdSetsFor(camp, range);
+      // Criativos do cliente (filtrados depois pela campanha)
+      await supabase.functions.invoke('meta-import-creatives', {
+        body: { client_id: id, ...period },
+      });
+      await loadCreatives(camp.id);
+      toast.success('Métricas atualizadas', { id: 'camp-range' });
+    } catch (e) {
+      toast.error('Falha ao atualizar métricas', { id: 'camp-range' });
+    } finally {
+      setReloadingCampaign(false);
+    }
   };
 
   useEffect(() => { loadClient(); loadCampaigns(); loadAttachments(); }, [id]);
@@ -337,6 +363,7 @@ export default function ClientDetail() {
 
   const openSelectedCampaign = (c: Campaign) => {
     setSelectedCampaign(c);
+    setCampaignDateRange(dateRange);
     loadNotes(c.id);
     loadCreatives(c.id);
     loadAdSets(c.id, c);
@@ -666,9 +693,21 @@ export default function ClientDetail() {
       {/* Campanhas Tab - Detail */}
       {tab === 'campanhas' && selectedCampaign && (
         <div className="space-y-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button variant="ghost" size="sm" onClick={() => setSelectedCampaign(null)}><ArrowLeft className="w-4 h-4 mr-1" /> Voltar</Button>
             <Button variant="outline" size="sm" onClick={() => openEditCampaign(selectedCampaign)} className="gap-1"><Edit2 className="w-3 h-3" /> Editar Campanha</Button>
+            {selectedCampaign.source === 'meta' && (
+              <div className="ml-auto flex items-center gap-2">
+                {reloadingCampaign && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+                <DateRangePicker
+                  value={campaignDateRange}
+                  onChange={(r) => {
+                    setCampaignDateRange(r);
+                    if (selectedCampaign) reloadCampaignForRange(selectedCampaign, r);
+                  }}
+                />
+              </div>
+            )}
           </div>
           <div className="glass-surface rounded-xl p-5">
             <h3 className="font-semibold text-foreground mb-2">{selectedCampaign.name}</h3>
