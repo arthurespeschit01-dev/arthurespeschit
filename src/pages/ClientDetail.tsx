@@ -187,16 +187,17 @@ export default function ClientDetail() {
     }
   };
 
-  const buildPeriodBody = () => {
+  const buildPeriodBodyFrom = (r: DateRangeValue) => {
     const body: any = {};
-    if (dateRange.preset === 'custom' && dateRange.since && dateRange.until) {
-      body.since = dateRange.since;
-      body.until = dateRange.until;
+    if (r.preset === 'custom' && r.since && r.until) {
+      body.since = r.since;
+      body.until = r.until;
     } else {
-      body.date_preset = dateRange.preset;
+      body.date_preset = r.preset;
     }
     return body;
   };
+  const buildPeriodBody = () => buildPeriodBodyFrom(dateRange);
 
   const importAdSetsFor = async (camp: Campaign) => {
     setImportingAdSets(true);
