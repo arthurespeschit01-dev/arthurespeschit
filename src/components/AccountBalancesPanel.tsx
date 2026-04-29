@@ -184,7 +184,7 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
           ) : (
             <div className="space-y-2">
               {sorted.map((a) => {
-                const st = getBalanceStatus(a, threshold);
+                const st = getBalanceStatus(a);
                 const cfg = STATUS_CONFIG[st];
                 const Icon = cfg.icon;
                 return (
