@@ -30,6 +30,8 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
+    const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
+    const debug = body?.debug === true;
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
@@ -61,7 +63,10 @@ Deno.serve(async (req) => {
         const adAccountId = String(c.selected_ad_account_id).startsWith('act_')
           ? c.selected_ad_account_id
           : `act_${c.selected_ad_account_id}`;
-        const url = `${GRAPH}/${adAccountId}?fields=name,currency,balance,spend_cap,amount_spent&access_token=${c.access_token}`;
+        const fields = debug
+          ? 'name,currency,balance,spend_cap,amount_spent,funding_source,funding_source_details,is_prepay_account'
+          : 'name,currency,balance,spend_cap,amount_spent';
+        const url = `${GRAPH}/${adAccountId}?fields=${fields}&access_token=${c.access_token}`;
         const r = await fetch(url);
         const j = await r.json();
         if (!r.ok) {
@@ -81,6 +86,16 @@ Deno.serve(async (req) => {
           account_name: j.name || c.selected_ad_account_name,
           currency: j.currency || 'BRL',
           balance,
+          ...(debug ? {
+            debug: {
+              raw_balance: j.balance,
+              raw_spend_cap: j.spend_cap,
+              raw_amount_spent: j.amount_spent,
+              funding_source: j.funding_source,
+              funding_source_details: j.funding_source_details,
+              is_prepay_account: j.is_prepay_account,
+            },
+          } : {}),
         };
       } catch (e) {
         return {
