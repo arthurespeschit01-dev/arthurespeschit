@@ -8,8 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
+import AccountBalancesDialog from '@/components/AccountBalancesDialog';
 
 interface AccountIds {
   bm?: string;
@@ -38,6 +39,7 @@ export default function Clientes() {
   const navigate = useNavigate();
   const [clients, setClients] = useState<Client[]>([]);
   const [open, setOpen] = useState(false);
+  const [balancesOpen, setBalancesOpen] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
   const [form, setForm] = useState({
     name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo',
@@ -126,8 +128,13 @@ export default function Clientes() {
           <h1 className="text-2xl font-bold text-foreground">Clientes</h1>
           <p className="text-muted-foreground text-sm mt-1">Gerencie seus clientes</p>
         </div>
-        <Button onClick={openNew} className="neon-glow gap-2"><Plus className="w-4 h-4" /> Novo Cliente</Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button onClick={() => setBalancesOpen(true)} variant="outline" className="gap-2"><Wallet className="w-4 h-4" /> Verificar Saldos</Button>
+          <Button onClick={openNew} className="neon-glow gap-2"><Plus className="w-4 h-4" /> Novo Cliente</Button>
+        </div>
       </div>
+
+      <AccountBalancesDialog open={balancesOpen} onOpenChange={setBalancesOpen} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {clients.map((c) => (
