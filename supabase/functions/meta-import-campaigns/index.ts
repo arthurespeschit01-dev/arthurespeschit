@@ -183,7 +183,7 @@ Deno.serve(async (req) => {
         meta_ad_account_id: accountId,
         spend, impressions, clicks, ctr, cpc, cpm, reach, frequency,
         leads: acts.leads, purchases: acts.purchases, revenue: acts.revenue,
-        messages: acts.messages, link_clicks: acts.link_clicks, video_views: acts.video_views,
+        messages: acts.messages, link_clicks: acts.link_clicks, video_views: acts.video_views, engagements: acts.engagements,
         cpa, roas,
         date_preset: usedPreset,
         last_synced_at: new Date().toISOString(),
