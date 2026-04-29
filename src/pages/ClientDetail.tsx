@@ -631,11 +631,12 @@ export default function ClientDetail() {
                     spend: 0, impressions: 0, clicks: 0, ctr: 0, cpc: 0, cpm: 0, reach: 0,
                     leads: 0, purchases: 0, messages: 0, link_clicks: 0, revenue: 0,
                     cpl: 0, cpp: 0, cpm_msg: 0, roas: 0,
+                    engagements: 0, frequency: 0, cost_per_engagement: 0,
                   };
                   const cells = metricsForObjective(c.objective, ins);
                   const hasData = !!insightsByCamp[c.id];
                   return (
-                    <div className="grid grid-cols-3 gap-2 mt-3 pt-2 border-t border-border/50 text-xs">
+                    <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-${Math.min(cells.length || 3, 6)} gap-2 mt-3 pt-2 border-t border-border/50 text-xs`}>
                       {cells.map((m, i) => (
                         <div key={i}>
                           <p className="text-muted-foreground">{m.label}</p>
@@ -643,10 +644,10 @@ export default function ClientDetail() {
                         </div>
                       ))}
                       {!hasData && !loadingInsights && (
-                        <p className="col-span-3 text-[10px] text-muted-foreground italic">Sem dados no período</p>
+                        <p className="col-span-full text-[10px] text-muted-foreground italic">Sem dados no período</p>
                       )}
                       {loadingInsights && !hasData && (
-                        <p className="col-span-3 text-[10px] text-muted-foreground">Carregando...</p>
+                        <p className="col-span-full text-[10px] text-muted-foreground">Carregando...</p>
                       )}
                     </div>
                   );
