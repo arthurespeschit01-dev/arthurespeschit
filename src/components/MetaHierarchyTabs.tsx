@@ -567,7 +567,7 @@ export default function MetaHierarchyTabs({
               <table className="w-full text-xs">
                 <thead className="bg-secondary/40 border-b border-border/50">
                   <tr className="text-left">
-                    
+                    <th className="px-3 py-2 w-8"></th>
                     <th className="px-2 py-2 w-16 text-muted-foreground font-medium">Status</th>
                     <th className="px-3 py-2 text-muted-foreground font-medium min-w-[260px]">
                       <SortHeader label="Conjunto" active={sort.key === 'name'} dir={sort.dir} onClick={() => toggleSort('name')} />
