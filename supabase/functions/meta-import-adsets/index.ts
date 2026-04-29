@@ -160,12 +160,13 @@ Deno.serve(async (req) => {
       try { adsets = await fetchAllPages(url); }
       catch (e) { console.warn(`adsets failed for campaign ${camp.meta_campaign_id}:`, String(e)); continue; }
 
-      // Insights por adset
+      // Insights por adset (com atribuição padrão do Ads Manager para paridade)
       const insightsMap = new Map<string, any>();
       try {
-        const insUrl = `${GRAPH}/${camp.meta_campaign_id}/insights?level=adset&fields=${insightFields}${timeParam}&limit=200&access_token=${accessToken}`;
+        const insUrl = `${GRAPH}/${camp.meta_campaign_id}/insights?level=adset&fields=${insightFields}${timeParam}${attribParam}&limit=200&access_token=${accessToken}`;
         const insights = await fetchAllPages(insUrl);
         for (const row of insights) insightsMap.set(row.adset_id, row);
+        if (insights[0]) console.log('[meta-import-adsets] sample action_types:', (insights[0].actions || []).map((a: any) => a.action_type));
       } catch (e) {
         console.warn(`adset insights failed for campaign ${camp.meta_campaign_id}:`, String(e));
       }
