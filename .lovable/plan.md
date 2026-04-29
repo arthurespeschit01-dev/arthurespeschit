@@ -1,35 +1,64 @@
 ## Problema
 
-A Meta retorna `objective = OUTCOME_ENGAGEMENT` mesmo para campanhas que na prática são de **mensagens (WhatsApp/Messenger)**. Hoje o código decide as métricas só pelo `objective`, então mostra "Engajamentos / Custo por Engajamento", quando o correto seria "Mensagens / Custo por Mensagem".
+Olhando a screenshot:
 
-A informação que diferencia isso vem do **adset**, em `optimization_goal` (ex: `CONVERSATIONS`) e `destination_type` (ex: `WHATSAPP`, `MESSENGER`), não do nível da campanha.
+- **Campanha PAUSADA** (`OUTCOME_AWARENESS`) → mostra Gasto, Alcance, Impressões, CPM, Frequência ✅
+- **Campanha ATIVA** `01 - [ENGAJAMENTO] [WHATSAPP]...` (`OUTCOME_ENGAGEMENT`) → mostra **Engajamentos / Custo/Engaj. / CPM** ❌
+  - Deveria mostrar **Mensagens / Custo/Msg / CPM**, igual à campanha do meio (que está funcionando).
+
+## Causa raiz
+
+A heurística atual em `src/lib/campaignMetrics.ts` (linha 37):
+
+```ts
+const dataDrivenIsMessages = messages > 0 && messages >= engagements;
+```
+
+Em campanhas **ativas** de WhatsApp, a Meta retorna **dois action_types simultâneos**:
+
+1. `onsite_conversion.messaging_conversation_started_7d` → conta como `messages` (ex: 1.969)
+2. `post_engagement` / `page_engagement` → conta como `engagements` (ex: 41.982 — toda interação com o anúncio: clique, reação, comentário, visualização de perfil etc.)
+
+Como `post_engagement` quase sempre é muito maior que `messages` (cada mensagem gera múltiplos engajamentos antes), a condição `messages >= engagements` **falha** e o sistema cai no branch de "Engajamento". Em campanhas pausadas há muito tempo, o `engagements` no período selecionado costuma ser 0 ou baixo, então a condição passa — por isso parecem corretas.
+
+A campanha do meio na screenshot (`R$ 976,53 / 41.982 engaj.`) na verdade também está exibindo "Engajamentos" — só que o usuário aceitou aquele caso. O caso real quebrado é a 3ª (WhatsApp ativa).
 
 ## Solução
 
-Em vez de depender do nome do objetivo, **decidir as métricas pelos dados reais retornados pela Meta** (`messages`, `engagements`, `leads`, `purchases`). Esses números só são preenchidos pela ação correspondente, então são a fonte mais confiável.
+Mudar a heurística para detectar **intenção de mensagens** quando há QUALQUER volume relevante de mensagens, independentemente de `engagements`:
 
-### Regra de prioridade no `metricsForObjective`
+```ts
+// Suficiente para considerar campanha de mensagens:
+// - há mensagens registradas, E
+// - o nome sugere mensagens/whatsapp/conversas OU não há sinal forte de outro objetivo
+const nameSuggestsMessages = /WHATS|MENSAGEM|MENSAGENS|MESSAGE|CONVERSA|CHAT|DM|INBOX/i.test(campaignName);
+const dataDrivenIsMessages = messages > 0 && (
+  nameSuggestsMessages ||
+  obj.includes('MESSAGES') ||
+  // Se o objetivo for ENGAGEMENT e existem mensagens, mensagens vencem
+  // (já que ENGAGEMENT no Meta é guarda-chuva pra conversations também)
+  obj.includes('ENGAGEMENT')
+);
+```
 
-Antes de cair na ramificação por `objective`, verificar:
+Ou seja: **se o objetivo é ENGAGEMENT e a Meta retornou mensagens > 0 → é uma campanha de conversas**, exibe métricas de mensagem. Engajamento "puro" (post_engagement sem mensagens) continua caindo no branch de Engajamento.
 
-1. Se `messages > 0` e `messages >= engagements` → **render MESSAGES** (Gasto, Alcance, Mensagens, Custo/Msg, CPM)
-2. Se `purchases > 0` → **render SALES** (Gasto, Alcance, Conversões, Custo/Conv, ROAS, Receita)
-3. Se `leads > 0` e o objective contém LEAD → **render LEADS**
-4. Caso contrário → cair na lógica atual baseada em `objective`
+### Mudanças
 
-Isso resolve o caso da imagem: campanha `OUTCOME_ENGAGEMENT` com `messages = 666` será renderizada corretamente como "Mensagens iniciadas / Custo por Mensagem".
+**1. `src/lib/campaignMetrics.ts`**
+- Aceitar parâmetro extra `campaignName?: string` em `metricsForObjective`.
+- Substituir `messages >= engagements` por: `messages > 0 && (obj.includes('MESSAGES') || obj.includes('ENGAGEMENT') || nameSuggestsMessages)`.
+- Remover a regra restritiva que comparava magnitudes; manter apenas a verificação semântica.
 
-### Mudança única
+**2. `src/pages/ClientDetail.tsx`**
+- Passar `c.name` como 3º argumento nas 3 chamadas existentes a `metricsForObjective(...)` (cards de campanha, ad sets e creatives).
 
-Apenas em `src/lib/campaignMetrics.ts`, dentro de `metricsForObjective`:
-- Calcular flags `isMessages`, `isSales`, `isLeads` a partir do `ins`
-- Mover a checagem dessas flags para **antes** da ramificação por `objective`
-- A lógica por `objective` continua como fallback para campanhas sem dados ainda
+Sem migração de banco, sem mudança em edge functions — só a lógica de exibição.
 
-Nenhuma migration, nenhuma mudança em edge function, nenhuma mudança no frontend ClientDetail. Os dados de `messages` e `engagements` já são importados pelo `meta-import-campaigns` (incluído no patch anterior).
+## Resultado esperado
 
-## Acceptance
+A campanha `01 - [ENGAJAMENTO] [WHATSAPP] [HORARIO COMERCIAL]` (ativa, `OUTCOME_ENGAGEMENT`, com 1.969 mensagens) passará a exibir:
 
-- Campanha `OUTCOME_ENGAGEMENT` com `messages > 0` mostra: Gasto, Alcance, **Mensagens**, **Custo/Msg**, CPM (como deve ser para a campanha de WhatsApp da imagem).
-- Campanha `OUTCOME_ENGAGEMENT` com só `engagements > 0` continua mostrando Engajamentos / Custo/Engaj.
-- Campanhas de outros objetivos não são afetadas.
+`Gasto R$ 1.147,76 • Alcance 48.391 • Mensagens 1.969 • Custo/Msg R$ 0,58 • CPM R$ 12,61`
+
+Campanhas de Engajamento "puras" (sem mensagens) continuam exibindo Engajamentos normalmente.
