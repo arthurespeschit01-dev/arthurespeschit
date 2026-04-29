@@ -45,6 +45,7 @@ function parseActions(ins: any) {
   let leadStd = 0, leadGrouped = 0, leadPixel = 0;
   let purchaseStd = 0, purchaseOmni = 0, purchasePixel = 0, purchaseOnsite = 0;
   let link_clicks = 0, video_views = 0;
+  let followers = 0, profile_visits = 0;
 
   for (const a of (ins?.actions || [])) {
     const v = parseFloat(a.value || '0') || 0;
@@ -63,6 +64,8 @@ function parseActions(ins: any) {
     if (t === 'onsite_web_purchase') purchaseOnsite = v;
     if (t === 'link_click') link_clicks = v;
     if (t === 'video_view') video_views = v;
+    if (t === 'follow' || t === 'onsite_conversion.follow' || t === 'page_likes') followers = Math.max(followers, v);
+    if (t === 'onsite_conversion.profile_visit') profile_visits = Math.max(profile_visits, v);
   }
   if (messages === 0) messages = messagesFallback;
   const engagements = postEng > 0 ? postEng : pageEng;
@@ -79,7 +82,7 @@ function parseActions(ins: any) {
   }
   const revenue = Math.max(revenueStd, revenueOmni, revenuePixel, revenueOnsite);
 
-  return { leads, purchases, messages, link_clicks, revenue, engagements, video_views };
+  return { leads, purchases, messages, link_clicks, revenue, engagements, video_views, followers, profile_visits };
 }
 
 function cpaForObjective(objective: string, spend: number, leads: number, purchases: number, messages: number) {
