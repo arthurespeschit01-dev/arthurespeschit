@@ -1,4 +1,4 @@
-// Lista saldos (balance + spend_cap) de TODAS as contas de anúncio conectadas
+// Lista saldos (balance) de TODAS as contas de anúncio conectadas
 // para o usuário autenticado, atravessando todas as meta_connections dele.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -11,7 +11,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const GRAPH = 'https://graph.facebook.com/v21.0';
 
-// Meta retorna balance/spend_cap em "centavos" da moeda (string).
+// Meta retorna balance em "centavos" da moeda (string).
 // Convertemos para número decimal.
 function toMoney(v: any): number {
   const n = parseFloat(String(v ?? '0')) || 0;
@@ -50,14 +50,17 @@ Deno.serve(async (req) => {
 
     const results = await Promise.all(connections.map(async (c) => {
       try {
-        const url = `${GRAPH}/${c.selected_ad_account_id}?fields=name,balance,currency,account_status&access_token=${c.access_token}`;
+        const adAccountId = String(c.selected_ad_account_id).startsWith('act_')
+          ? c.selected_ad_account_id
+          : `act_${c.selected_ad_account_id}`;
+        const url = `${GRAPH}/${adAccountId}?fields=balance,currency,name&access_token=${c.access_token}`;
         const r = await fetch(url);
         const j = await r.json();
         if (!r.ok) {
           return {
             client_id: c.client_id,
             client_name: clientName.get(c.client_id) || '—',
-            account_id: c.selected_ad_account_id,
+            account_id: adAccountId,
             account_name: c.selected_ad_account_name,
             error: j?.error?.message || 'Falha ao consultar conta',
           };
@@ -66,11 +69,10 @@ Deno.serve(async (req) => {
         return {
           client_id: c.client_id,
           client_name: clientName.get(c.client_id) || '—',
-          account_id: c.selected_ad_account_id,
+          account_id: adAccountId,
           account_name: j.name || c.selected_ad_account_name,
           currency: j.currency || 'BRL',
           balance,
-          account_status: j.account_status,
         };
       } catch (e) {
         return {
