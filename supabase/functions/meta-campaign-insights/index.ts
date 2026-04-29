@@ -166,10 +166,13 @@ Deno.serve(async (req) => {
       const cost_per_engagement = engagements > 0 ? spend / engagements : 0;
       const roas = spend > 0 ? revenue / spend : 0;
 
+      const cost_per_follower = followers > 0 ? spend / followers : 0;
+
       result[ins.campaign_id] = {
         spend, impressions, clicks, ctr, cpc, cpm, reach, frequency,
         leads, purchases, messages, link_clicks, revenue, engagements,
         cpl, cpp, cpm_msg, cost_per_engagement, roas,
+        followers, profile_visits, cost_per_follower,
       };
     }
 
