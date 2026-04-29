@@ -24,13 +24,56 @@ export function metricsForObjective(objective: string, ins?: CampaignInsights): 
   const spend = ins.spend || 0;
   const reach = ins.reach || 0;
   const engagements = ins.engagements || 0;
+  const messages = ins.messages || 0;
+  const leads = ins.leads || 0;
+  const purchases = ins.purchases || 0;
   const cpe = engagements > 0 ? spend / engagements : 0;
   const frequency = ins.frequency || (reach > 0 ? (ins.impressions || 0) / reach : 0);
 
+  // Decide o "objetivo efetivo" pelos dados reais retornados pela Meta.
+  // Isso corrige campanhas OUTCOME_ENGAGEMENT otimizadas para CONVERSATIONS (WhatsApp/Messenger),
+  // onde o nome do objetivo é "engajamento" mas a métrica real é "mensagens iniciadas".
+  // Prioridade: dados reais > nome do objective.
+  const dataDrivenIsMessages = messages > 0 && messages >= engagements;
+  const dataDrivenIsSales = purchases > 0;
+  const dataDrivenIsLeads = leads > 0 && leads > purchases && obj.includes('LEAD');
+
   let cells: Cell[] = [];
 
+  // Mensagens (data-driven OU pelo nome) — vem antes para sobrescrever ENGAGEMENT
+  if (dataDrivenIsMessages || obj.includes('MESSAGES')) {
+    cells = [
+      c('Gasto', fmtBRL(spend), spend, { alwaysShow: true }),
+      c('Alcance', fmtInt(reach), reach),
+      c('Mensagens', fmtInt(messages), messages),
+      c('Custo/Msg', fmtBRL(ins.cpm_msg || 0), ins.cpm_msg || 0, { highlight: true }),
+      c('CPM', fmtBRL(ins.cpm || 0), ins.cpm || 0),
+    ];
+  }
+  // Vendas (data-driven OU pelo nome)
+  else if (dataDrivenIsSales || obj.includes('SALES') || obj.includes('PURCHASE') || obj.includes('CONVERSIONS') || obj.includes('APP_PROMOTION')) {
+    cells = [
+      c('Gasto', fmtBRL(spend), spend, { alwaysShow: true }),
+      c('Alcance', fmtInt(reach), reach),
+      c('Conversões', fmtInt(purchases), purchases),
+      c('Custo/Conv.', fmtBRL(ins.cpp || 0), ins.cpp || 0),
+      c('ROAS', `${fmtNum(ins.roas || 0)}x`, ins.roas || 0, { highlight: true }),
+      c('Receita', fmtBRL(ins.revenue || 0), ins.revenue || 0),
+    ];
+  }
+  // Leads (data-driven OU pelo nome)
+  else if (dataDrivenIsLeads || obj.includes('LEAD')) {
+    cells = [
+      c('Gasto', fmtBRL(spend), spend, { alwaysShow: true }),
+      c('Alcance', fmtInt(reach), reach),
+      c('Leads', fmtInt(leads), leads),
+      c('CPL', fmtBRL(ins.cpl || 0), ins.cpl || 0, { highlight: true }),
+      c('CTR', fmtPct(ins.ctr || 0), ins.ctr || 0),
+    ];
+  }
+
   // Tráfego
-  if (obj.includes('TRAFFIC') || obj.includes('LINK_CLICKS')) {
+  else if (obj.includes('TRAFFIC') || obj.includes('LINK_CLICKS')) {
     cells = [
       c('Gasto', fmtBRL(spend), spend, { alwaysShow: true }),
       c('Alcance', fmtInt(reach), reach),
@@ -39,7 +82,7 @@ export function metricsForObjective(objective: string, ins?: CampaignInsights): 
       c('CPC', fmtBRL(ins.cpc || 0), ins.cpc || 0, { highlight: true }),
     ];
   }
-  // Engajamento
+  // Engajamento (só cai aqui se NÃO houver mensagens — checado acima)
   else if (obj.includes('ENGAGEMENT')) {
     cells = [
       c('Gasto', fmtBRL(spend), spend, { alwaysShow: true }),
@@ -47,27 +90,6 @@ export function metricsForObjective(objective: string, ins?: CampaignInsights): 
       c('Engajamentos', fmtInt(engagements), engagements),
       c('Custo/Engaj.', fmtBRL(cpe), cpe, { highlight: true }),
       c('CPM', fmtBRL(ins.cpm || 0), ins.cpm || 0),
-    ];
-  }
-  // Leads
-  else if (obj.includes('LEAD')) {
-    cells = [
-      c('Gasto', fmtBRL(spend), spend, { alwaysShow: true }),
-      c('Alcance', fmtInt(reach), reach),
-      c('Leads', fmtInt(ins.leads || 0), ins.leads || 0),
-      c('CPL', fmtBRL(ins.cpl || 0), ins.cpl || 0, { highlight: true }),
-      c('CTR', fmtPct(ins.ctr || 0), ins.ctr || 0),
-    ];
-  }
-  // Vendas / Conversões
-  else if (obj.includes('SALES') || obj.includes('PURCHASE') || obj.includes('CONVERSIONS') || obj.includes('APP_PROMOTION')) {
-    cells = [
-      c('Gasto', fmtBRL(spend), spend, { alwaysShow: true }),
-      c('Alcance', fmtInt(reach), reach),
-      c('Conversões', fmtInt(ins.purchases || 0), ins.purchases || 0),
-      c('Custo/Conv.', fmtBRL(ins.cpp || 0), ins.cpp || 0),
-      c('ROAS', `${fmtNum(ins.roas || 0)}x`, ins.roas || 0, { highlight: true }),
-      c('Receita', fmtBRL(ins.revenue || 0), ins.revenue || 0),
     ];
   }
   // Reconhecimento / Alcance
@@ -78,16 +100,6 @@ export function metricsForObjective(objective: string, ins?: CampaignInsights): 
       c('Impressões', fmtInt(ins.impressions || 0), ins.impressions || 0),
       c('CPM', fmtBRL(ins.cpm || 0), ins.cpm || 0, { highlight: true }),
       c('Frequência', fmtNum(frequency), frequency),
-    ];
-  }
-  // Mensagens
-  else if (obj.includes('MESSAGES')) {
-    cells = [
-      c('Gasto', fmtBRL(spend), spend, { alwaysShow: true }),
-      c('Alcance', fmtInt(reach), reach),
-      c('Mensagens', fmtInt(ins.messages || 0), ins.messages || 0),
-      c('Custo/Msg', fmtBRL(ins.cpm_msg || 0), ins.cpm_msg || 0, { highlight: true }),
-      c('CPM', fmtBRL(ins.cpm || 0), ins.cpm || 0),
     ];
   }
   // Vídeo (mantém comportamento de awareness)
