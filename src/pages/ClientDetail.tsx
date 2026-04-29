@@ -363,6 +363,7 @@ export default function ClientDetail() {
 
   const openSelectedCampaign = (c: Campaign) => {
     setSelectedCampaign(c);
+    setCampaignDateRange(dateRange);
     loadNotes(c.id);
     loadCreatives(c.id);
     loadAdSets(c.id, c);
