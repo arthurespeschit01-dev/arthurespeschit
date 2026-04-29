@@ -145,6 +145,18 @@ Deno.serve(async (req) => {
       if (c.meta_campaign_id) campMap.set(c.meta_campaign_id, { id: c.id, objective: c.objective || '' });
     }
 
+    // 0) Buscar optimization_goal por adset, para herdar nos anúncios.
+    const optGoalByAdset = new Map<string, string>();
+    try {
+      const adsetsUrl = `${GRAPH}/${accountId}/adsets?fields=id,optimization_goal&limit=200&access_token=${accessToken}`;
+      const adsets = await fetchAllPages(adsetsUrl);
+      for (const a of adsets) {
+        if (a.id) optGoalByAdset.set(a.id, (a.optimization_goal || '').toString());
+      }
+    } catch (e) {
+      console.warn('adsets fetch (optimization_goal) failed:', String(e));
+    }
+
     // 1) Buscar ads com creative completo
     const adFields = 'id,name,status,campaign_id,adset_id,preview_shareable_link,creative{id,thumbnail_url,image_url,image_hash,object_story_spec,asset_feed_spec,video_id,effective_object_story_id,instagram_permalink_url}';
     const adsUrl = `${GRAPH}/${accountId}/ads?fields=${encodeURIComponent(adFields)}&limit=50&access_token=${accessToken}`;
