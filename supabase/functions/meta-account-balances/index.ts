@@ -1,4 +1,4 @@
-// Lista saldos (balance) de TODAS as contas de anúncio conectadas
+// Lista fundos disponíveis de TODAS as contas de anúncio conectadas
 // para o usuário autenticado, atravessando todas as meta_connections dele.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -11,11 +11,19 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const GRAPH = 'https://graph.facebook.com/v21.0';
 
-// Meta retorna balance em "centavos" da moeda (string).
+// Meta retorna valores monetários em "centavos" da moeda (string).
 // Convertemos para número decimal.
 function toMoney(v: any): number {
   const n = parseFloat(String(v ?? '0')) || 0;
   return n / 100;
+}
+
+function getAvailableFunds(account: any): number {
+  const billBalance = toMoney(account.balance);
+  const spendCap = toMoney(account.spend_cap);
+  const amountSpent = toMoney(account.amount_spent);
+  const remainingCap = spendCap > 0 ? Math.max(spendCap - amountSpent, 0) : 0;
+  return Number((billBalance + remainingCap).toFixed(2));
 }
 
 Deno.serve(async (req) => {
@@ -53,7 +61,7 @@ Deno.serve(async (req) => {
         const adAccountId = String(c.selected_ad_account_id).startsWith('act_')
           ? c.selected_ad_account_id
           : `act_${c.selected_ad_account_id}`;
-        const url = `${GRAPH}/${adAccountId}?fields=balance,currency,name&access_token=${c.access_token}`;
+        const url = `${GRAPH}/${adAccountId}?fields=name,currency,balance,spend_cap,amount_spent&access_token=${c.access_token}`;
         const r = await fetch(url);
         const j = await r.json();
         if (!r.ok) {
@@ -65,7 +73,7 @@ Deno.serve(async (req) => {
             error: j?.error?.message || 'Falha ao consultar conta',
           };
         }
-        const balance = toMoney(j.balance);
+        const balance = getAvailableFunds(j);
         return {
           client_id: c.client_id,
           client_name: clientName.get(c.client_id) || '—',
