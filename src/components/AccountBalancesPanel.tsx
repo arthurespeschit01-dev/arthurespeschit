@@ -28,7 +28,7 @@ const LOW_THRESHOLD = 200;
 export function getBalanceStatus(a: AccountBalance): BalanceStatus {
   if (a.error) return 'error';
   if (a.account_status && a.account_status !== 1) return 'empty';
-  const r = a.remaining ?? 0;
+  const r = a.balance ?? 0;
   if (r <= 0) return 'empty';
   if (r <= LOW_THRESHOLD) return 'low';
   return 'ok';
@@ -110,7 +110,7 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
       const sa = STATUS_CONFIG[getBalanceStatus(a)].order;
       const sb = STATUS_CONFIG[getBalanceStatus(b)].order;
       if (sa !== sb) return sa - sb;
-      return (a.remaining ?? 0) - (b.remaining ?? 0);
+      return (a.balance ?? 0) - (b.balance ?? 0);
     });
   }, [accounts]);
 
@@ -209,10 +209,10 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
                       </div>
                       {!a.error && (
                         <>
-                          <p className="text-sm font-bold text-foreground">{fmt(a.remaining, a.currency)}</p>
-                          {a.spend_cap && a.spend_cap > 0 && (
-                            <p className="text-[10px] text-muted-foreground">Cap: {fmt(a.spend_cap, a.currency)}</p>
-                          )}
+                          <p className="text-lg font-bold text-foreground leading-tight">{fmt(a.balance, a.currency)}</p>
+                          {a.spend_cap && a.spend_cap > 0 ? (
+                            <p className="text-[10px] text-muted-foreground mt-0.5">Limite da conta: {fmt(a.spend_cap, a.currency)}</p>
+                          ) : null}
                         </>
                       )}
                     </div>
