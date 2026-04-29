@@ -21,16 +21,16 @@ export interface AccountBalance {
   error?: string;
 }
 
-const THRESHOLD_KEY = 'meta_balance_threshold';
-
 export type BalanceStatus = 'ok' | 'low' | 'empty' | 'error';
 
-export function getBalanceStatus(a: AccountBalance, threshold: number): BalanceStatus {
+const LOW_THRESHOLD = 200;
+
+export function getBalanceStatus(a: AccountBalance): BalanceStatus {
   if (a.error) return 'error';
   if (a.account_status && a.account_status !== 1) return 'empty';
   const r = a.remaining ?? 0;
   if (r <= 0) return 'empty';
-  if (r < threshold) return 'low';
+  if (r <= LOW_THRESHOLD) return 'low';
   return 'ok';
 }
 
@@ -40,11 +40,6 @@ const STATUS_CONFIG = {
   empty: { label: 'Sem saldo', icon: XCircle, color: 'bg-red-500/10 text-red-400 border-red-500/30', dot: 'bg-red-500', emoji: '🔴', order: 0 },
   error: { label: 'Erro / Inativa', icon: AlertCircle, color: 'bg-red-500/10 text-red-400 border-red-500/30', dot: 'bg-red-500', emoji: '🔴', order: 0 },
 };
-
-function getThreshold(): number {
-  const v = Number(localStorage.getItem(THRESHOLD_KEY));
-  return Number.isFinite(v) && v > 0 ? v : 50;
-}
 
 /** Hook leve para somente contar contas problemáticas (badge) */
 export function useAccountBalancesCount() {
