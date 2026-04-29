@@ -89,19 +89,32 @@ Deno.serve(async (req) => {
       const cpc = parseFloat(ins.cpc || '0') || 0;
       const cpm = parseFloat(ins.cpm || '0') || 0;
       const reach = parseInt(ins.reach || '0') || 0;
+      const frequency = parseFloat(ins.frequency || '0') || 0;
 
       let leads = 0;
       let purchases = 0;
       let messages = 0;
       let link_clicks = 0;
+      let engagements = 0;
       let revenue = 0;
+
+      const messageTypes = new Set([
+        'onsite_conversion.messaging_conversation_started_7d',
+        'onsite_conversion.total_messaging_connection',
+        'onsite_conversion.messaging_first_reply',
+        'onsite_conversion.messaging_conversation_started',
+      ]);
+      const engagementTypes = new Set([
+        'post_engagement', 'page_engagement', 'post_reaction', 'comment', 'like', 'post', 'post_save',
+      ]);
 
       for (const a of (ins.actions || [])) {
         const v = parseFloat(a.value || '0') || 0;
         if (['lead', 'onsite_conversion.lead_grouped', 'offsite_conversion.fb_pixel_lead'].includes(a.action_type)) leads += v;
         if (['purchase', 'omni_purchase', 'offsite_conversion.fb_pixel_purchase'].includes(a.action_type)) purchases += v;
-        if (['onsite_conversion.messaging_conversation_started_7d', 'onsite_conversion.total_messaging_connection'].includes(a.action_type)) messages += v;
+        if (messageTypes.has(a.action_type)) messages += v;
         if (a.action_type === 'link_click') link_clicks += v;
+        if (engagementTypes.has(a.action_type)) engagements += v;
       }
       for (const a of (ins.action_values || [])) {
         if (['purchase', 'omni_purchase', 'offsite_conversion.fb_pixel_purchase'].includes(a.action_type)) {
@@ -112,12 +125,13 @@ Deno.serve(async (req) => {
       const cpl = leads > 0 ? spend / leads : 0;
       const cpp = purchases > 0 ? spend / purchases : 0;
       const cpm_msg = messages > 0 ? spend / messages : 0;
+      const cost_per_engagement = engagements > 0 ? spend / engagements : 0;
       const roas = spend > 0 ? revenue / spend : 0;
 
       result[ins.campaign_id] = {
-        spend, impressions, clicks, ctr, cpc, cpm, reach,
-        leads, purchases, messages, link_clicks, revenue,
-        cpl, cpp, cpm_msg, roas,
+        spend, impressions, clicks, ctr, cpc, cpm, reach, frequency,
+        leads, purchases, messages, link_clicks, revenue, engagements,
+        cpl, cpp, cpm_msg, cost_per_engagement, roas,
       };
     }
 
