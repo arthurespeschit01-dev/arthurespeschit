@@ -14,9 +14,6 @@ export interface AccountBalance {
   account_name: string;
   currency?: string;
   balance?: number;
-  spend_cap?: number;
-  amount_spent?: number;
-  remaining?: number;
   account_status?: number;
   error?: string;
 }
