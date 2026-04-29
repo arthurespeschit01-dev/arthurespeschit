@@ -595,7 +595,7 @@ export default function MetaHierarchyTabs({
                       : (a.lifetime_budget || 0) > 0 ? `R$ ${Number(a.lifetime_budget).toLocaleString('pt-BR')} total` : '—';
                     return (
                       <tr key={a.id} className={`border-b border-border/40 hover:bg-secondary/30 transition-colors ${checked ? 'bg-primary/5' : ''}`}>
-                        <td className="px-3 py-2"><Checkbox checked={checked} onCheckedChange={() => toggleAdSet(a.id)} /></td>
+                        
                         <td className="px-2 py-2">
                           <EntityStatusToggle
                             clientId={clientId} entityType="adset"
