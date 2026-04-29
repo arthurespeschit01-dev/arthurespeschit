@@ -98,7 +98,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 return (
                   <Tooltip key={item.to}>
                     <TooltipTrigger asChild>{link}</TooltipTrigger>
-                    <TooltipContent side="right" className="hidden lg:block">{item.label}</TooltipContent>
+                    <TooltipContent side="right">{item.label}</TooltipContent>
                   </Tooltip>
                 );
               }
