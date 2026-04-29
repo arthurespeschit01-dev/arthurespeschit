@@ -237,6 +237,7 @@ Deno.serve(async (req) => {
         leads: acts.leads, purchases: acts.purchases, messages: acts.messages,
         link_clicks: acts.link_clicks, revenue: acts.revenue,
         engagements: acts.engagements, video_views: acts.video_views,
+        followers: acts.followers, profile_visits: acts.profile_visits,
         cpa, roas,
         last_synced_at: now,
       };
