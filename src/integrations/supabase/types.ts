@@ -27,6 +27,7 @@ export type Database = {
           daily_budget: number | null
           end_time: string | null
           engagements: number
+          followers: number
           frequency: number
           id: string
           impressions: number | null
@@ -39,6 +40,7 @@ export type Database = {
           meta_campaign_id: string | null
           name: string
           optimization_goal: string | null
+          profile_visits: number
           purchases: number | null
           reach: number | null
           revenue: number | null
@@ -62,6 +64,7 @@ export type Database = {
           daily_budget?: number | null
           end_time?: string | null
           engagements?: number
+          followers?: number
           frequency?: number
           id?: string
           impressions?: number | null
@@ -74,6 +77,7 @@ export type Database = {
           meta_campaign_id?: string | null
           name: string
           optimization_goal?: string | null
+          profile_visits?: number
           purchases?: number | null
           reach?: number | null
           revenue?: number | null
@@ -97,6 +101,7 @@ export type Database = {
           daily_budget?: number | null
           end_time?: string | null
           engagements?: number
+          followers?: number
           frequency?: number
           id?: string
           impressions?: number | null
@@ -109,6 +114,7 @@ export type Database = {
           meta_campaign_id?: string | null
           name?: string
           optimization_goal?: string | null
+          profile_visits?: number
           purchases?: number | null
           reach?: number | null
           revenue?: number | null
@@ -174,6 +180,7 @@ export type Database = {
           ctr: number | null
           date_preset: string | null
           engagements: number
+          followers: number
           frequency: number | null
           id: string
           impressions: number | null
@@ -187,6 +194,7 @@ export type Database = {
           notes: string | null
           objective: string | null
           platform: string | null
+          profile_visits: number
           purchases: number | null
           reach: number | null
           revenue: number | null
@@ -210,6 +218,7 @@ export type Database = {
           ctr?: number | null
           date_preset?: string | null
           engagements?: number
+          followers?: number
           frequency?: number | null
           id?: string
           impressions?: number | null
@@ -223,6 +232,7 @@ export type Database = {
           notes?: string | null
           objective?: string | null
           platform?: string | null
+          profile_visits?: number
           purchases?: number | null
           reach?: number | null
           revenue?: number | null
@@ -246,6 +256,7 @@ export type Database = {
           ctr?: number | null
           date_preset?: string | null
           engagements?: number
+          followers?: number
           frequency?: number | null
           id?: string
           impressions?: number | null
@@ -259,6 +270,7 @@ export type Database = {
           notes?: string | null
           objective?: string | null
           platform?: string | null
+          profile_visits?: number
           purchases?: number | null
           reach?: number | null
           revenue?: number | null
@@ -509,6 +521,7 @@ export type Database = {
           created_at: string
           ctr: number | null
           engagements: number
+          followers: number
           frequency: number
           id: string
           impressions: number | null
@@ -521,6 +534,7 @@ export type Database = {
           meta_adset_id: string | null
           meta_creative_id: string | null
           name: string
+          profile_visits: number
           purchases: number | null
           reach: number | null
           revenue: number | null
@@ -545,6 +559,7 @@ export type Database = {
           created_at?: string
           ctr?: number | null
           engagements?: number
+          followers?: number
           frequency?: number
           id?: string
           impressions?: number | null
@@ -557,6 +572,7 @@ export type Database = {
           meta_adset_id?: string | null
           meta_creative_id?: string | null
           name: string
+          profile_visits?: number
           purchases?: number | null
           reach?: number | null
           revenue?: number | null
@@ -581,6 +597,7 @@ export type Database = {
           created_at?: string
           ctr?: number | null
           engagements?: number
+          followers?: number
           frequency?: number
           id?: string
           impressions?: number | null
@@ -593,6 +610,7 @@ export type Database = {
           meta_adset_id?: string | null
           meta_creative_id?: string | null
           name?: string
+          profile_visits?: number
           purchases?: number | null
           reach?: number | null
           revenue?: number | null

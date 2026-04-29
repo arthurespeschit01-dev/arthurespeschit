@@ -1,75 +1,63 @@
-## Causa do problema
+## Problema
 
-No edge function `meta-campaign-insights`, a contagem de **mensagens** soma 4 action_types de uma vez:
+A campanha `[RECONHECIMENTO] [INSTAGRAM]` tem objetivo `OUTCOME_ENGAGEMENT` na Meta. No código atual de `src/lib/campaignMetrics.ts`, qualquer objetivo que contenha `ENGAGEMENT` cai no ramo de **Mensagens** quando há qualquer valor de `messages > 0`. Por isso o sistema mostra "Mensagens 8 / Custo/Msg R$ 55,63" em vez das métricas corretas de reconhecimento (Seguidores, Visitas no perfil, Alcance, Impressões, CPM, Frequência, CTR).
 
-```ts
-'onsite_conversion.messaging_conversation_started_7d',
-'onsite_conversion.total_messaging_connection',
-'onsite_conversion.messaging_first_reply',
-'onsite_conversion.messaging_conversation_started',
-```
-
-A Meta retorna vários desses simultaneamente para o MESMO evento — `messaging_conversation_started` e `messaging_conversation_started_7d` referem-se à mesma conversa apenas com janelas de atribuição diferentes, e `total_messaging_connection` agrega outros eventos. Isso causa **dupla/tripla contagem** de mensagens, inflando "Mensagens" e deflando o "Custo/Msg" em relação ao Gerenciador de Anúncios.
-
-O Gerenciador da Meta exibe a coluna "Conversas iniciadas por mensagens" usando **apenas** `onsite_conversion.messaging_conversation_started_7d` (a métrica oficial padrão).
-
-O mesmo problema afeta `engagements`, que soma `post_engagement` + `page_engagement` + reações/comentários/likes individuais — quando `post_engagement` no Meta **já é o total agregado** desses eventos. Isso gera dupla contagem de engajamento também.
+Além disso, o backend hoje **não puxa** os action_types `follow`, `page_likes`, `onsite_conversion.profile_visit` da API da Meta, então mesmo se o frontend tentasse exibir Seguidores e Visitas no perfil, o valor seria zero.
 
 ## Mudanças
 
-### 1. `supabase/functions/meta-campaign-insights/index.ts`
+### 1. Backend — extrair Seguidores e Visitas no perfil
 
-**Mensagens** — usar APENAS o action_type oficial do Gerenciador (com fallback se ele não vier):
+Em **3 arquivos** (`meta-campaign-insights`, `meta-import-campaigns`, `meta-import-adsets`, `meta-import-creatives`), adicionar parsing dos seguintes `action_type`:
 
-```ts
-let messages = 0;
-let messagesFallback = 0;
-for (const a of (ins.actions || [])) {
-  if (a.action_type === 'onsite_conversion.messaging_conversation_started_7d') {
-    messages = parseFloat(a.value || '0') || 0; // métrica oficial
-  }
-  if (a.action_type === 'onsite_conversion.messaging_conversation_started') {
-    messagesFallback = Math.max(messagesFallback, parseFloat(a.value || '0') || 0);
-  }
-}
-if (messages === 0) messages = messagesFallback;
+- `follow`, `onsite_conversion.follow`, `page_likes` → `followers`
+- `onsite_conversion.profile_visit` → `profile_visits`
+
+Calcular também `cost_per_follower = spend / followers`.
+
+### 2. Banco — novas colunas
+
+Adicionar em `campaigns`, `ad_sets`, `creatives`:
+- `followers bigint default 0`
+- `profile_visits bigint default 0`
+
+### 3. Frontend — `src/lib/campaignMetrics.ts`
+
+Reescrever `metricsForObjective` para usar SEMPRE o objetivo da Meta (sem detecção por nome):
+
+- **`OUTCOME_AWARENESS` / `BRAND_AWARENESS` / `REACH`** → painel de reconhecimento
+- **`OUTCOME_ENGAGEMENT` / `ENGAGEMENT` / `POST_ENGAGEMENT` / `PAGE_LIKES`** → painel de reconhecimento (mesmas métricas)
+- **`MESSAGES`** → painel de mensagens (continua igual)
+- **`OUTCOME_LEADS` / `LEAD_GENERATION`** → leads (igual)
+- **`OUTCOME_SALES` / `CONVERSIONS` / `PURCHASE`** → vendas (igual)
+- **`OUTCOME_TRAFFIC` / `LINK_CLICKS`** → tráfego (igual)
+
+Painel de **Reconhecimento/Engajamento** (escolhido pelo usuário — opção "Mostrar TUDO"):
+```
+Gasto | Seguidores | Custo/Seguidor | Visitas no perfil | Engajamentos | Alcance | Impressões | CPM | Frequência | CTR
 ```
 
-**Engajamentos** — usar `post_engagement` se existir (já é o total agregado da Meta), senão `page_engagement`, sem somar reações individuais:
+### 4. Tipos e tabela
 
-```ts
-let postEng = 0, pageEng = 0;
-for (const a of (ins.actions || [])) {
-  if (a.action_type === 'post_engagement') postEng = parseFloat(a.value || '0') || 0;
-  if (a.action_type === 'page_engagement') pageEng = parseFloat(a.value || '0') || 0;
-}
-const engagements = postEng > 0 ? postEng : pageEng;
-```
+- Atualizar `CampaignInsights` em `src/lib/campaignMetrics.ts` com `followers?: number; profile_visits?: number; cost_per_follower?: number`.
+- Atualizar `Campaign`/`AdSet`/`Creative` em `src/components/MetaHierarchyTabs.tsx` com os mesmos campos para que `insightsFromAdSet`/`insightsFromCreative` os repassem.
+- O backend `ClientDetail.tsx` já injeta o objeto `insightsByCamp` direto da função realtime — só repassa.
 
-**Leads** — manter, mas evitar dupla contagem entre `lead` e `onsite_conversion.lead_grouped`:
+### 5. Reimportar dados
 
-```ts
-let leadStd = 0, leadGrouped = 0, leadPixel = 0;
-for (const a of (ins.actions || [])) {
-  if (a.action_type === 'lead') leadStd = v;
-  if (a.action_type === 'onsite_conversion.lead_grouped') leadGrouped = v;
-  if (a.action_type === 'offsite_conversion.fb_pixel_lead') leadPixel = v;
-}
-const leads = Math.max(leadStd, leadGrouped, leadPixel); // pega o maior, não soma
-```
+Após a mudança, o usuário precisa clicar em **"Importar"** dentro de cada aba (Conjuntos / Anúncios) para que os novos campos sejam preenchidos a partir da Meta. Para a aba Campanhas, os insights são lidos em tempo real, então atualiza sozinho ao trocar o período.
 
-**Purchases** — mesma lógica (pegar o maior entre `purchase`, `omni_purchase`, `offsite_conversion.fb_pixel_purchase` — eles representam a mesma conversão por canais distintos).
+## Arquivos afetados
 
-**Revenue** — mesma lógica em `action_values` (pegar o maior).
-
-### 2. Aplicar a mesma correção em `meta-import-campaigns/index.ts`, `meta-import-adsets/index.ts` e `meta-import-creatives/index.ts`
-
-Essas funções persistem dados no banco com a mesma lógica defeituosa. Replicar o parsing corrigido nelas também.
+- `supabase/functions/meta-campaign-insights/index.ts`
+- `supabase/functions/meta-import-campaigns/index.ts`
+- `supabase/functions/meta-import-adsets/index.ts`
+- `supabase/functions/meta-import-creatives/index.ts`
+- `src/lib/campaignMetrics.ts`
+- `src/components/MetaHierarchyTabs.tsx`
+- `src/pages/ClientDetail.tsx` (apenas adicionar campos no `ZERO` e mapeamento)
+- Migration SQL para adicionar colunas em `campaigns`, `ad_sets`, `creatives`
 
 ## Resultado esperado
 
-Os valores de Mensagens, Engajamentos, Leads, Conversões e Receita passarão a bater com o Gerenciador de Anúncios da Meta (tolerância pequena por janelas de atribuição). O `Custo/Msg`, `CPL`, `CPA` e `ROAS` ficam consistentes.
-
-Métricas que já estavam corretas (Gasto, Alcance, Impressões, CPM, CTR, CPC, Frequência, Cliques no link) **não são tocadas** — o parsing delas vem direto dos campos top-level da Meta e não muda.
-
-A heurística de seleção de objetivo em `src/lib/campaignMetrics.ts` permanece como está (correta).
+A campanha `[RECONHECIMENTO] [INSTAGRAM] [16/03/26]` passará a mostrar exatamente as colunas que aparecem no Gerenciador do Meta para campanhas de reconhecimento: Seguidores, Visitas no perfil, Engajamentos, Alcance, Impressões, CPM, Frequência e CTR — com os mesmos números.
