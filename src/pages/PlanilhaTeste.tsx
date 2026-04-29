@@ -486,41 +486,47 @@ function PlatformSheet({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => {
+            {rows.map((row, idx) => {
               const isInput = row.type === "input-money" || row.type === "input-int";
-              // Fundo da linha (semi-transparente, ok para colunas roláveis)
-              const rowBg = isInput && !readOnly ? "bg-accent/40" : (isInput && readOnly ? "bg-muted/40" : "bg-card");
-              // Fundo OPACO para as células sticky — evita ver as células dos meses passando por baixo
-              const stickyBg = isInput && !readOnly ? "bg-accent" : (isInput && readOnly ? "bg-muted" : "bg-card");
+              // Zebra sutil: linhas pares vs ímpares
+              const rowBg = idx % 2 === 0 ? "bg-card" : "bg-muted/30";
+              const stickyBg = idx % 2 === 0 ? "bg-card" : "bg-[hsl(var(--muted))]";
               return (
-                <tr key={row.key} className={`${rowBg} border-b border-border`}>
+                <tr key={row.key} className={`${rowBg} border-b border-border/50 hover:bg-accent/5 transition-colors`}>
                   <td className={`px-3 py-1 sticky left-0 ${stickyBg} z-10 font-medium text-foreground border-r border-border min-w-[220px]`}>{row.label}</td>
                   <td className={`sticky left-[220px] ${stickyBg} z-10 border-r border-border min-w-[120px]`}>{renderObjectiveCell(row)}</td>
                   {Array.from({ length: 12 }).map((_, i) => (
-                    <td key={i} className="text-right px-1 border-r border-border/60">
+                    <td key={i} className="text-right px-1 border-r border-border/40 text-foreground">
                       {isInput ? renderInputCell(row, i) : <div className="px-2 py-1.5">{renderCalcCell(row, i)}</div>}
                     </td>
                   ))}
-                  <td className="text-right px-3 py-1.5 bg-muted/60 border-l border-border">{renderTotalCell(row)}</td>
+                  <td className={`text-right px-3 py-1.5 border-l border-border ${stickyBg} font-semibold text-foreground`}>{renderTotalCell(row)}</td>
                 </tr>
               );
             })}
 
-            <tr className="bg-primary text-primary-foreground">
-              <td colSpan={15} className="px-0 py-0 font-semibold bg-primary">
-                <div className="sticky left-0 px-3 py-2 inline-block">TAXAS DE CONVERSÃO</div>
+            {/* Separador de seção */}
+            <tr className="bg-primary/15 border-y border-primary/30">
+              <td colSpan={15} className="px-0 py-0">
+                <div className="sticky left-0 px-3 py-2 inline-block text-xs font-semibold uppercase tracking-wide text-primary">
+                  Taxas de conversão
+                </div>
               </td>
             </tr>
-            {conversionRows.map((row) => (
-              <tr key={row.key} className="bg-card border-b border-border">
-                <td className="px-3 py-1.5 sticky left-0 bg-card z-10 font-medium text-foreground border-r border-border min-w-[220px]">{row.label}</td>
-                <td className="sticky left-[220px] bg-card z-10 border-r border-border text-center text-muted-foreground min-w-[120px]">—</td>
-                {Array.from({ length: 12 }).map((_, i) => (
-                  <td key={i} className="text-right px-3 py-1.5 border-r border-border/60">{renderCalcCell(row, i)}</td>
-                ))}
-                <td className="text-right px-3 py-1.5 bg-muted/60 border-l border-border font-semibold">{renderTotalCell(row)}</td>
-              </tr>
-            ))}
+            {conversionRows.map((row, idx) => {
+              const rowBg = idx % 2 === 0 ? "bg-card" : "bg-muted/30";
+              const stickyBg = idx % 2 === 0 ? "bg-card" : "bg-[hsl(var(--muted))]";
+              return (
+                <tr key={row.key} className={`${rowBg} border-b border-border/50 hover:bg-accent/5 transition-colors`}>
+                  <td className={`px-3 py-1.5 sticky left-0 ${stickyBg} z-10 font-medium text-foreground border-r border-border min-w-[220px]`}>{row.label}</td>
+                  <td className={`sticky left-[220px] ${stickyBg} z-10 border-r border-border text-center text-muted-foreground min-w-[120px]`}>—</td>
+                  {Array.from({ length: 12 }).map((_, i) => (
+                    <td key={i} className="text-right px-3 py-1.5 border-r border-border/40 text-foreground">{renderCalcCell(row, i)}</td>
+                  ))}
+                  <td className={`text-right px-3 py-1.5 border-l border-border ${stickyBg} font-semibold text-foreground`}>{renderTotalCell(row)}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
