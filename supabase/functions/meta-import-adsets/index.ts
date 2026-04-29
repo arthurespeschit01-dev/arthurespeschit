@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
     };
 
     const fields = 'id,name,status,daily_budget,lifetime_budget,bid_strategy,optimization_goal,start_time,end_time,campaign_id';
-    const insightFields = 'adset_id,spend,impressions,clicks,ctr,cpc,cpm,reach,actions,action_values';
+    const insightFields = 'adset_id,spend,impressions,clicks,ctr,cpc,cpm,reach,frequency,actions,action_values';
     let imported = 0;
 
     for (const camp of campaigns) {
