@@ -1,0 +1,252 @@
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Loader2, RefreshCw, Wallet, AlertCircle, CheckCircle2, AlertTriangle, XCircle,
+  ChevronDown, ChevronUp,
+} from 'lucide-react';
+import { toast } from 'sonner';
+
+export interface AccountBalance {
+  client_id: string;
+  client_name: string;
+  account_id: string;
+  account_name: string;
+  currency?: string;
+  balance?: number;
+  spend_cap?: number;
+  amount_spent?: number;
+  remaining?: number;
+  account_status?: number;
+  error?: string;
+}
+
+const THRESHOLD_KEY = 'meta_balance_threshold';
+
+export type BalanceStatus = 'ok' | 'low' | 'empty' | 'error';
+
+export function getBalanceStatus(a: AccountBalance, threshold: number): BalanceStatus {
+  if (a.error) return 'error';
+  if (a.account_status && a.account_status !== 1) return 'empty';
+  const r = a.remaining ?? 0;
+  if (r <= 0) return 'empty';
+  if (r < threshold) return 'low';
+  return 'ok';
+}
+
+const STATUS_CONFIG = {
+  ok: { label: 'Saldo OK', icon: CheckCircle2, color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30', dot: 'bg-emerald-500', emoji: '🟢', order: 3 },
+  low: { label: 'Saldo baixo', icon: AlertTriangle, color: 'bg-amber-500/10 text-amber-400 border-amber-500/30', dot: 'bg-amber-500', emoji: '🟡', order: 1 },
+  empty: { label: 'Sem saldo', icon: XCircle, color: 'bg-red-500/10 text-red-400 border-red-500/30', dot: 'bg-red-500', emoji: '🔴', order: 0 },
+  error: { label: 'Erro / Inativa', icon: AlertCircle, color: 'bg-red-500/10 text-red-400 border-red-500/30', dot: 'bg-red-500', emoji: '🔴', order: 0 },
+};
+
+function getThreshold(): number {
+  const v = Number(localStorage.getItem(THRESHOLD_KEY));
+  return Number.isFinite(v) && v > 0 ? v : 50;
+}
+
+/** Hook leve para somente contar contas problemáticas (badge) */
+export function useAccountBalancesCount() {
+  const [problemCount, setProblemCount] = useState(0);
+  const [accounts, setAccounts] = useState<AccountBalance[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase.functions.invoke('meta-account-balances', { body: {} });
+    setLoading(false);
+    if (error) return;
+    const list: AccountBalance[] = data?.accounts || [];
+    setAccounts(list);
+    const threshold = getThreshold();
+    const count = list.filter(a => {
+      const s = getBalanceStatus(a, threshold);
+      return s === 'low' || s === 'empty' || s === 'error';
+    }).length;
+    setProblemCount(count);
+  }, []);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  return { problemCount, accounts, loading, refresh };
+}
+
+interface PanelProps {
+  defaultOpen?: boolean;
+  /** Permite reutilizar dados já carregados pelo hook do badge */
+  initialAccounts?: AccountBalance[];
+  onAccountsChange?: (accounts: AccountBalance[]) => void;
+}
+
+export default function AccountBalancesPanel({ defaultOpen = false, initialAccounts, onAccountsChange }: PanelProps) {
+  const [open, setOpen] = useState(defaultOpen);
+  const [loading, setLoading] = useState(false);
+  const [accounts, setAccounts] = useState<AccountBalance[]>(initialAccounts || []);
+  const [hasLoaded, setHasLoaded] = useState(!!initialAccounts?.length);
+  const [threshold, setThreshold] = useState<number>(getThreshold);
+
+  useEffect(() => {
+    if (initialAccounts && initialAccounts.length) {
+      setAccounts(initialAccounts);
+      setHasLoaded(true);
+    }
+  }, [initialAccounts]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase.functions.invoke('meta-account-balances', { body: {} });
+    setLoading(false);
+    if (error) {
+      toast.error('Falha ao carregar saldos');
+      return;
+    }
+    const list = data?.accounts || [];
+    setAccounts(list);
+    setHasLoaded(true);
+    onAccountsChange?.(list);
+  }, [onAccountsChange]);
+
+  // Carrega ao abrir pela primeira vez
+  useEffect(() => {
+    if (open && !hasLoaded && !loading) load();
+  }, [open, hasLoaded, loading, load]);
+
+  useEffect(() => { localStorage.setItem(THRESHOLD_KEY, String(threshold)); }, [threshold]);
+
+  const sorted = useMemo(() => {
+    return [...accounts].sort((a, b) => {
+      const sa = STATUS_CONFIG[getBalanceStatus(a, threshold)].order;
+      const sb = STATUS_CONFIG[getBalanceStatus(b, threshold)].order;
+      if (sa !== sb) return sa - sb;
+      return (a.remaining ?? 0) - (b.remaining ?? 0);
+    });
+  }, [accounts, threshold]);
+
+  const problemCount = useMemo(() => accounts.filter(a => {
+    const s = getBalanceStatus(a, threshold);
+    return s === 'low' || s === 'empty' || s === 'error';
+  }).length, [accounts, threshold]);
+
+  const fmt = (v: number | undefined, currency = 'BRL') => {
+    if (v === undefined || v === null) return '—';
+    try {
+      return new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(v);
+    } catch {
+      return `R$ ${v.toFixed(2)}`;
+    }
+  };
+
+  return (
+    <div className="glass-surface rounded-xl border border-border/50 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 p-4">
+        <button
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          className="flex items-center gap-3 flex-1 min-w-0 text-left"
+        >
+          <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <Wallet className="w-4 h-4 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              Saldos das Contas
+              {problemCount > 0 && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/30">
+                  {problemCount} com problema
+                </span>
+              )}
+            </h3>
+            <p className="text-[11px] text-muted-foreground">
+              Verificação de saldo das contas de anúncio do Meta {hasLoaded && `• ${accounts.length} contas`}
+            </p>
+          </div>
+        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {open && (
+            <Button onClick={load} variant="outline" size="sm" disabled={loading} className="gap-2">
+              {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+              Atualizar tudo
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={() => setOpen(o => !o)} className="gap-1">
+            {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </Button>
+        </div>
+      </div>
+
+      {/* Body */}
+      {open && (
+        <div className="border-t border-border/50 p-4 space-y-3">
+          <div className="flex flex-wrap items-end gap-3 p-3 bg-secondary/30 rounded-lg border border-border/50">
+            <div className="flex-1 min-w-[180px] max-w-[260px]">
+              <Label className="text-muted-foreground text-xs">Limite mínimo (R$)</Label>
+              <Input
+                type="number"
+                min={0}
+                value={threshold}
+                onChange={(e) => setThreshold(Number(e.target.value) || 0)}
+                className="bg-secondary/50 border-border/50 mt-1 text-sm h-9"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">Abaixo disso → "Saldo baixo"</p>
+            </div>
+          </div>
+
+          {loading && accounts.length === 0 ? (
+            <div className="space-y-2">
+              {[0, 1, 2].map(i => (
+                <div key={i} className="h-16 rounded-lg bg-secondary/30 animate-pulse border border-border/30" />
+              ))}
+            </div>
+          ) : sorted.length === 0 ? (
+            <p className="text-center text-sm text-muted-foreground py-8">
+              Nenhuma conta de anúncio conectada com cliente ativo.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {sorted.map((a) => {
+                const st = getBalanceStatus(a, threshold);
+                const cfg = STATUS_CONFIG[st];
+                const Icon = cfg.icon;
+                return (
+                  <div key={a.account_id} className={`flex items-center justify-between gap-3 p-3 rounded-lg border ${cfg.color}`}>
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${cfg.dot}`} />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground truncate">
+                          {a.client_name}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          {a.account_name || 'Sem nome'} • {a.account_id}
+                        </p>
+                        {a.error && <p className="text-[11px] text-red-400 mt-0.5">{a.error}</p>}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="flex items-center gap-1.5 justify-end mb-0.5">
+                        <span className="text-xs">{cfg.emoji}</span>
+                        <Icon className="w-3 h-3" />
+                        <span className="text-[10px] font-semibold uppercase tracking-wider">{cfg.label}</span>
+                      </div>
+                      {!a.error && (
+                        <>
+                          <p className="text-sm font-bold text-foreground">{fmt(a.remaining, a.currency)}</p>
+                          {a.spend_cap && a.spend_cap > 0 && (
+                            <p className="text-[10px] text-muted-foreground">Cap: {fmt(a.spend_cap, a.currency)}</p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
