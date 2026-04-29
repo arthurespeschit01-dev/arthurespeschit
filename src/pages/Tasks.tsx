@@ -266,7 +266,25 @@ export default function Tasks() {
   };
 
   const changeStatus = async (t: Task, newStatus: string) => {
-    await supabase.from('operational_tasks').update({ status: newStatus }).eq('id', t.id);
+    if (t.status === newStatus) return;
+
+    // Atualização otimista: muda na UI imediatamente
+    const previousStatus = t.status;
+    setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: newStatus } : x)));
+
+    const { error } = await supabase
+      .from('operational_tasks')
+      .update({ status: newStatus })
+      .eq('id', t.id);
+
+    if (error) {
+      // Rollback em caso de erro
+      setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: previousStatus } : x)));
+      toast.error('Erro ao atualizar status');
+      return;
+    }
+
+    toast.success(`Status alterado para "${statusConfig[newStatus]?.label || newStatus}"`);
 
     // If completing a recurring task, create the next occurrence
     if (newStatus === 'concluída' && t.recurrence && t.recurrence !== 'none' && user) {
@@ -289,9 +307,9 @@ export default function Tasks() {
           recurrence_days: days,
         });
         toast.success('Próxima recorrência criada!');
+        load();
       }
     }
-    load();
   };
 
   const handleFileUpload = async (taskId: string, file: File) => {
