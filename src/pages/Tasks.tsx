@@ -268,32 +268,30 @@ export default function Tasks() {
   const changeStatus = async (t: Task, newStatus: string) => {
     if (t.status === newStatus) return;
 
-    // Atualização otimista: muda na UI imediatamente
+    // Atualização otimista: muda na UI imediatamente (sem aguardar rede)
     const previousStatus = t.status;
     setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: newStatus } : x)));
 
-    const { error } = await supabase
+    // Persiste em background — não bloqueia a UI
+    supabase
       .from('operational_tasks')
       .update({ status: newStatus })
-      .eq('id', t.id);
+      .eq('id', t.id)
+      .then(({ error }) => {
+        if (error) {
+          setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: previousStatus } : x)));
+          toast.error('Erro ao atualizar status');
+        }
+      });
 
-    if (error) {
-      // Rollback em caso de erro
-      setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: previousStatus } : x)));
-      toast.error('Erro ao atualizar status');
-      return;
-    }
-
-    toast.success(`Status alterado para "${statusConfig[newStatus]?.label || newStatus}"`);
-
-    // If completing a recurring task, create the next occurrence
+    // Recorrência: cria próxima ocorrência em background, atualizando a lista localmente
     if (newStatus === 'concluída' && t.recurrence && t.recurrence !== 'none' && user) {
       const interval = Math.max(1, t.recurrence_interval || 1);
       const days = t.recurrence_days || [];
       const nextStart = t.start_date ? addRecurrence(t.start_date, t.recurrence, interval, days) : null;
       const nextEnd = t.end_date ? addRecurrence(t.end_date, t.recurrence, interval, days) : null;
       if (nextStart || nextEnd) {
-        await supabase.from('operational_tasks').insert({
+        const newTask = {
           user_id: user.id,
           title: t.title,
           description: t.description || '',
@@ -305,9 +303,24 @@ export default function Tasks() {
           recurrence: t.recurrence,
           recurrence_interval: interval,
           recurrence_days: days,
-        });
-        toast.success('Próxima recorrência criada!');
-        load();
+        };
+        supabase
+          .from('operational_tasks')
+          .insert(newTask)
+          .select('*')
+          .single()
+          .then(({ data }) => {
+            if (data) {
+              const normalized: Task = {
+                ...data,
+                recurrence_days: Array.isArray(data.recurrence_days)
+                  ? (data.recurrence_days as unknown[]).map((n) => Number(n)).filter((n) => !Number.isNaN(n))
+                  : [],
+              };
+              setTasks((prev) => [normalized, ...prev]);
+              toast.success('Próxima recorrência criada!');
+            }
+          });
       }
     }
   };
