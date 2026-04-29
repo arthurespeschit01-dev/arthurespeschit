@@ -14,7 +14,6 @@ export interface AccountBalance {
   account_name: string;
   currency?: string;
   balance?: number;
-  account_status?: number;
   error?: string;
 }
 
@@ -24,7 +23,6 @@ const LOW_THRESHOLD = 200;
 
 export function getBalanceStatus(a: AccountBalance): BalanceStatus {
   if (a.error) return 'error';
-  if (a.account_status && a.account_status !== 1) return 'empty';
   const r = a.balance ?? 0;
   if (r <= 0) return 'empty';
   if (r <= LOW_THRESHOLD) return 'low';
@@ -190,10 +188,7 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
                       <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${cfg.dot}`} />
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-foreground truncate">
-                          {a.client_name}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground truncate">
-                          {a.account_name || 'Sem nome'} • {a.account_id}
+                          {a.account_name || 'Sem nome'}
                         </p>
                         {a.error && <p className="text-[11px] text-red-400 mt-0.5">{a.error}</p>}
                       </div>
