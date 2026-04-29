@@ -184,7 +184,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   variant="ghost"
                   onClick={toggleCollapsed}
                   size={collapsed ? 'icon' : 'sm'}
-                  className={`hidden lg:flex text-muted-foreground hover:text-foreground ${collapsed ? 'w-full' : 'w-full justify-start gap-3'}`}
+                  className={`flex text-muted-foreground hover:text-foreground ${collapsed ? 'w-full' : 'w-full justify-start gap-3'}`}
                 >
                   {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <><PanelLeftClose className="w-4 h-4" /> Minimizar</>}
                 </Button>
