@@ -18,9 +18,47 @@ type Cell = MetricCell & { _v: number; _alwaysShow?: boolean };
 const c = (label: string, value: string, v: number, opts: { highlight?: boolean; alwaysShow?: boolean } = {}): Cell =>
   ({ label, value, _v: v, highlight: opts.highlight, _alwaysShow: opts.alwaysShow });
 
-export function metricsForObjective(objective: string, ins?: CampaignInsights): MetricCell[] {
-  if (!ins) return [];
+/**
+ * Decide o "tipo de painel" usando APENAS campos oficiais da Meta:
+ *   - objective: objetivo da campanha (ex.: OUTCOME_ENGAGEMENT, OUTCOME_AWARENESS, MESSAGES…)
+ *   - optimizationGoal: optimization_goal do conjunto de anúncios (ex.: CONVERSATIONS, REACH, LINK_CLICKS…)
+ *
+ * Regra-chave:
+ *   "Mensagens" sempre que o optimization_goal for de conversa OU o objetivo legado for MESSAGES.
+ *   Isso resolve o caso comum de OUTCOME_ENGAGEMENT + CONVERSATIONS (campanhas WhatsApp/Direct),
+ *   que no Gerenciador da Meta aparecem como "Conversas iniciadas" e não como "Engajamentos".
+ */
+export type MetricKind = 'messages' | 'sales' | 'leads' | 'traffic' | 'awareness' | 'fallback';
+
+export function detectMetricKind(objective: string, optimizationGoal?: string): MetricKind {
   const obj = (objective || '').toUpperCase();
+  const og = (optimizationGoal || '').toUpperCase();
+
+  // Mensagens: optimization_goal oficial de conversa OU objetivo legado MESSAGES
+  if (
+    obj.includes('MESSAGES') ||
+    og === 'CONVERSATIONS' ||
+    og === 'REPLIES' ||
+    og === 'LEAD_GENERATION_MESSAGES'
+  ) return 'messages';
+
+  if (obj.includes('SALES') || obj.includes('PURCHASE') || obj.includes('CONVERSIONS') || obj.includes('APP_PROMOTION')) return 'sales';
+  if (obj.includes('LEAD')) return 'leads';
+  if (obj.includes('TRAFFIC') || obj.includes('LINK_CLICKS')) return 'traffic';
+  if (
+    obj.includes('AWARENESS') || obj.includes('REACH') ||
+    obj.includes('ENGAGEMENT') || obj.includes('PAGE_LIKES') ||
+    obj.includes('VIDEO')
+  ) return 'awareness';
+  return 'fallback';
+}
+
+export function metricsForObjective(
+  objective: string,
+  ins?: CampaignInsights,
+  optimizationGoal?: string,
+): MetricCell[] {
+  if (!ins) return [];
 
   const spend = ins.spend || 0;
   const reach = ins.reach || 0;
@@ -35,22 +73,27 @@ export function metricsForObjective(objective: string, ins?: CampaignInsights): 
   const cpf = ins.cost_per_follower || (followers > 0 ? spend / followers : 0);
   const frequency = ins.frequency || (reach > 0 ? impressions / reach : 0);
 
+  let kind = detectMetricKind(objective, optimizationGoal);
+
+  // Fallback de segurança: se a classificação caiu em "awareness" mas existem mensagens
+  // reais nas actions oficiais (onsite_conversion.messaging_conversation_started_7d > 0),
+  // tratamos como "messages" — bate com o que o Gerenciador mostra.
+  if (kind === 'awareness' && messages > 0) kind = 'messages';
+
   let cells: Cell[] = [];
 
-  // === Decisão baseada SEMPRE no objetivo da Meta ===
-
-  // Mensagens (WhatsApp/Messenger)
-  if (obj.includes('MESSAGES')) {
+  if (kind === 'messages') {
     cells = [
       c('Gasto', fmtBRL(spend), spend, { alwaysShow: true }),
       c('Alcance', fmtInt(reach), reach),
+      c('Impressões', fmtInt(impressions), impressions),
+      c('CPM', fmtBRL(ins.cpm || 0), ins.cpm || 0),
+      c('Frequência', fmtNum(frequency), frequency),
       c('Mensagens', fmtInt(messages), messages),
       c('Custo/Msg', fmtBRL(ins.cpm_msg || 0), ins.cpm_msg || 0, { highlight: true }),
-      c('CPM', fmtBRL(ins.cpm || 0), ins.cpm || 0),
+      c('CTR', fmtPct(ins.ctr || 0), ins.ctr || 0),
     ];
-  }
-  // Vendas / Conversões / App
-  else if (obj.includes('SALES') || obj.includes('PURCHASE') || obj.includes('CONVERSIONS') || obj.includes('APP_PROMOTION')) {
+  } else if (kind === 'sales') {
     cells = [
       c('Gasto', fmtBRL(spend), spend, { alwaysShow: true }),
       c('Alcance', fmtInt(reach), reach),
@@ -59,9 +102,7 @@ export function metricsForObjective(objective: string, ins?: CampaignInsights): 
       c('ROAS', `${fmtNum(ins.roas || 0)}x`, ins.roas || 0, { highlight: true }),
       c('Receita', fmtBRL(ins.revenue || 0), ins.revenue || 0),
     ];
-  }
-  // Leads
-  else if (obj.includes('LEAD')) {
+  } else if (kind === 'leads') {
     cells = [
       c('Gasto', fmtBRL(spend), spend, { alwaysShow: true }),
       c('Alcance', fmtInt(reach), reach),
@@ -69,9 +110,7 @@ export function metricsForObjective(objective: string, ins?: CampaignInsights): 
       c('CPL', fmtBRL(ins.cpl || 0), ins.cpl || 0, { highlight: true }),
       c('CTR', fmtPct(ins.ctr || 0), ins.ctr || 0),
     ];
-  }
-  // Tráfego
-  else if (obj.includes('TRAFFIC') || obj.includes('LINK_CLICKS')) {
+  } else if (kind === 'traffic') {
     cells = [
       c('Gasto', fmtBRL(spend), spend, { alwaysShow: true }),
       c('Alcance', fmtInt(reach), reach),
@@ -79,16 +118,7 @@ export function metricsForObjective(objective: string, ins?: CampaignInsights): 
       c('CTR', fmtPct(ins.ctr || 0), ins.ctr || 0),
       c('CPC', fmtBRL(ins.cpc || 0), ins.cpc || 0, { highlight: true }),
     ];
-  }
-  // Reconhecimento de Marca / Alcance / Engajamento
-  // Inclui: OUTCOME_AWARENESS, BRAND_AWARENESS, REACH, OUTCOME_ENGAGEMENT,
-  // ENGAGEMENT, POST_ENGAGEMENT, PAGE_LIKES, VIDEO (sem leads/vendas).
-  // Painel completo igual ao Gerenciador do Meta para essas campanhas.
-  else if (
-    obj.includes('AWARENESS') || obj.includes('REACH') ||
-    obj.includes('ENGAGEMENT') || obj.includes('PAGE_LIKES') ||
-    obj.includes('VIDEO')
-  ) {
+  } else if (kind === 'awareness') {
     cells = [
       c('Gasto', fmtBRL(spend), spend, { alwaysShow: true }),
       c('Seguidores', fmtInt(followers), followers),
@@ -101,9 +131,7 @@ export function metricsForObjective(objective: string, ins?: CampaignInsights): 
       c('Frequência', fmtNum(frequency), frequency),
       c('CTR', fmtPct(ins.ctr || 0), ins.ctr || 0),
     ];
-  }
-  // Fallback
-  else {
+  } else {
     cells = [
       c('Gasto', fmtBRL(spend), spend, { alwaysShow: true }),
       c('Impressões', fmtInt(impressions), impressions),
@@ -112,7 +140,6 @@ export function metricsForObjective(objective: string, ins?: CampaignInsights): 
     ];
   }
 
-  // Filtra zeros, exceto quando alwaysShow=true
   return cells
     .filter((cell) => cell._alwaysShow || cell._v > 0)
     .map(({ _v, _alwaysShow, ...rest }) => rest);
