@@ -349,7 +349,7 @@ export default function MetaHierarchyTabs({
   const renderMetricsCells = (ins: CampaignInsights, objective: string, name: string) => {
     const dynamicCells = metricsForObjective(objective, ins, name);
     // mostra extras (que não já estão no fixo)
-    const fixedKeys = new Set(FIXED_METRIC_COLS.map(c => c.label));
+    const fixedKeys = new Set<string>(FIXED_METRIC_COLS.map(c => c.label));
     const extras = dynamicCells.filter(c => !fixedKeys.has(c.label));
     return (
       <>
