@@ -158,7 +158,7 @@ Deno.serve(async (req) => {
     }
 
     const statusMap: Record<string, string> = {
-      ACTIVE: 'escalando', PAUSED: 'teste', DELETED: 'morto', ARCHIVED: 'morto',
+      ACTIVE: 'Ativo', PAUSED: 'Pausado', DELETED: 'Encerrada', ARCHIVED: 'Encerrada',
     };
 
     // 3) Buscar TODOS os creatives existentes dessas campanhas em uma única query
@@ -220,7 +220,7 @@ Deno.serve(async (req) => {
         name: ad.name,
         type: isVideo ? 'video' : 'imagem',
         link: permalink,
-        status: statusMap[ad.status] || 'teste',
+        status: statusMap[ad.status] || 'Pausado',
         source: 'meta',
         meta_ad_id: ad.id,
         meta_creative_id: cr.id || null,
