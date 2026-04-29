@@ -37,6 +37,7 @@ interface Creative {
   id: string; campaign_id: string; name: string; type: string; link: string; status: string;
   source?: string; thumbnail_url?: string | null; body?: string | null; title?: string | null;
   meta_ad_id?: string | null; meta_adset_id?: string | null;
+  optimization_goal?: string | null;
   spend?: number; impressions?: number; clicks?: number; ctr?: number; cpc?: number; cpm?: number;
   reach?: number; leads?: number; purchases?: number; messages?: number; link_clicks?: number;
   revenue?: number; engagements?: number; frequency?: number; roas?: number;
