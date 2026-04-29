@@ -84,6 +84,8 @@ export default function ClientDetail() {
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
   const [campForm, setCampForm] = useState({ name: '', platform: 'Facebook Ads', objective: '', status: 'Ativa', start_date: '', budget: 0, notes: '' });
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
+  const [campaignDateRange, setCampaignDateRange] = useState<DateRangeValue>({ preset: 'last_30d' });
+  const [reloadingCampaign, setReloadingCampaign] = useState(false);
   const [notes, setNotes] = useState<Note[]>([]);
   const [noteText, setNoteText] = useState('');
   const [editClient, setEditClient] = useState(false);
