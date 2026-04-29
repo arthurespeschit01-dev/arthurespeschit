@@ -832,12 +832,15 @@ export default function ClientDetail() {
                             cpp: Number(a.purchases) > 0 ? Number(a.spend) / Number(a.purchases) : 0,
                             cpm_msg: Number(a.messages) > 0 ? Number(a.spend) / Number(a.messages) : 0,
                             roas: Number(a.roas) || 0,
+                            engagements: Number(a.engagements) || 0,
+                            frequency: Number(a.frequency) || 0,
+                            cost_per_engagement: Number(a.engagements) > 0 ? Number(a.spend) / Number(a.engagements) : 0,
                           };
                           const cells = metricsForObjective(selectedCampaign?.objective || '', ins);
                           const hasMetrics = ins.spend > 0 || ins.impressions > 0;
                           if (!hasMetrics) return null;
                           return (
-                            <div className="grid grid-cols-3 gap-1.5 mb-2 pb-2 border-b border-border/50 text-[10px]">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mb-2 pb-2 border-b border-border/50 text-[10px]">
                               {cells.map((m, i) => (
                                 <div key={i}>
                                   <p className="text-muted-foreground">{m.label}</p>
