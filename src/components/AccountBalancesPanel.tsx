@@ -28,7 +28,7 @@ const LOW_THRESHOLD = 200;
 export function getBalanceStatus(a: AccountBalance): BalanceStatus {
   if (a.error) return 'error';
   if (a.account_status && a.account_status !== 1) return 'empty';
-  const r = a.remaining ?? 0;
+  const r = a.balance ?? 0;
   if (r <= 0) return 'empty';
   if (r <= LOW_THRESHOLD) return 'low';
   return 'ok';
