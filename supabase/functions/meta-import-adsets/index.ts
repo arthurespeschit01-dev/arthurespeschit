@@ -45,6 +45,7 @@ function parseActions(ins: any) {
   let leadStd = 0, leadGrouped = 0, leadPixel = 0;
   let purchaseStd = 0, purchaseOmni = 0, purchasePixel = 0, purchaseOnsite = 0;
   let link_clicks = 0;
+  let followers = 0, profile_visits = 0;
 
   for (const a of (ins?.actions || [])) {
     const v = parseFloat(a.value || '0') || 0;
@@ -62,6 +63,8 @@ function parseActions(ins: any) {
     if (t === 'offsite_conversion.fb_pixel_purchase') purchasePixel = v;
     if (t === 'onsite_web_purchase') purchaseOnsite = v;
     if (t === 'link_click') link_clicks = v;
+    if (t === 'follow' || t === 'onsite_conversion.follow' || t === 'page_likes') followers = Math.max(followers, v);
+    if (t === 'onsite_conversion.profile_visit') profile_visits = Math.max(profile_visits, v);
   }
   if (messages === 0) messages = messagesFallback;
   const engagements = postEng > 0 ? postEng : pageEng;
@@ -78,7 +81,7 @@ function parseActions(ins: any) {
   }
   const revenue = Math.max(revenueStd, revenueOmni, revenuePixel, revenueOnsite);
 
-  return { leads, purchases, messages, link_clicks, revenue, engagements };
+  return { leads, purchases, messages, link_clicks, revenue, engagements, followers, profile_visits };
 }
 
 function cpaForObjective(objective: string, spend: number, leads: number, purchases: number, messages: number) {
@@ -196,6 +199,7 @@ Deno.serve(async (req) => {
           spend, impressions, clicks, ctr, cpc, cpm, reach, frequency,
           leads: acts.leads, purchases: acts.purchases, messages: acts.messages,
           link_clicks: acts.link_clicks, revenue: acts.revenue, engagements: acts.engagements,
+          followers: acts.followers, profile_visits: acts.profile_visits,
           cpa, roas,
           last_synced_at: new Date().toISOString(),
         };

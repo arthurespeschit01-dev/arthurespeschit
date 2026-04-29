@@ -105,6 +105,8 @@ Deno.serve(async (req) => {
       let purchaseOmni = 0;
       let purchasePixel = 0;
       let link_clicks = 0;
+      let followers = 0;
+      let profile_visits = 0;
 
       for (const a of (ins.actions || [])) {
         const v = parseFloat(a.value || '0') || 0;
@@ -131,6 +133,16 @@ Deno.serve(async (req) => {
 
         // Cliques no link
         if (t === 'link_click') link_clicks = v;
+
+        // Seguidores (Instagram/Facebook page follows)
+        if (t === 'follow' || t === 'onsite_conversion.follow' || t === 'page_likes') {
+          followers = Math.max(followers, v);
+        }
+
+        // Visitas no perfil (Instagram)
+        if (t === 'onsite_conversion.profile_visit') {
+          profile_visits = Math.max(profile_visits, v);
+        }
       }
 
       if (messages === 0) messages = messagesFallback;
@@ -154,10 +166,13 @@ Deno.serve(async (req) => {
       const cost_per_engagement = engagements > 0 ? spend / engagements : 0;
       const roas = spend > 0 ? revenue / spend : 0;
 
+      const cost_per_follower = followers > 0 ? spend / followers : 0;
+
       result[ins.campaign_id] = {
         spend, impressions, clicks, ctr, cpc, cpm, reach, frequency,
         leads, purchases, messages, link_clicks, revenue, engagements,
         cpl, cpp, cpm_msg, cost_per_engagement, roas,
+        followers, profile_visits, cost_per_follower,
       };
     }
 

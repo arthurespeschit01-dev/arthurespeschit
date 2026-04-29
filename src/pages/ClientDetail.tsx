@@ -305,6 +305,7 @@ export default function ClientDetail() {
         leads: 0, purchases: 0, messages: 0, link_clicks: 0, revenue: 0,
         cpl: 0, cpp: 0, cpm_msg: 0, roas: 0,
         engagements: 0, frequency: 0, cost_per_engagement: 0,
+        followers: 0, profile_visits: 0, cost_per_follower: 0,
       };
       const mapped: Record<string, CampaignInsights> = {};
       for (const c of campaigns) {
