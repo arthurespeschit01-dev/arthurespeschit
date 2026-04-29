@@ -540,7 +540,7 @@ export default function MetaHierarchyTabs({
                           </div>
                         </button>
                       </td>
-                      {renderMetricsCells(ins, c.objective, c.name)}
+                      {renderMetricsCells(ins, c.objective)}
                       <td className="px-3 py-2 w-0"></td>
                       <td className="px-2 py-2 text-right">
                         {isMeta ? (
@@ -615,7 +615,7 @@ export default function MetaHierarchyTabs({
                             </div>
                           </button>
                         </td>
-                        {renderMetricsCells(ins, objectiveFor(a.campaign_id), a.name)}
+                        {renderMetricsCells(ins, objectiveFor(a.campaign_id))}
                         <td className="px-3 py-2 w-0"></td>
                         <td className="px-2 py-2 text-right">
                           <EntityActionsMenu
@@ -696,7 +696,7 @@ export default function MetaHierarchyTabs({
                             </button>
                           </div>
                         </td>
-                        {renderMetricsCells(ins, objectiveFor(cr.campaign_id), cr.name)}
+                        {renderMetricsCells(ins, objectiveFor(cr.campaign_id))}
                         <td className="px-3 py-2 w-0"></td>
                         <td className="px-2 py-2 text-right">
                           {isMeta ? (
