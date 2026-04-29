@@ -18,7 +18,7 @@ type Cell = MetricCell & { _v: number; _alwaysShow?: boolean };
 const c = (label: string, value: string, v: number, opts: { highlight?: boolean; alwaysShow?: boolean } = {}): Cell =>
   ({ label, value, _v: v, highlight: opts.highlight, _alwaysShow: opts.alwaysShow });
 
-export function metricsForObjective(objective: string, ins?: CampaignInsights, _campaignName: string = ''): MetricCell[] {
+export function metricsForObjective(objective: string, ins?: CampaignInsights): MetricCell[] {
   if (!ins) return [];
   const obj = (objective || '').toUpperCase();
 

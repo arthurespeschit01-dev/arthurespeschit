@@ -354,8 +354,8 @@ export default function MetaHierarchyTabs({
   );
 
   // Renderiza células de métricas fixas + extras dinâmicas baseadas no objetivo
-  const renderMetricsCells = (ins: CampaignInsights, objective: string, name: string) => {
-    const dynamicCells = metricsForObjective(objective, ins, name);
+  const renderMetricsCells = (ins: CampaignInsights, objective: string) => {
+    const dynamicCells = metricsForObjective(objective, ins);
     // mostra extras (que não já estão no fixo)
     const fixedKeys = new Set<string>(FIXED_METRIC_COLS.map(c => c.label));
     const extras = dynamicCells.filter(c => !fixedKeys.has(c.label));
