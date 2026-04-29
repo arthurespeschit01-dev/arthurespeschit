@@ -1,8 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Loader2, RefreshCw, Wallet, AlertCircle, CheckCircle2, AlertTriangle, XCircle,
   ChevronDown, ChevronUp,
@@ -23,16 +21,16 @@ export interface AccountBalance {
   error?: string;
 }
 
-const THRESHOLD_KEY = 'meta_balance_threshold';
-
 export type BalanceStatus = 'ok' | 'low' | 'empty' | 'error';
 
-export function getBalanceStatus(a: AccountBalance, threshold: number): BalanceStatus {
+const LOW_THRESHOLD = 200;
+
+export function getBalanceStatus(a: AccountBalance): BalanceStatus {
   if (a.error) return 'error';
   if (a.account_status && a.account_status !== 1) return 'empty';
   const r = a.remaining ?? 0;
   if (r <= 0) return 'empty';
-  if (r < threshold) return 'low';
+  if (r <= LOW_THRESHOLD) return 'low';
   return 'ok';
 }
 
@@ -42,11 +40,6 @@ const STATUS_CONFIG = {
   empty: { label: 'Sem saldo', icon: XCircle, color: 'bg-red-500/10 text-red-400 border-red-500/30', dot: 'bg-red-500', emoji: '🔴', order: 0 },
   error: { label: 'Erro / Inativa', icon: AlertCircle, color: 'bg-red-500/10 text-red-400 border-red-500/30', dot: 'bg-red-500', emoji: '🔴', order: 0 },
 };
-
-function getThreshold(): number {
-  const v = Number(localStorage.getItem(THRESHOLD_KEY));
-  return Number.isFinite(v) && v > 0 ? v : 50;
-}
 
 /** Hook leve para somente contar contas problemáticas (badge) */
 export function useAccountBalancesCount() {
@@ -61,9 +54,8 @@ export function useAccountBalancesCount() {
     if (error) return;
     const list: AccountBalance[] = data?.accounts || [];
     setAccounts(list);
-    const threshold = getThreshold();
     const count = list.filter(a => {
-      const s = getBalanceStatus(a, threshold);
+      const s = getBalanceStatus(a);
       return s === 'low' || s === 'empty' || s === 'error';
     }).length;
     setProblemCount(count);
@@ -86,7 +78,6 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
   const [loading, setLoading] = useState(false);
   const [accounts, setAccounts] = useState<AccountBalance[]>(initialAccounts || []);
   const [hasLoaded, setHasLoaded] = useState(!!initialAccounts?.length);
-  const [threshold, setThreshold] = useState<number>(getThreshold);
 
   useEffect(() => {
     if (initialAccounts && initialAccounts.length) {
@@ -114,21 +105,19 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
     if (open && !hasLoaded && !loading) load();
   }, [open, hasLoaded, loading, load]);
 
-  useEffect(() => { localStorage.setItem(THRESHOLD_KEY, String(threshold)); }, [threshold]);
-
   const sorted = useMemo(() => {
     return [...accounts].sort((a, b) => {
-      const sa = STATUS_CONFIG[getBalanceStatus(a, threshold)].order;
-      const sb = STATUS_CONFIG[getBalanceStatus(b, threshold)].order;
+      const sa = STATUS_CONFIG[getBalanceStatus(a)].order;
+      const sb = STATUS_CONFIG[getBalanceStatus(b)].order;
       if (sa !== sb) return sa - sb;
       return (a.remaining ?? 0) - (b.remaining ?? 0);
     });
-  }, [accounts, threshold]);
+  }, [accounts]);
 
   const problemCount = useMemo(() => accounts.filter(a => {
-    const s = getBalanceStatus(a, threshold);
+    const s = getBalanceStatus(a);
     return s === 'low' || s === 'empty' || s === 'error';
-  }).length, [accounts, threshold]);
+  }).length, [accounts]);
 
   const fmt = (v: number | undefined, currency = 'BRL') => {
     if (v === undefined || v === null) return '—';
@@ -181,19 +170,6 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
       {/* Body */}
       {open && (
         <div className="border-t border-border/50 p-4 space-y-3">
-          <div className="flex flex-wrap items-end gap-3 p-3 bg-secondary/30 rounded-lg border border-border/50">
-            <div className="flex-1 min-w-[180px] max-w-[260px]">
-              <Label className="text-muted-foreground text-xs">Limite mínimo (R$)</Label>
-              <Input
-                type="number"
-                min={0}
-                value={threshold}
-                onChange={(e) => setThreshold(Number(e.target.value) || 0)}
-                className="bg-secondary/50 border-border/50 mt-1 text-sm h-9"
-              />
-              <p className="text-[10px] text-muted-foreground mt-1">Abaixo disso → "Saldo baixo"</p>
-            </div>
-          </div>
 
           {loading && accounts.length === 0 ? (
             <div className="space-y-2">
@@ -208,7 +184,7 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
           ) : (
             <div className="space-y-2">
               {sorted.map((a) => {
-                const st = getBalanceStatus(a, threshold);
+                const st = getBalanceStatus(a);
                 const cfg = STATUS_CONFIG[st];
                 const Icon = cfg.icon;
                 return (

@@ -42,12 +42,8 @@ export default function Clientes() {
   const [balanceAccounts, setBalanceAccounts] = useState<AccountBalance[]>([]);
   const [editing, setEditing] = useState<Client | null>(null);
 
-  const balanceThreshold = (() => {
-    const v = Number(localStorage.getItem('meta_balance_threshold'));
-    return Number.isFinite(v) && v > 0 ? v : 50;
-  })();
   const problemCount = balanceAccounts.filter(a => {
-    const s = getBalanceStatus(a, balanceThreshold);
+    const s = getBalanceStatus(a);
     return s === 'low' || s === 'empty' || s === 'error';
   }).length;
   const [form, setForm] = useState({
