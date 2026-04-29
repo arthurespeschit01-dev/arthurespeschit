@@ -190,6 +190,8 @@ export default function Tasks() {
   const [uploading, setUploading] = useState(false);
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [newComment, setNewComment] = useState('');
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
   const [form, setForm] = useState({
     title: '', description: '', status: 'pendente', priority: 'média',
     start_date: '', end_date: '', client_id: '',
