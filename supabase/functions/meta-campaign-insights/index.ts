@@ -197,10 +197,11 @@ Deno.serve(async (req) => {
         leads, purchases, messages, link_clicks, revenue, engagements,
         cpl, cpp, cpm_msg, cost_per_engagement, roas,
         followers, profile_visits, cost_per_follower,
+        optimization_goal: optGoalByCampaign[ins.campaign_id] || '',
       };
     }
 
-    return new Response(JSON.stringify({ insights: result }), {
+    return new Response(JSON.stringify({ insights: result, optimization_goal_by_campaign: optGoalByCampaign }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {
