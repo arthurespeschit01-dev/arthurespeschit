@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
     const ads = await fetchAllPages(adsUrl);
 
     // 2) Buscar insights ricos por ad
-    const insightFields = 'ad_id,spend,impressions,clicks,ctr,cpc,cpm,reach,actions,action_values';
+    const insightFields = 'ad_id,spend,impressions,clicks,ctr,cpc,cpm,reach,frequency,actions,action_values';
     const insightsUrl = `${GRAPH}/${accountId}/insights?level=ad&fields=${insightFields}${timeParam}&limit=200&access_token=${accessToken}`;
     const insightsMap = new Map<string, any>();
     try {
