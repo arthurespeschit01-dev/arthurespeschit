@@ -171,6 +171,24 @@ Deno.serve(async (req) => {
       console.warn('insights failed (continuing without metrics):', String(e));
     }
 
+    // Buscar optimization_goal por campanha (a partir dos adsets oficiais).
+    // Isso permite diferenciar OUTCOME_ENGAGEMENT comum de OUTCOME_ENGAGEMENT+CONVERSATIONS (mensagens).
+    const optGoalByCampaign = new Map<string, string>();
+    try {
+      const adsetsUrl = `${GRAPH}/${accountId}/adsets?fields=id,campaign_id,optimization_goal&limit=200&access_token=${accessToken}`;
+      const adsets = await fetchAllPages(adsetsUrl);
+      // Prioriza CONVERSATIONS quando existir; senão pega o primeiro optimization_goal não-vazio.
+      for (const a of adsets) {
+        const cid = a.campaign_id;
+        const og = (a.optimization_goal || '').toString();
+        if (!cid || !og) continue;
+        const cur = optGoalByCampaign.get(cid);
+        if (!cur || og === 'CONVERSATIONS') optGoalByCampaign.set(cid, og);
+      }
+    } catch (e) {
+      console.warn('adsets fetch for optimization_goal failed:', String(e));
+    }
+
     const statusMap: Record<string, string> = {
       ACTIVE: 'Ativa', PAUSED: 'Pausada', DELETED: 'Encerrada', ARCHIVED: 'Encerrada',
     };
