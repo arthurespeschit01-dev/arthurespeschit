@@ -220,7 +220,7 @@ Deno.serve(async (req) => {
         name: ad.name,
         type: isVideo ? 'video' : 'imagem',
         link: permalink,
-        status: statusMap[ad.status] || 'teste',
+        status: statusMap[ad.status] || 'Pausado',
         source: 'meta',
         meta_ad_id: ad.id,
         meta_creative_id: cr.id || null,
