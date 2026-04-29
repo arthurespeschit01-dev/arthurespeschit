@@ -105,21 +105,19 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
     if (open && !hasLoaded && !loading) load();
   }, [open, hasLoaded, loading, load]);
 
-  useEffect(() => { localStorage.setItem(THRESHOLD_KEY, String(threshold)); }, [threshold]);
-
   const sorted = useMemo(() => {
     return [...accounts].sort((a, b) => {
-      const sa = STATUS_CONFIG[getBalanceStatus(a, threshold)].order;
-      const sb = STATUS_CONFIG[getBalanceStatus(b, threshold)].order;
+      const sa = STATUS_CONFIG[getBalanceStatus(a)].order;
+      const sb = STATUS_CONFIG[getBalanceStatus(b)].order;
       if (sa !== sb) return sa - sb;
       return (a.remaining ?? 0) - (b.remaining ?? 0);
     });
-  }, [accounts, threshold]);
+  }, [accounts]);
 
   const problemCount = useMemo(() => accounts.filter(a => {
-    const s = getBalanceStatus(a, threshold);
+    const s = getBalanceStatus(a);
     return s === 'low' || s === 'empty' || s === 'error';
-  }).length, [accounts, threshold]);
+  }).length, [accounts]);
 
   const fmt = (v: number | undefined, currency = 'BRL') => {
     if (v === undefined || v === null) return '—';
