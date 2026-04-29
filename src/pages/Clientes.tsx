@@ -8,9 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Edit2, Trash2, Wallet } from 'lucide-react';
+import { Plus, Edit2, Trash2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
-import AccountBalancesDialog from '@/components/AccountBalancesDialog';
+import AccountBalancesPanel, { getBalanceStatus, type AccountBalance } from '@/components/AccountBalancesPanel';
 
 interface AccountIds {
   bm?: string;
@@ -39,8 +39,17 @@ export default function Clientes() {
   const navigate = useNavigate();
   const [clients, setClients] = useState<Client[]>([]);
   const [open, setOpen] = useState(false);
-  const [balancesOpen, setBalancesOpen] = useState(false);
+  const [balanceAccounts, setBalanceAccounts] = useState<AccountBalance[]>([]);
   const [editing, setEditing] = useState<Client | null>(null);
+
+  const balanceThreshold = (() => {
+    const v = Number(localStorage.getItem('meta_balance_threshold'));
+    return Number.isFinite(v) && v > 0 ? v : 50;
+  })();
+  const problemCount = balanceAccounts.filter(a => {
+    const s = getBalanceStatus(a, balanceThreshold);
+    return s === 'low' || s === 'empty' || s === 'error';
+  }).length;
   const [form, setForm] = useState({
     name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo',
     payment_day: '' as string, verba_mensal: 0, niche: '', phone: '',
@@ -125,16 +134,21 @@ export default function Clientes() {
     <div className="animate-fade-in space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Clientes</h1>
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            Clientes
+            {problemCount > 0 && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full bg-red-500/15 text-red-400 border border-red-500/30">
+                <AlertTriangle className="w-3 h-3" />
+                {problemCount} {problemCount === 1 ? 'conta sem saldo' : 'contas sem saldo'}
+              </span>
+            )}
+          </h1>
           <p className="text-muted-foreground text-sm mt-1">Gerencie seus clientes</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button onClick={() => setBalancesOpen(true)} variant="outline" className="gap-2"><Wallet className="w-4 h-4" /> Verificar Saldos</Button>
           <Button onClick={openNew} className="neon-glow gap-2"><Plus className="w-4 h-4" /> Novo Cliente</Button>
         </div>
       </div>
-
-      <AccountBalancesDialog open={balancesOpen} onOpenChange={setBalancesOpen} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {clients.map((c) => (
