@@ -62,12 +62,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
         )}
 
-        <aside className={`fixed lg:sticky top-0 left-0 z-50 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300 overflow-hidden ${collapsed ? 'lg:!w-16' : 'lg:!w-64'} ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+        <aside className={`fixed lg:sticky top-0 left-0 z-50 h-screen bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300 overflow-hidden ${collapsed ? 'w-16' : 'w-64'} ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
           <div className={`flex items-center border-b border-sidebar-border relative ${collapsed ? 'p-2 justify-center' : 'p-4 justify-center'}`}>
             <img src={logoCentralGestor} alt="Central do Gestor" className={`object-contain transition-all ${collapsed ? 'h-10 w-10' : 'h-24 w-auto'}`} />
-            <button onClick={() => setSidebarOpen(false)} className="absolute right-3 top-3 lg:hidden text-muted-foreground">
-              <X className="w-5 h-5" />
-            </button>
+            {!collapsed && (
+              <button onClick={() => setSidebarOpen(false)} className="absolute right-3 top-3 lg:hidden text-muted-foreground">
+                <X className="w-5 h-5" />
+              </button>
+            )}
           </div>
 
           <nav className="flex-1 p-3 space-y-1 overflow-y-auto overflow-x-hidden">
@@ -77,10 +79,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   key={item.to}
                   to={item.to}
                   end={item.to === '/'}
-                  onClick={() => setSidebarOpen(false)}
+                  onClick={() => { if (!collapsed) setSidebarOpen(false); }}
                   className={({ isActive }) =>
                     `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 ${
-                      collapsed ? 'lg:justify-center lg:px-2' : ''
+                      collapsed ? 'justify-center px-2' : ''
                     } ${
                       isActive
                         ? 'bg-primary/15 text-primary font-medium'
@@ -89,14 +91,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   }
                 >
                   <item.icon className="w-4 h-4 shrink-0" />
-                  <span className={collapsed ? 'lg:hidden' : ''}>{item.label}</span>
+                  <span className={collapsed ? 'hidden' : ''}>{item.label}</span>
                 </NavLink>
               );
               if (collapsed) {
                 return (
                   <Tooltip key={item.to}>
                     <TooltipTrigger asChild>{link}</TooltipTrigger>
-                    <TooltipContent side="right" className="hidden lg:block">{item.label}</TooltipContent>
+                    <TooltipContent side="right">{item.label}</TooltipContent>
                   </Tooltip>
                 );
               }
@@ -182,7 +184,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   variant="ghost"
                   onClick={toggleCollapsed}
                   size={collapsed ? 'icon' : 'sm'}
-                  className={`hidden lg:flex text-muted-foreground hover:text-foreground ${collapsed ? 'w-full' : 'w-full justify-start gap-3'}`}
+                  className={`flex text-muted-foreground hover:text-foreground ${collapsed ? 'w-full' : 'w-full justify-start gap-3'}`}
                 >
                   {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <><PanelLeftClose className="w-4 h-4" /> Minimizar</>}
                 </Button>
@@ -194,16 +196,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         <div className="flex-1 flex flex-col min-h-screen min-w-0">
           <header className="sticky top-0 z-30 h-14 flex items-center px-4 lg:px-6 border-b border-border bg-background/80 backdrop-blur-xl">
-            <button onClick={() => setSidebarOpen(true)} className="lg:hidden mr-3 text-muted-foreground hover:text-foreground">
-              <Menu className="w-5 h-5" />
-            </button>
             <button
-              onClick={toggleCollapsed}
-              className="hidden lg:flex mr-3 text-muted-foreground hover:text-foreground items-center justify-center w-8 h-8 rounded-md hover:bg-accent"
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                  // mobile: se sidebar fechado, abre; se aberto, alterna minimizado
+                  if (!sidebarOpen) setSidebarOpen(true);
+                  else toggleCollapsed();
+                } else {
+                  toggleCollapsed();
+                }
+              }}
+              className="flex mr-3 text-muted-foreground hover:text-foreground items-center justify-center w-8 h-8 rounded-md hover:bg-accent"
               aria-label={collapsed ? 'Expandir menu' : 'Minimizar menu'}
               title={collapsed ? 'Expandir menu' : 'Minimizar menu'}
             >
-              {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+              {collapsed || (!sidebarOpen && typeof window !== 'undefined' && window.innerWidth < 1024)
+                ? <PanelLeftOpen className="w-4 h-4" />
+                : <PanelLeftClose className="w-4 h-4" />}
             </button>
             <div className="ml-auto flex items-center gap-2 sm:gap-3 min-w-0">
               <ThemeToggle />
