@@ -19,6 +19,7 @@ export interface Campaign {
   spend?: number; impressions?: number; clicks?: number; ctr?: number; cpc?: number; cpm?: number;
   reach?: number; leads?: number; purchases?: number; messages?: number; link_clicks?: number;
   revenue?: number; cpa?: number; roas?: number;
+  followers?: number; profile_visits?: number;
 }
 
 interface AdSet {
@@ -28,6 +29,7 @@ interface AdSet {
   spend?: number; impressions?: number; clicks?: number; ctr?: number; cpc?: number; cpm?: number;
   reach?: number; leads?: number; purchases?: number; messages?: number; link_clicks?: number;
   revenue?: number; engagements?: number; frequency?: number; roas?: number;
+  followers?: number; profile_visits?: number;
 }
 
 interface Creative {
@@ -37,6 +39,7 @@ interface Creative {
   spend?: number; impressions?: number; clicks?: number; ctr?: number; cpc?: number; cpm?: number;
   reach?: number; leads?: number; purchases?: number; messages?: number; link_clicks?: number;
   revenue?: number; engagements?: number; frequency?: number; roas?: number;
+  followers?: number; profile_visits?: number;
 }
 
 interface Props {
