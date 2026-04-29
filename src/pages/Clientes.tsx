@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Plus, Edit2, Trash2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
-import AccountBalancesPanel, { getBalanceStatus, type AccountBalance } from '@/components/AccountBalancesPanel';
+import AccountBalancesPanel, { getBalanceStatus, type AccountBalance, useAccountBalancesCount } from '@/components/AccountBalancesPanel';
 
 interface AccountIds {
   bm?: string;
@@ -41,6 +41,11 @@ export default function Clientes() {
   const [open, setOpen] = useState(false);
   const [balanceAccounts, setBalanceAccounts] = useState<AccountBalance[]>([]);
   const [editing, setEditing] = useState<Client | null>(null);
+  const { accounts: preloadedBalanceAccounts } = useAccountBalancesCount();
+
+  useEffect(() => {
+    setBalanceAccounts(preloadedBalanceAccounts);
+  }, [preloadedBalanceAccounts]);
 
   const problemCount = balanceAccounts.filter(a => {
     const s = getBalanceStatus(a);
@@ -188,7 +193,7 @@ export default function Clientes() {
       </div>
 
       {/* Painel de Saldos das Contas de Anúncio */}
-      <AccountBalancesPanel onAccountsChange={setBalanceAccounts} />
+      <AccountBalancesPanel initialAccounts={balanceAccounts} onAccountsChange={setBalanceAccounts} />
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="bg-card border-border max-h-[85vh] overflow-y-auto">
           <DialogHeader>
