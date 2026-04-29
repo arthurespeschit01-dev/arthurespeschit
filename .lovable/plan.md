@@ -1,66 +1,35 @@
-## Goal
+## Problema
 
-Replace the current fixed metric set (Gasto / Alcance / CPM) with **dynamic metrics tailored to each campaign's `objective`** returned by the Meta API. Apply the same logic to campaign cards, Ad Set cards and Creative cards.
+A Meta retorna `objective = OUTCOME_ENGAGEMENT` mesmo para campanhas que na prática são de **mensagens (WhatsApp/Messenger)**. Hoje o código decide as métricas só pelo `objective`, então mostra "Engajamentos / Custo por Engajamento", quando o correto seria "Mensagens / Custo por Mensagem".
 
-## Mapping by objective
+A informação que diferencia isso vem do **adset**, em `optimization_goal` (ex: `CONVERSATIONS`) e `destination_type` (ex: `WHATSAPP`, `MESSENGER`), não do nível da campanha.
 
-| Objective (Meta) | Métricas exibidas |
-|---|---|
-| `OUTCOME_TRAFFIC` / `LINK_CLICKS` | Gasto, Alcance, Cliques no link, CTR, CPC |
-| `OUTCOME_ENGAGEMENT` / `POST_ENGAGEMENT` | Gasto, Alcance, Engajamentos, Custo por Engajamento, CPM |
-| `OUTCOME_LEADS` / `LEAD_GENERATION` | Gasto, Alcance, Leads, Custo por Lead, CTR |
-| `OUTCOME_SALES` / `OUTCOME_APP_PROMOTION` / `CONVERSIONS` | Gasto, Alcance, Conversões, Custo por Conversão, ROAS, Valor convertido |
-| `OUTCOME_AWARENESS` / `BRAND_AWARENESS` / `REACH` | Gasto, Alcance, Impressões, CPM, Frequência |
-| `MESSAGES` / `OUTCOME_MESSAGES` | Gasto, Alcance, Mensagens iniciadas, Custo por Mensagem, CPM |
-| Fallback | Gasto, Impressões, CTR, CPC |
+## Solução
 
-Regras de exibição:
-- Valores monetários em `R$ 0,00` (pt-BR).
-- Métricas indisponíveis (zero ou ausentes) são **omitidas** — não renderizar `—` nem placeholder.
-- `highlight: true` no KPI principal de cada objetivo (CPL, CPC, ROAS, Custo/Conv, etc.).
+Em vez de depender do nome do objetivo, **decidir as métricas pelos dados reais retornados pela Meta** (`messages`, `engagements`, `leads`, `purchases`). Esses números só são preenchidos pela ação correspondente, então são a fonte mais confiável.
 
-## Backend changes (Edge Functions)
+### Regra de prioridade no `metricsForObjective`
 
-### `supabase/functions/meta-import-campaigns/index.ts`
-- Adicionar à `parseActions` os tipos:
-  - `post_engagement` (e variantes `page_engagement`) → `engagements`
-  - `frequency` já vem em insights — capturar.
-- Salvar novas colunas em `campaigns`: `engagements` (já não existe — usar JSONB? não — adicionar coluna numérica via migration).
-- Reaproveitar `frequency` (já existe na tabela).
+Antes de cair na ramificação por `objective`, verificar:
 
-### `supabase/functions/meta-import-adsets/index.ts` e `meta-import-creatives/index.ts`
-- Mesmo tratamento: incluir `engagements` e garantir `frequency`, `link_clicks`, `messages`, `revenue`, `purchases` no payload.
+1. Se `messages > 0` e `messages >= engagements` → **render MESSAGES** (Gasto, Alcance, Mensagens, Custo/Msg, CPM)
+2. Se `purchases > 0` → **render SALES** (Gasto, Alcance, Conversões, Custo/Conv, ROAS, Receita)
+3. Se `leads > 0` e o objective contém LEAD → **render LEADS**
+4. Caso contrário → cair na lógica atual baseada em `objective`
 
-### `supabase/functions/meta-campaign-insights/index.ts`
-- Retornar também `engagements` e `frequency` no `result[campaign_id]`, além de `cost_per_engagement = spend/engagements`.
+Isso resolve o caso da imagem: campanha `OUTCOME_ENGAGEMENT` com `messages = 666` será renderizada corretamente como "Mensagens iniciadas / Custo por Mensagem".
 
-## Database migration
+### Mudança única
 
-Adicionar colunas (apenas as que faltam):
-- `campaigns.engagements bigint default 0`
-- `ad_sets.engagements bigint default 0`, `ad_sets.frequency numeric default 0`
-- `creatives.engagements bigint default 0`, `creatives.frequency numeric default 0`, `creatives.video_views bigint default 0`
+Apenas em `src/lib/campaignMetrics.ts`, dentro de `metricsForObjective`:
+- Calcular flags `isMessages`, `isSales`, `isLeads` a partir do `ins`
+- Mover a checagem dessas flags para **antes** da ramificação por `objective`
+- A lógica por `objective` continua como fallback para campanhas sem dados ainda
 
-## Frontend changes
-
-### `src/lib/campaignMetrics.ts` (refatorar)
-- Estender `CampaignInsights` com `engagements`, `frequency`, `cost_per_engagement`.
-- Reescrever `metricsForObjective` para retornar a lista completa por objetivo conforme tabela acima.
-- Filtrar células com valor zero antes de retornar (exceto Gasto, sempre exibir).
-- Normalizar nomes de objetivo (uppercase + tratamento de prefixo `OUTCOME_`).
-
-### `src/pages/ClientDetail.tsx`
-- Atualizar os 3 pontos onde `metricsForObjective` é chamado para popular o `CampaignInsights` com os novos campos (`engagements`, `frequency`).
-- Trocar `grid-cols-3` fixo por grid responsivo (`grid-cols-2 sm:grid-cols-3 lg:grid-cols-5`) já que agora pode haver até 6 métricas.
-- Manter destaque visual para a célula `highlight: true`.
-
-## Out of scope
-- Não alterar o layout geral, filtros de período ou fluxo OAuth.
-- Não tocar em `MetaAdsTab.tsx` (apenas conexão).
+Nenhuma migration, nenhuma mudança em edge function, nenhuma mudança no frontend ClientDetail. Os dados de `messages` e `engagements` já são importados pelo `meta-import-campaigns` (incluído no patch anterior).
 
 ## Acceptance
-- Card de campanha "Tráfego" mostra Cliques no link, CTR, CPC.
-- Card de campanha "Vendas" mostra Conversões, CPA, ROAS, Receita.
-- Card de campanha "Mensagens" mostra Mensagens iniciadas, Custo por Mensagem.
-- Mesmo comportamento aplicado em Conjuntos de Anúncios e Criativos.
-- Métricas zeradas/indisponíveis não aparecem no card.
+
+- Campanha `OUTCOME_ENGAGEMENT` com `messages > 0` mostra: Gasto, Alcance, **Mensagens**, **Custo/Msg**, CPM (como deve ser para a campanha de WhatsApp da imagem).
+- Campanha `OUTCOME_ENGAGEMENT` com só `engagements > 0` continua mostrando Engajamentos / Custo/Engaj.
+- Campanhas de outros objetivos não são afetadas.
