@@ -636,7 +636,7 @@ export default function ClientDetail() {
                   const cells = metricsForObjective(c.objective, ins);
                   const hasData = !!insightsByCamp[c.id];
                   return (
-                    <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-${Math.min(cells.length || 3, 6)} gap-2 mt-3 pt-2 border-t border-border/50 text-xs`}>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mt-3 pt-2 border-t border-border/50 text-xs">
                       {cells.map((m, i) => (
                         <div key={i}>
                           <p className="text-muted-foreground">{m.label}</p>
