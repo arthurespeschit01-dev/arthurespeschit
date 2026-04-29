@@ -76,8 +76,14 @@ Deno.serve(async (req) => {
       timeParam = `&date_preset=${preset}`;
     }
 
-    const url = `${GRAPH}/${conn.selected_ad_account_id}/insights?level=campaign&fields=${fields}${timeParam}&limit=200&access_token=${conn.access_token}`;
+    // Paridade com o Gerenciador da Meta: atribuição unificada 7d_click/1d_view (padrão do Ads Manager)
+    const attribParam = `&use_unified_attribution_setting=true&action_attribution_windows=${encodeURIComponent('["7d_click","1d_view"]')}&action_report_time=mixed`;
+
+    const url = `${GRAPH}/${conn.selected_ad_account_id}/insights?level=campaign&fields=${fields}${timeParam}${attribParam}&limit=200&access_token=${conn.access_token}`;
     const insights = await fetchAllPages(url);
+    if (insights[0]) {
+      console.log('[meta-campaign-insights] sample action_types:', (insights[0].actions || []).map((a: any) => a.action_type));
+    }
 
     // Agregar por campaign_id (Meta retorna 1 linha/campanha)
     const result: Record<string, any> = {};
@@ -147,10 +153,11 @@ Deno.serve(async (req) => {
 
       if (messages === 0) messages = messagesFallback;
       const engagements = postEng > 0 ? postEng : pageEng;
-      const leads = Math.max(leadStd, leadGrouped, leadPixel);
-      const purchases = Math.max(purchaseStd, purchaseOmni, purchasePixel);
+      // Paridade com Ads Manager: prioridade > Math.max (evita inflar quando ambos existem)
+      const leads = leadGrouped || leadStd || leadPixel;
+      const purchases = purchaseOmni || purchaseStd || purchasePixel;
 
-      // Receita — também pegar o maior entre as variações (mesma conversão por canais distintos)
+      // Receita: mesma ordem de prioridade das compras
       let revenueStd = 0, revenueOmni = 0, revenuePixel = 0;
       for (const a of (ins.action_values || [])) {
         const v = parseFloat(a.value || '0') || 0;
@@ -158,7 +165,7 @@ Deno.serve(async (req) => {
         if (a.action_type === 'omni_purchase') revenueOmni = v;
         if (a.action_type === 'offsite_conversion.fb_pixel_purchase') revenuePixel = v;
       }
-      const revenue = Math.max(revenueStd, revenueOmni, revenuePixel);
+      const revenue = revenueOmni || revenueStd || revenuePixel;
 
       const cpl = leads > 0 ? spend / leads : 0;
       const cpp = purchases > 0 ? spend / purchases : 0;

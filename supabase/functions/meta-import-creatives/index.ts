@@ -69,8 +69,9 @@ function parseActions(ins: any) {
   }
   if (messages === 0) messages = messagesFallback;
   const engagements = postEng > 0 ? postEng : pageEng;
-  const leads = Math.max(leadStd, leadGrouped, leadPixel);
-  const purchases = Math.max(purchaseStd, purchaseOmni, purchasePixel, purchaseOnsite);
+  // Paridade com Ads Manager: prioridade entre variações da mesma conversão
+  const leads = leadGrouped || leadStd || leadPixel;
+  const purchases = purchaseOmni || purchaseStd || purchasePixel || purchaseOnsite;
 
   let revenueStd = 0, revenueOmni = 0, revenuePixel = 0, revenueOnsite = 0;
   for (const a of (ins?.action_values || [])) {
@@ -80,7 +81,7 @@ function parseActions(ins: any) {
     if (a.action_type === 'offsite_conversion.fb_pixel_purchase') revenuePixel = v;
     if (a.action_type === 'onsite_web_purchase') revenueOnsite = v;
   }
-  const revenue = Math.max(revenueStd, revenueOmni, revenuePixel, revenueOnsite);
+  const revenue = revenueOmni || revenueStd || revenuePixel || revenueOnsite;
 
   return { leads, purchases, messages, link_clicks, revenue, engagements, video_views, followers, profile_visits };
 }
@@ -149,13 +150,15 @@ Deno.serve(async (req) => {
     const adsUrl = `${GRAPH}/${accountId}/ads?fields=${encodeURIComponent(adFields)}&limit=50&access_token=${accessToken}`;
     const ads = await fetchAllPages(adsUrl);
 
-    // 2) Buscar insights ricos por ad
+    // 2) Buscar insights ricos por ad (com atribuição padrão do Ads Manager para paridade)
     const insightFields = 'ad_id,spend,impressions,clicks,ctr,cpc,cpm,reach,frequency,actions,action_values';
-    const insightsUrl = `${GRAPH}/${accountId}/insights?level=ad&fields=${insightFields}${timeParam}&limit=200&access_token=${accessToken}`;
+    const attribParam = `&use_unified_attribution_setting=true&action_attribution_windows=${encodeURIComponent('["7d_click","1d_view"]')}&action_report_time=mixed`;
+    const insightsUrl = `${GRAPH}/${accountId}/insights?level=ad&fields=${insightFields}${timeParam}${attribParam}&limit=200&access_token=${accessToken}`;
     const insightsMap = new Map<string, any>();
     try {
       const insights = await fetchAllPages(insightsUrl);
       for (const ins of insights) insightsMap.set(ins.ad_id, ins);
+      if (insights[0]) console.log('[meta-import-creatives] sample action_types:', (insights[0].actions || []).map((a: any) => a.action_type));
     } catch (e) {
       console.warn('insights failed (continuing):', e);
     }

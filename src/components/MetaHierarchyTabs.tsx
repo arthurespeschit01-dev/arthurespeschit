@@ -354,8 +354,8 @@ export default function MetaHierarchyTabs({
   );
 
   // Renderiza células de métricas fixas + extras dinâmicas baseadas no objetivo
-  const renderMetricsCells = (ins: CampaignInsights, objective: string, name: string) => {
-    const dynamicCells = metricsForObjective(objective, ins, name);
+  const renderMetricsCells = (ins: CampaignInsights, objective: string) => {
+    const dynamicCells = metricsForObjective(objective, ins);
     // mostra extras (que não já estão no fixo)
     const fixedKeys = new Set<string>(FIXED_METRIC_COLS.map(c => c.label));
     const extras = dynamicCells.filter(c => !fixedKeys.has(c.label));
@@ -540,7 +540,7 @@ export default function MetaHierarchyTabs({
                           </div>
                         </button>
                       </td>
-                      {renderMetricsCells(ins, c.objective, c.name)}
+                      {renderMetricsCells(ins, c.objective)}
                       <td className="px-3 py-2 w-0"></td>
                       <td className="px-2 py-2 text-right">
                         {isMeta ? (
@@ -615,7 +615,7 @@ export default function MetaHierarchyTabs({
                             </div>
                           </button>
                         </td>
-                        {renderMetricsCells(ins, objectiveFor(a.campaign_id), a.name)}
+                        {renderMetricsCells(ins, objectiveFor(a.campaign_id))}
                         <td className="px-3 py-2 w-0"></td>
                         <td className="px-2 py-2 text-right">
                           <EntityActionsMenu
@@ -696,7 +696,7 @@ export default function MetaHierarchyTabs({
                             </button>
                           </div>
                         </td>
-                        {renderMetricsCells(ins, objectiveFor(cr.campaign_id), cr.name)}
+                        {renderMetricsCells(ins, objectiveFor(cr.campaign_id))}
                         <td className="px-3 py-2 w-0"></td>
                         <td className="px-2 py-2 text-right">
                           {isMeta ? (

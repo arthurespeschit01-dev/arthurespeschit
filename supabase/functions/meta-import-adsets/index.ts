@@ -68,8 +68,9 @@ function parseActions(ins: any) {
   }
   if (messages === 0) messages = messagesFallback;
   const engagements = postEng > 0 ? postEng : pageEng;
-  const leads = Math.max(leadStd, leadGrouped, leadPixel);
-  const purchases = Math.max(purchaseStd, purchaseOmni, purchasePixel, purchaseOnsite);
+  // Paridade com Ads Manager: prioridade entre variações da mesma conversão
+  const leads = leadGrouped || leadStd || leadPixel;
+  const purchases = purchaseOmni || purchaseStd || purchasePixel || purchaseOnsite;
 
   let revenueStd = 0, revenueOmni = 0, revenuePixel = 0, revenueOnsite = 0;
   for (const a of (ins?.action_values || [])) {
@@ -79,7 +80,7 @@ function parseActions(ins: any) {
     if (a.action_type === 'offsite_conversion.fb_pixel_purchase') revenuePixel = v;
     if (a.action_type === 'onsite_web_purchase') revenueOnsite = v;
   }
-  const revenue = Math.max(revenueStd, revenueOmni, revenuePixel, revenueOnsite);
+  const revenue = revenueOmni || revenueStd || revenuePixel || revenueOnsite;
 
   return { leads, purchases, messages, link_clicks, revenue, engagements, followers, profile_visits };
 }
@@ -150,6 +151,7 @@ Deno.serve(async (req) => {
 
     const fields = 'id,name,status,daily_budget,lifetime_budget,bid_strategy,optimization_goal,start_time,end_time,campaign_id';
     const insightFields = 'adset_id,spend,impressions,clicks,ctr,cpc,cpm,reach,frequency,actions,action_values';
+    const attribParam = `&use_unified_attribution_setting=true&action_attribution_windows=${encodeURIComponent('["7d_click","1d_view"]')}&action_report_time=mixed`;
     let imported = 0;
 
     for (const camp of campaigns) {
@@ -158,12 +160,13 @@ Deno.serve(async (req) => {
       try { adsets = await fetchAllPages(url); }
       catch (e) { console.warn(`adsets failed for campaign ${camp.meta_campaign_id}:`, String(e)); continue; }
 
-      // Insights por adset
+      // Insights por adset (com atribuição padrão do Ads Manager para paridade)
       const insightsMap = new Map<string, any>();
       try {
-        const insUrl = `${GRAPH}/${camp.meta_campaign_id}/insights?level=adset&fields=${insightFields}${timeParam}&limit=200&access_token=${accessToken}`;
+        const insUrl = `${GRAPH}/${camp.meta_campaign_id}/insights?level=adset&fields=${insightFields}${timeParam}${attribParam}&limit=200&access_token=${accessToken}`;
         const insights = await fetchAllPages(insUrl);
         for (const row of insights) insightsMap.set(row.adset_id, row);
+        if (insights[0]) console.log('[meta-import-adsets] sample action_types:', (insights[0].actions || []).map((a: any) => a.action_type));
       } catch (e) {
         console.warn(`adset insights failed for campaign ${camp.meta_campaign_id}:`, String(e));
       }
