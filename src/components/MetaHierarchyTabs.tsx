@@ -212,6 +212,7 @@ export default function MetaHierarchyTabs({
     spend: 0, impressions: 0, clicks: 0, ctr: 0, cpc: 0, cpm: 0, reach: 0,
     leads: 0, purchases: 0, messages: 0, link_clicks: 0, revenue: 0,
     cpl: 0, cpp: 0, cpm_msg: 0, roas: 0, engagements: 0, frequency: 0, cost_per_engagement: 0,
+    followers: 0, profile_visits: 0, cost_per_follower: 0,
   };
   const insightsFromAdSet = (a: AdSet): CampaignInsights => ({
     spend: Number(a.spend) || 0, impressions: Number(a.impressions) || 0, clicks: Number(a.clicks) || 0,
@@ -223,6 +224,8 @@ export default function MetaHierarchyTabs({
     cpm_msg: Number(a.messages) > 0 ? Number(a.spend) / Number(a.messages) : 0,
     roas: Number(a.roas) || 0, engagements: Number(a.engagements) || 0, frequency: Number(a.frequency) || 0,
     cost_per_engagement: Number(a.engagements) > 0 ? Number(a.spend) / Number(a.engagements) : 0,
+    followers: Number(a.followers) || 0, profile_visits: Number(a.profile_visits) || 0,
+    cost_per_follower: Number(a.followers) > 0 ? Number(a.spend) / Number(a.followers) : 0,
   });
   const insightsFromCreative = (cr: Creative): CampaignInsights => ({
     spend: Number(cr.spend) || 0, impressions: Number(cr.impressions) || 0, clicks: Number(cr.clicks) || 0,
@@ -234,6 +237,8 @@ export default function MetaHierarchyTabs({
     cpm_msg: Number(cr.messages) > 0 ? Number(cr.spend) / Number(cr.messages) : 0,
     roas: Number(cr.roas) || 0, engagements: Number(cr.engagements) || 0, frequency: Number(cr.frequency) || 0,
     cost_per_engagement: Number(cr.engagements) > 0 ? Number(cr.spend) / Number(cr.engagements) : 0,
+    followers: Number(cr.followers) || 0, profile_visits: Number(cr.profile_visits) || 0,
+    cost_per_follower: Number(cr.followers) > 0 ? Number(cr.spend) / Number(cr.followers) : 0,
   });
 
   const objectiveFor = (campId: string) => campaigns.find(c => c.id === campId)?.objective || '';
