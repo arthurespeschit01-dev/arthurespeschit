@@ -633,7 +633,7 @@ export default function ClientDetail() {
                     cpl: 0, cpp: 0, cpm_msg: 0, roas: 0,
                     engagements: 0, frequency: 0, cost_per_engagement: 0,
                   };
-                  const cells = metricsForObjective(c.objective, ins);
+                  const cells = metricsForObjective(c.objective, ins, c.name);
                   const hasData = !!insightsByCamp[c.id];
                   return (
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mt-3 pt-2 border-t border-border/50 text-xs">
@@ -735,7 +735,7 @@ export default function ClientDetail() {
                       frequency: Number(a.frequency) || 0,
                       cost_per_engagement: Number(a.engagements) > 0 ? Number(a.spend) / Number(a.engagements) : 0,
                     };
-                    const cells = metricsForObjective(selectedCampaign?.objective || '', ins);
+                    const cells = metricsForObjective(selectedCampaign?.objective || '', ins, a.name || selectedCampaign?.name || '');
                     const hasMetrics = ins.spend > 0 || ins.impressions > 0;
                     return (
                       <div key={a.id} className="bg-secondary/30 border border-border/50 rounded-lg p-3 hover:border-primary/30 transition-colors">
@@ -836,7 +836,7 @@ export default function ClientDetail() {
                             frequency: Number(a.frequency) || 0,
                             cost_per_engagement: Number(a.engagements) > 0 ? Number(a.spend) / Number(a.engagements) : 0,
                           };
-                          const cells = metricsForObjective(selectedCampaign?.objective || '', ins);
+                          const cells = metricsForObjective(selectedCampaign?.objective || '', ins, a.name || selectedCampaign?.name || '');
                           const hasMetrics = ins.spend > 0 || ins.impressions > 0;
                           if (!hasMetrics) return null;
                           return (
