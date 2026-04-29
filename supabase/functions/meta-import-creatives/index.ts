@@ -243,6 +243,7 @@ Deno.serve(async (req) => {
         meta_ad_id: ad.id,
         meta_creative_id: cr.id || null,
         meta_adset_id: ad.adset_id || null,
+        optimization_goal: optGoalByAdset.get(ad.adset_id) || '',
         thumbnail_url: thumb,
         title: ad.name,
         body: spend > 0
