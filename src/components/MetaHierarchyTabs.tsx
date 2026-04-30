@@ -17,6 +17,7 @@ export interface Campaign {
   budget: number; notes: string;
   source?: string; meta_campaign_id?: string | null; meta_ad_account_id?: string | null;
   optimization_goal?: string | null;
+  destination_type?: string | null;
   spend?: number; impressions?: number; clicks?: number; ctr?: number; cpc?: number; cpm?: number;
   reach?: number; leads?: number; purchases?: number; messages?: number; link_clicks?: number;
   revenue?: number; cpa?: number; roas?: number;
@@ -246,6 +247,7 @@ export default function MetaHierarchyTabs({
   const campaignFor = (campId: string) => campaigns.find(c => c.id === campId);
   const objectiveFor = (campId: string) => campaignFor(campId)?.objective || '';
   const optGoalForCampaign = (campId: string) => campaignFor(campId)?.optimization_goal || '';
+  const destTypeForCampaign = (campId: string) => campaignFor(campId)?.destination_type || '';
 
   // Filtros derivados
   const filteredCampaigns = useMemo(() => {
@@ -357,9 +359,9 @@ export default function MetaHierarchyTabs({
     </>
   );
 
-  // Renderiza células de métricas fixas + extras dinâmicas baseadas no objetivo + optimization_goal (campos oficiais Meta)
-  const renderMetricsCells = (ins: CampaignInsights, objective: string, optimizationGoal?: string) => {
-    const dynamicCells = metricsForObjective(objective, ins, optimizationGoal);
+  // Renderiza células de métricas fixas + extras dinâmicas baseadas em objective + destination_type (fonte da verdade Meta)
+  const renderMetricsCells = (ins: CampaignInsights, objective: string, optimizationGoal?: string, destinationType?: string) => {
+    const dynamicCells = metricsForObjective(objective, ins, optimizationGoal, destinationType);
     // mostra extras (que não já estão no fixo)
     const fixedKeys = new Set<string>(FIXED_METRIC_COLS.map(c => c.label));
     const extras = dynamicCells.filter(c => !fixedKeys.has(c.label));
@@ -544,7 +546,7 @@ export default function MetaHierarchyTabs({
                           </div>
                         </button>
                       </td>
-                      {renderMetricsCells(ins, c.objective, c.optimization_goal || '')}
+                      {renderMetricsCells(ins, c.objective, c.optimization_goal || '', c.destination_type || '')}
                       <td className="px-3 py-2 w-0"></td>
                       <td className="px-2 py-2 text-right">
                         {isMeta ? (
@@ -619,7 +621,7 @@ export default function MetaHierarchyTabs({
                             </div>
                           </button>
                         </td>
-                        {renderMetricsCells(ins, objectiveFor(a.campaign_id), a.optimization_goal || optGoalForCampaign(a.campaign_id))}
+                        {renderMetricsCells(ins, objectiveFor(a.campaign_id), a.optimization_goal || optGoalForCampaign(a.campaign_id), destTypeForCampaign(a.campaign_id))}
                         <td className="px-3 py-2 w-0"></td>
                         <td className="px-2 py-2 text-right">
                           <EntityActionsMenu
@@ -700,7 +702,7 @@ export default function MetaHierarchyTabs({
                             </button>
                           </div>
                         </td>
-                        {renderMetricsCells(ins, objectiveFor(cr.campaign_id), cr.optimization_goal || optGoalForCampaign(cr.campaign_id))}
+                        {renderMetricsCells(ins, objectiveFor(cr.campaign_id), cr.optimization_goal || optGoalForCampaign(cr.campaign_id), destTypeForCampaign(cr.campaign_id))}
                         <td className="px-3 py-2 w-0"></td>
                         <td className="px-2 py-2 text-right">
                           {isMeta ? (
