@@ -25,6 +25,15 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
   const [connecting, setConnecting] = useState(false);
   const [selecting, setSelecting] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [importStep, setImportStep] = useState<'idle' | 'campaigns' | 'creatives'>('idle');
+  const [importStartedAt, setImportStartedAt] = useState<number | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!importing || !importStartedAt) { setElapsed(0); return; }
+    const i = setInterval(() => setElapsed(Math.floor((Date.now() - importStartedAt) / 1000)), 500);
+    return () => clearInterval(i);
+  }, [importing, importStartedAt]);
 
   const loadConnection = useCallback(async () => {
     setLoading(true);
