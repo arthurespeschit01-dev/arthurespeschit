@@ -123,7 +123,9 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
       const sa = STATUS_CONFIG[getBalanceStatus(a)].order;
       const sb = STATUS_CONFIG[getBalanceStatus(b)].order;
       if (sa !== sb) return sa - sb;
-      return (a.balance ?? 0) - (b.balance ?? 0);
+      const va = a.available_balance ?? a.balance ?? Number.POSITIVE_INFINITY;
+      const vb = b.available_balance ?? b.balance ?? Number.POSITIVE_INFINITY;
+      return va - vb;
     });
   }, [accounts]);
 
