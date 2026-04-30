@@ -256,18 +256,24 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
                         <Icon className="w-3 h-3" />
                         <span className="text-[10px] font-semibold uppercase tracking-wider">{cfg.label}</span>
                       </div>
-                      {!errMsg && st === 'postpaid' ? (
+                      {a.is_prepaid === false ? (
+                        // Pós-paga: SEMPRE mostra a fatura em aberto em destaque,
+                        // mesmo quando há erro/status (ex.: "Fatura em atraso").
                         <>
                           <p className="text-[10px] text-muted-foreground uppercase tracking-wider leading-tight">Fatura em aberto</p>
-                          <p className="text-base font-semibold text-foreground/80 leading-tight tabular-nums">
-                            {fmt(a.pending_bill ?? 0, a.currency)}
+                          <p className={`text-lg font-bold leading-tight tabular-nums ${errMsg ? 'text-red-400' : 'text-foreground/90'}`}>
+                            {fmt(a.pending_bill ?? a.balance ?? 0, a.currency)}
                           </p>
                         </>
                       ) : !errMsg ? (
                         <p className="text-lg font-bold text-foreground leading-tight tabular-nums">
                           {fmt(a.available_balance ?? a.balance ?? 0, a.currency)}
                         </p>
-                      ) : null}
+                      ) : (
+                        <p className="text-lg font-bold text-red-400 leading-tight tabular-nums">
+                          {fmt(a.available_balance ?? a.balance ?? 0, a.currency)}
+                        </p>
+                      )}
                     </div>
                   </div>
                 );
