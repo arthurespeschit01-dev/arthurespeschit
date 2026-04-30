@@ -220,6 +220,29 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
         </div>
       </div>
 
+      {importing && (
+        <div className="glass-surface rounded-xl p-4 space-y-3 animate-fade-in">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+              <p className="text-sm font-medium text-foreground">
+                {importStep === 'campaigns' ? 'Etapa 1/2 — Importando campanhas da Meta' : 'Etapa 2/2 — Importando criativos da Meta'}
+              </p>
+            </div>
+            <span className="text-xs font-mono text-muted-foreground tabular-nums">{Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, '0')}</span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-muted/40 overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-primary via-primary/70 to-primary bg-[length:200%_100%] animate-[shimmer_1.6s_linear_infinite] rounded-full"
+              style={{ width: importStep === 'campaigns' ? '50%' : '100%', transition: 'width 0.6s ease' }}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Esta operação pode demorar de 3 a 5 minutos para contas com muitas campanhas. Não feche esta página.
+          </p>
+        </div>
+      )}
+
       <div className="glass-surface rounded-xl p-4">
         <h4 className="text-sm font-semibold text-foreground mb-3">Contas de anúncio ({accounts.length})</h4>
         {accounts.length === 0 ? (
