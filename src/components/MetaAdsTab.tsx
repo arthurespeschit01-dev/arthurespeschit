@@ -25,7 +25,7 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
   const [connecting, setConnecting] = useState(false);
   const [selecting, setSelecting] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
-  const [importStep, setImportStep] = useState<'idle' | 'campaigns' | 'creatives'>('idle');
+  const [importStep, setImportStep] = useState<'idle' | 'campaigns' | 'children'>('idle');
   const [importStartedAt, setImportStartedAt] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
 
