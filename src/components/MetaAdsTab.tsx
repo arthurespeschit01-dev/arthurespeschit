@@ -25,7 +25,7 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
   const [connecting, setConnecting] = useState(false);
   const [selecting, setSelecting] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
-  const [importStep, setImportStep] = useState<'idle' | 'campaigns' | 'creatives'>('idle');
+  const [importStep, setImportStep] = useState<'idle' | 'campaigns' | 'children'>('idle');
   const [importStartedAt, setImportStartedAt] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
 
@@ -138,15 +138,31 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
       toast.error('Falha ao atualizar campanhas', { id: 'meta-refresh' });
       return;
     }
-    setImportStep('creatives');
-    toast.loading(`Etapa 2/2 — ${imp?.imported ?? 0} campanhas ok. Importando criativos (pode levar 2–3 min)...`, { id: 'meta-refresh' });
-    const { data: cre } = await supabase.functions.invoke('meta-import-creatives', {
-      body: { client_id: clientId },
-    });
+    // Etapa 2: conjuntos + criativos em paralelo (ambos dependem das campanhas, mas são independentes entre si)
+    setImportStep('children');
+    toast.loading(
+      `Etapa 2/2 — ${imp?.imported ?? 0} campanhas ok. Importando conjuntos e criativos em paralelo...`,
+      { id: 'meta-refresh' }
+    );
+    const [adsetsRes, creativesRes] = await Promise.allSettled([
+      supabase.functions.invoke('meta-import-adsets', { body: { client_id: clientId } }),
+      supabase.functions.invoke('meta-import-creatives', { body: { client_id: clientId } }),
+    ]);
+    const adsetsCount = adsetsRes.status === 'fulfilled' ? (adsetsRes.value.data?.imported ?? 0) : 0;
+    const creativesCount = creativesRes.status === 'fulfilled' ? (creativesRes.value.data?.imported ?? 0) : 0;
+    const partialFail = adsetsRes.status === 'rejected' || creativesRes.status === 'rejected'
+      || (adsetsRes.status === 'fulfilled' && adsetsRes.value.error)
+      || (creativesRes.status === 'fulfilled' && creativesRes.value.error);
+
     setImporting(false);
     setImportStep('idle');
     setImportStartedAt(null);
-    toast.success(`${imp?.imported ?? 0} campanhas e ${cre?.imported ?? 0} criativos atualizados`, { id: 'meta-refresh' });
+    const summary = `${imp?.imported ?? 0} campanhas, ${adsetsCount} conjuntos e ${creativesCount} criativos atualizados`;
+    if (partialFail) {
+      toast.warning(`${summary} (algumas falhas)`, { id: 'meta-refresh' });
+    } else {
+      toast.success(summary, { id: 'meta-refresh' });
+    }
     await loadAccounts();
     onCampaignsImported?.();
   };
@@ -226,7 +242,9 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
             <div className="flex items-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin text-primary" />
               <p className="text-sm font-medium text-foreground">
-                {importStep === 'campaigns' ? 'Etapa 1/2 — Importando campanhas da Meta' : 'Etapa 2/2 — Importando criativos da Meta'}
+                {importStep === 'campaigns'
+                  ? 'Etapa 1/2 — Importando campanhas da Meta'
+                  : 'Etapa 2/2 — Importando conjuntos e criativos (em paralelo)'}
               </p>
             </div>
             <span className="text-xs font-mono text-muted-foreground tabular-nums">{Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, '0')}</span>
