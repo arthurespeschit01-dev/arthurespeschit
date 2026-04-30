@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import {
   Loader2, RefreshCw, Wallet, AlertCircle, CheckCircle2, AlertTriangle, XCircle,
-  ChevronDown, ChevronUp,
+  ChevronDown, ChevronUp, CreditCard,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -13,27 +13,45 @@ export interface AccountBalance {
   account_id: string;
   account_name: string;
   currency?: string;
+  /** Saldo disponível APENAS para contas pré-pagas. `null` em pós-pagas. */
+  available_balance?: number | null;
+  /** Fatura em aberto (gasto não cobrado) — só preenchido em pós-pagas. */
+  pending_bill?: number;
+  is_prepaid?: boolean;
+  funding_type?: number | null;
+  funding_label?: string;
+  account_status?: number;
+  account_status_label?: string;
+  /** Compat retroativo — não usar para decisões. */
   balance?: number;
   error?: string;
 }
 
-export type BalanceStatus = 'ok' | 'low' | 'empty' | 'error';
+export type BalanceStatus = 'ok' | 'low' | 'empty' | 'error' | 'postpaid';
 
 const LOW_THRESHOLD = 200;
 
 export function getBalanceStatus(a: AccountBalance): BalanceStatus {
+  // Erro técnico de fetch OU status problemático na Meta
   if (a.error) return 'error';
-  const r = a.balance ?? 0;
+  if (a.account_status_label) return 'error';
+
+  // Pós-paga saudável: não é "OK" verde, é estado neutro próprio
+  if (a.is_prepaid === false) return 'postpaid';
+
+  // Pré-paga: avalia saldo disponível
+  const r = a.available_balance ?? a.balance ?? 0;
   if (r <= 0) return 'empty';
   if (r <= LOW_THRESHOLD) return 'low';
   return 'ok';
 }
 
 const STATUS_CONFIG = {
-  ok: { label: 'Saldo OK', icon: CheckCircle2, color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30', dot: 'bg-emerald-500', emoji: '🟢', order: 3 },
-  low: { label: 'Saldo baixo', icon: AlertTriangle, color: 'bg-amber-500/10 text-amber-400 border-amber-500/30', dot: 'bg-amber-500', emoji: '🟡', order: 1 },
-  empty: { label: 'Sem saldo', icon: XCircle, color: 'bg-red-500/10 text-red-400 border-red-500/30', dot: 'bg-red-500', emoji: '🔴', order: 0 },
-  error: { label: 'Erro / Inativa', icon: AlertCircle, color: 'bg-red-500/10 text-red-400 border-red-500/30', dot: 'bg-red-500', emoji: '🔴', order: 0 },
+  ok:       { label: 'Saldo OK',           icon: CheckCircle2,  color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30', dot: 'bg-emerald-500', emoji: '🟢', order: 4 },
+  postpaid: { label: 'Cartão de crédito',  icon: CreditCard,    color: 'bg-sky-500/10 text-sky-400 border-sky-500/30',             dot: 'bg-sky-500',     emoji: '💳', order: 3 },
+  low:      { label: 'Saldo baixo',        icon: AlertTriangle, color: 'bg-amber-500/10 text-amber-400 border-amber-500/30',       dot: 'bg-amber-500',   emoji: '🟡', order: 1 },
+  empty:    { label: 'Sem saldo',          icon: XCircle,       color: 'bg-red-500/10 text-red-400 border-red-500/30',             dot: 'bg-red-500',     emoji: '🔴', order: 0 },
+  error:    { label: 'Erro / Inativa',     icon: AlertCircle,   color: 'bg-red-500/10 text-red-400 border-red-500/30',             dot: 'bg-red-500',     emoji: '🔴', order: 0 },
 };
 
 /** Hook leve para somente contar contas problemáticas (badge) */
