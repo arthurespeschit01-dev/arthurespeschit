@@ -70,8 +70,15 @@ export function detectMetricKind(
   }
 
   if (obj === 'OUTCOME_ENGAGEMENT' || obj === 'POST_ENGAGEMENT' || obj === 'PAGE_LIKES' || obj === 'EVENT_RESPONSES' || obj === 'VIDEO_VIEWS') {
-    // Conversa só quando o destino/optimization_goal indica explicitamente conversa
-    if (dest === 'WHATSAPP' || dest === 'MESSENGER' || dest === 'INSTAGRAM_DIRECT') return 'messages';
+    // Conversa quando o destino indica msg/whatsapp/messenger/direct (inclui formatos compostos da Meta
+    // como MESSAGING_INSTAGRAM_DIRECT_WHATSAPP, MESSAGING_WHATSAPP, etc.)
+    if (
+      dest.includes('WHATSAPP') ||
+      dest.includes('MESSENGER') ||
+      dest.includes('MESSAGING') ||
+      dest.includes('INSTAGRAM_DIRECT') ||
+      dest.includes('DIRECT')
+    ) return 'messages';
     if (og === 'CONVERSATIONS' || og === 'REPLIES' || og === 'LEAD_GENERATION_MESSAGES') return 'messages';
     return 'engagement';
   }
