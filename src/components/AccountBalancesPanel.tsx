@@ -6,6 +6,7 @@ import {
   ChevronDown, ChevronUp, CreditCard,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export interface AccountBalance {
   client_id: string;
