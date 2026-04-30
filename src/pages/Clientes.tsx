@@ -201,7 +201,9 @@ export default function Clientes() {
       </div>
 
       {/* Painel de Saldos das Contas de Anúncio */}
-      <AccountBalancesPanel initialAccounts={balanceAccounts} onAccountsChange={setBalanceAccounts} />
+      <div id="account-balances-panel" className="scroll-mt-24">
+        <AccountBalancesPanel initialAccounts={balanceAccounts} onAccountsChange={setBalanceAccounts} defaultOpen={problemCount > 0} />
+      </div>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="bg-card border-border max-h-[85vh] overflow-y-auto">
           <DialogHeader>
