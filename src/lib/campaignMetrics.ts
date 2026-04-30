@@ -75,10 +75,13 @@ export function metricsForObjective(
 
   let kind = detectMetricKind(objective, optimizationGoal);
 
-  // Fallback de segurança: se a classificação caiu em "awareness" mas existem mensagens
-  // reais nas actions oficiais (onsite_conversion.messaging_conversation_started_7d > 0),
-  // tratamos como "messages" — bate com o que o Gerenciador mostra.
-  if (kind === 'awareness' && messages > 0) kind = 'messages';
+  // Fallback: só reclassifica como "messages" quando o objetivo é ENGAGEMENT
+  // (caso WhatsApp/Direct com optimization_goal ausente). NUNCA para AWARENESS,
+  // REACH, VIDEO ou PAGE_LIKES — esses têm objetivo próprio mesmo com mensagens residuais.
+  const obj = (objective || '').toUpperCase();
+  if (kind === 'awareness' && messages > 0 && obj.includes('ENGAGEMENT')) {
+    kind = 'messages';
+  }
 
   let cells: Cell[] = [];
 
