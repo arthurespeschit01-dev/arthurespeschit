@@ -170,9 +170,29 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
               Saldos das Contas
               {problemCount > 0 && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/30">
-                  {problemCount} com problema
-                </span>
+                <TooltipProvider delayDuration={150}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span
+                        className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/30 cursor-help"
+                        onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+                      >
+                        {problemCount} com problema
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" align="start" className="max-w-xs">
+                      <div className="space-y-1.5">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Contas com problema</p>
+                        {problemAccounts.map(a => (
+                          <div key={a.account_id} className="text-xs">
+                            <span className="font-semibold">{a.account_name || 'Sem nome'}</span>
+                            <span className="text-muted-foreground"> — {problemReason(a)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
             </h3>
             <p className="text-[11px] text-muted-foreground">
