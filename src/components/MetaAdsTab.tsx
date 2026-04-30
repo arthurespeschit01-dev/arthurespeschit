@@ -242,7 +242,9 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
             <div className="flex items-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin text-primary" />
               <p className="text-sm font-medium text-foreground">
-                {importStep === 'campaigns' ? 'Etapa 1/2 — Importando campanhas da Meta' : 'Etapa 2/2 — Importando criativos da Meta'}
+                {importStep === 'campaigns'
+                  ? 'Etapa 1/2 — Importando campanhas da Meta'
+                  : 'Etapa 2/2 — Importando conjuntos e criativos (em paralelo)'}
               </p>
             </div>
             <span className="text-xs font-mono text-muted-foreground tabular-nums">{Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, '0')}</span>
