@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Loader2, Link2, CheckCircle2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Loader2, Link2, CheckCircle2, RefreshCw, AlertCircle, Megaphone, Image as ImageIcon, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface AdAccount {
@@ -230,9 +230,32 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
           </div>
         )}
         {importing && (
-          <p className="text-xs text-muted-foreground text-center mt-3 flex items-center justify-center gap-2">
-            <Loader2 className="w-3 h-3 animate-spin" /> Carregando campanhas da Meta...
-          </p>
+          <div className="mt-4 rounded-xl border border-primary/30 bg-gradient-to-br from-primary/10 via-card/60 to-accent/10 p-5 overflow-hidden">
+            <div className="flex items-center gap-4">
+              <div className="relative w-12 h-12 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
+                <span className="import-pulse-ring" />
+                <span className="import-pulse-ring" style={{ animationDelay: '0.6s' }} />
+                <RefreshCw className="w-5 h-5 text-primary animate-spin" style={{ animationDuration: '1.6s' }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  Sincronizando com a Meta
+                  <span className="flex gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary import-dot" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary import-dot" style={{ animationDelay: '0.15s' }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary import-dot" style={{ animationDelay: '0.3s' }} />
+                  </span>
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">Importando campanhas, conjuntos e criativos…</p>
+              </div>
+              <div className="hidden sm:flex items-center gap-3 text-muted-foreground">
+                <Megaphone className="w-5 h-5 import-float" />
+                <BarChart3 className="w-5 h-5 import-float" style={{ animationDelay: '0.4s' }} />
+                <ImageIcon className="w-5 h-5 import-float" style={{ animationDelay: '0.8s' }} />
+              </div>
+            </div>
+            <div className="import-bar relative mt-4 h-1.5 w-full rounded-full bg-muted/60 overflow-hidden" />
+          </div>
         )}
       </div>
     </div>
