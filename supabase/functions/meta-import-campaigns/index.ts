@@ -171,22 +171,30 @@ Deno.serve(async (req) => {
       console.warn('insights failed (continuing without metrics):', String(e));
     }
 
-    // Buscar optimization_goal por campanha (a partir dos adsets oficiais).
-    // Isso permite diferenciar OUTCOME_ENGAGEMENT comum de OUTCOME_ENGAGEMENT+CONVERSATIONS (mensagens).
+    // Buscar optimization_goal + destination_type por campanha (a partir dos adsets oficiais).
+    // destination_type identifica WHATSAPP/MESSENGER/WEBSITE/APP — fonte da verdade junto com objective.
     const optGoalByCampaign = new Map<string, string>();
+    const destTypeByCampaign = new Map<string, string>();
     try {
-      const adsetsUrl = `${GRAPH}/${accountId}/adsets?fields=id,campaign_id,optimization_goal&limit=200&access_token=${accessToken}`;
+      const adsetsUrl = `${GRAPH}/${accountId}/adsets?fields=id,campaign_id,optimization_goal,destination_type&limit=200&access_token=${accessToken}`;
       const adsets = await fetchAllPages(adsetsUrl);
-      // Prioriza CONVERSATIONS quando existir; senão pega o primeiro optimization_goal não-vazio.
       for (const a of adsets) {
         const cid = a.campaign_id;
         const og = (a.optimization_goal || '').toString();
-        if (!cid || !og) continue;
-        const cur = optGoalByCampaign.get(cid);
-        if (!cur || og === 'CONVERSATIONS') optGoalByCampaign.set(cid, og);
+        const dt = (a.destination_type || '').toString().toUpperCase();
+        if (!cid) continue;
+        if (og) {
+          const cur = optGoalByCampaign.get(cid);
+          if (!cur || og === 'CONVERSATIONS') optGoalByCampaign.set(cid, og);
+        }
+        if (dt) {
+          // Prioriza WHATSAPP/MESSENGER quando existir (mais específico)
+          const curDt = destTypeByCampaign.get(cid);
+          if (!curDt || dt === 'WHATSAPP' || dt === 'MESSENGER') destTypeByCampaign.set(cid, dt);
+        }
       }
     } catch (e) {
-      console.warn('adsets fetch for optimization_goal failed:', String(e));
+      console.warn('adsets fetch for optimization_goal/destination_type failed:', String(e));
     }
 
     const statusMap: Record<string, string> = {
