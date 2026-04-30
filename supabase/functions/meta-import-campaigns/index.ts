@@ -224,6 +224,7 @@ Deno.serve(async (req) => {
         platform: 'Meta Ads',
         objective: c.objective || '',
         optimization_goal: optGoalByCampaign.get(c.id) || '',
+        destination_type: destTypeByCampaign.get(c.id) || '',
         status: statusMap[c.status] || c.status,
         start_date: c.start_time ? c.start_time.slice(0, 10) : '',
         budget,
