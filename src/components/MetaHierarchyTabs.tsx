@@ -247,6 +247,7 @@ export default function MetaHierarchyTabs({
   const campaignFor = (campId: string) => campaigns.find(c => c.id === campId);
   const objectiveFor = (campId: string) => campaignFor(campId)?.objective || '';
   const optGoalForCampaign = (campId: string) => campaignFor(campId)?.optimization_goal || '';
+  const destTypeForCampaign = (campId: string) => campaignFor(campId)?.destination_type || '';
 
   // Filtros derivados
   const filteredCampaigns = useMemo(() => {
