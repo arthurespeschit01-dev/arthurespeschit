@@ -197,22 +197,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="flex-1 flex flex-col min-h-screen min-w-0">
           <header className="sticky top-0 z-30 h-14 flex items-center px-4 lg:px-6 border-b border-border bg-background/80 backdrop-blur-xl">
             <button
-              onClick={() => {
-                if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-                  // mobile: se sidebar fechado, abre; se aberto, alterna minimizado
-                  if (!sidebarOpen) setSidebarOpen(true);
-                  else toggleCollapsed();
-                } else {
-                  toggleCollapsed();
-                }
-              }}
-              className="flex mr-3 text-muted-foreground hover:text-foreground items-center justify-center w-8 h-8 rounded-md hover:bg-accent"
-              aria-label={collapsed ? 'Expandir menu' : 'Minimizar menu'}
-              title={collapsed ? 'Expandir menu' : 'Minimizar menu'}
+              onClick={() => setSidebarOpen(true)}
+              className="flex lg:hidden mr-3 text-muted-foreground hover:text-foreground items-center justify-center w-8 h-8 rounded-md hover:bg-accent"
+              aria-label="Abrir menu"
             >
-              {collapsed || (!sidebarOpen && typeof window !== 'undefined' && window.innerWidth < 1024)
-                ? <PanelLeftOpen className="w-4 h-4" />
-                : <PanelLeftClose className="w-4 h-4" />}
+              <Menu className="w-4 h-4" />
             </button>
             <div className="ml-auto flex items-center gap-2 sm:gap-3 min-w-0">
               <ThemeToggle />
