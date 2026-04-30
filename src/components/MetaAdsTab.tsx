@@ -125,19 +125,27 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
       return;
     }
     setImporting(true);
-    toast.loading('Atualizando campanhas e criativos...', { id: 'meta-refresh' });
+    setImportStartedAt(Date.now());
+    setImportStep('campaigns');
+    toast.loading('Etapa 1/2 — Importando campanhas (pode levar 1–2 min)...', { id: 'meta-refresh' });
     const { data: imp, error: impErr } = await supabase.functions.invoke('meta-import-campaigns', {
       body: { client_id: clientId },
     });
     if (impErr || imp?.error) {
       setImporting(false);
+      setImportStep('idle');
+      setImportStartedAt(null);
       toast.error('Falha ao atualizar campanhas', { id: 'meta-refresh' });
       return;
     }
+    setImportStep('creatives');
+    toast.loading(`Etapa 2/2 — ${imp?.imported ?? 0} campanhas ok. Importando criativos (pode levar 2–3 min)...`, { id: 'meta-refresh' });
     const { data: cre } = await supabase.functions.invoke('meta-import-creatives', {
       body: { client_id: clientId },
     });
     setImporting(false);
+    setImportStep('idle');
+    setImportStartedAt(null);
     toast.success(`${imp?.imported ?? 0} campanhas e ${cre?.imported ?? 0} criativos atualizados`, { id: 'meta-refresh' });
     await loadAccounts();
     onCampaignsImported?.();
