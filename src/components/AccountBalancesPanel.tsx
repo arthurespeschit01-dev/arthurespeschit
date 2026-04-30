@@ -200,6 +200,7 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
                 const st = getBalanceStatus(a);
                 const cfg = STATUS_CONFIG[st];
                 const Icon = cfg.icon;
+                const errMsg = a.error || a.account_status_label;
                 return (
                   <div key={a.account_id} className={`flex items-center justify-between gap-3 p-3 rounded-lg border ${cfg.color}`}>
                     <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -208,7 +209,12 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
                         <p className="text-sm font-semibold text-foreground truncate">
                           {a.account_name || 'Sem nome'}
                         </p>
-                        {a.error && <p className="text-[11px] text-red-400 mt-0.5">{a.error}</p>}
+                        {errMsg && <p className="text-[11px] text-red-400 mt-0.5">{errMsg}</p>}
+                        {!errMsg && st === 'postpaid' && (
+                          <p className="text-[11px] text-muted-foreground mt-0.5">
+                            {a.funding_label || 'Cartão de crédito'} • cobrança automática
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="text-right shrink-0">
@@ -217,9 +223,18 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
                         <Icon className="w-3 h-3" />
                         <span className="text-[10px] font-semibold uppercase tracking-wider">{cfg.label}</span>
                       </div>
-                      {!a.error && (
-                        <p className="text-lg font-bold text-foreground leading-tight">{fmt(a.balance, a.currency)}</p>
-                      )}
+                      {!errMsg && st === 'postpaid' ? (
+                        <>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider leading-tight">Fatura em aberto</p>
+                          <p className="text-base font-semibold text-foreground/80 leading-tight tabular-nums">
+                            {fmt(a.pending_bill ?? 0, a.currency)}
+                          </p>
+                        </>
+                      ) : !errMsg ? (
+                        <p className="text-lg font-bold text-foreground leading-tight tabular-nums">
+                          {fmt(a.available_balance ?? a.balance ?? 0, a.currency)}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 );
