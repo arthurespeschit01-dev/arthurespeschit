@@ -359,9 +359,9 @@ export default function MetaHierarchyTabs({
     </>
   );
 
-  // Renderiza células de métricas fixas + extras dinâmicas baseadas no objetivo + optimization_goal (campos oficiais Meta)
-  const renderMetricsCells = (ins: CampaignInsights, objective: string, optimizationGoal?: string) => {
-    const dynamicCells = metricsForObjective(objective, ins, optimizationGoal);
+  // Renderiza células de métricas fixas + extras dinâmicas baseadas em objective + destination_type (fonte da verdade Meta)
+  const renderMetricsCells = (ins: CampaignInsights, objective: string, optimizationGoal?: string, destinationType?: string) => {
+    const dynamicCells = metricsForObjective(objective, ins, optimizationGoal, destinationType);
     // mostra extras (que não já estão no fixo)
     const fixedKeys = new Set<string>(FIXED_METRIC_COLS.map(c => c.label));
     const extras = dynamicCells.filter(c => !fixedKeys.has(c.label));
