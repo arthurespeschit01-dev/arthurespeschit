@@ -48,10 +48,24 @@ export default function Clientes() {
     setBalanceAccounts(preloadedBalanceAccounts);
   }, [preloadedBalanceAccounts]);
 
-  const problemCount = balanceAccounts.filter(a => {
+  const problemAccounts = balanceAccounts.filter(a => {
     const s = getBalanceStatus(a);
     return s === 'low' || s === 'empty' || s === 'error';
-  }).length;
+  });
+  const problemCount = problemAccounts.length;
+  const fmtMoney = (v: number | undefined | null, currency = 'BRL') => {
+    if (v === undefined || v === null) return '—';
+    try { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(v); }
+    catch { return `R$ ${(v as number).toFixed(2)}`; }
+  };
+  const reasonOf = (a: AccountBalance) => {
+    const s = getBalanceStatus(a);
+    if (a.error) return a.error;
+    if (a.account_status_label) return a.account_status_label;
+    if (s === 'empty') return 'Sem saldo';
+    if (s === 'low') return `Saldo baixo (${fmtMoney(a.available_balance ?? a.balance ?? 0, a.currency)})`;
+    return 'Problema';
+  };
   const [form, setForm] = useState({
     name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo',
     payment_day: '' as string, verba_mensal: 0, niche: '', phone: '',
