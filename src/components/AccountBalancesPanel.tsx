@@ -130,18 +130,28 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
     });
   }, [accounts]);
 
-  const problemCount = useMemo(() => accounts.filter(a => {
+  const problemAccounts = useMemo(() => accounts.filter(a => {
     const s = getBalanceStatus(a);
     return s === 'low' || s === 'empty' || s === 'error';
-  }).length, [accounts]);
+  }), [accounts]);
+  const problemCount = problemAccounts.length;
 
-  const fmt = (v: number | undefined, currency = 'BRL') => {
+  const fmt = (v: number | undefined | null, currency = 'BRL') => {
     if (v === undefined || v === null) return '—';
     try {
       return new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(v);
     } catch {
       return `R$ ${v.toFixed(2)}`;
     }
+  };
+
+  const problemReason = (a: AccountBalance): string => {
+    const s = getBalanceStatus(a);
+    if (a.error) return a.error;
+    if (a.account_status_label) return a.account_status_label;
+    if (s === 'empty') return 'Sem saldo';
+    if (s === 'low') return `Saldo baixo (${fmt(a.available_balance ?? a.balance ?? 0, a.currency)})`;
+    return 'Problema';
   };
 
   return (
