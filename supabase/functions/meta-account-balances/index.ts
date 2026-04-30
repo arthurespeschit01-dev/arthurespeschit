@@ -134,7 +134,7 @@ Deno.serve(async (req) => {
         const adAccountId = String(c.selected_ad_account_id).startsWith('act_')
           ? c.selected_ad_account_id
           : `act_${c.selected_ad_account_id}`;
-        const url = `${GRAPH}/${adAccountId}?fields=name,currency,balance,spend_cap,amount_spent,funding_source_details&access_token=${c.access_token}`;
+        const url = `${GRAPH}/${adAccountId}?fields=name,currency,balance,spend_cap,amount_spent,funding_source_details,account_status&access_token=${c.access_token}`;
         const r = await fetch(url);
         const j = await r.json();
         if (!r.ok) {
@@ -146,14 +146,23 @@ Deno.serve(async (req) => {
             error: j?.error?.message || 'Falha ao consultar conta',
           };
         }
-        const balance = getAvailableFunds(j);
+        const bal = computeBalance(j);
+        const accountStatus = Number(j.account_status ?? 1);
+        const statusErr = statusProblem(accountStatus);
         return {
           client_id: c.client_id,
           client_name: clientName.get(c.client_id) || '—',
           account_id: adAccountId,
           account_name: j.name || c.selected_ad_account_name,
           currency: j.currency || 'BRL',
-          balance,
+          available_balance: bal.available_balance,
+          pending_bill: bal.pending_bill,
+          is_prepaid: bal.is_prepaid,
+          funding_type: bal.funding_type,
+          funding_label: bal.funding_label,
+          account_status: accountStatus,
+          balance: bal.available_balance ?? 0,
+          ...(statusErr ? { account_status_label: statusErr } : {}),
         };
       } catch (e) {
         return {
