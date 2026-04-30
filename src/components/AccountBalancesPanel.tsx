@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import {
   Loader2, RefreshCw, Wallet, AlertCircle, CheckCircle2, AlertTriangle, XCircle,
-  ChevronDown, ChevronUp,
+  ChevronDown, ChevronUp, CreditCard,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -13,27 +13,45 @@ export interface AccountBalance {
   account_id: string;
   account_name: string;
   currency?: string;
+  /** Saldo disponível APENAS para contas pré-pagas. `null` em pós-pagas. */
+  available_balance?: number | null;
+  /** Fatura em aberto (gasto não cobrado) — só preenchido em pós-pagas. */
+  pending_bill?: number;
+  is_prepaid?: boolean;
+  funding_type?: number | null;
+  funding_label?: string;
+  account_status?: number;
+  account_status_label?: string;
+  /** Compat retroativo — não usar para decisões. */
   balance?: number;
   error?: string;
 }
 
-export type BalanceStatus = 'ok' | 'low' | 'empty' | 'error';
+export type BalanceStatus = 'ok' | 'low' | 'empty' | 'error' | 'postpaid';
 
 const LOW_THRESHOLD = 200;
 
 export function getBalanceStatus(a: AccountBalance): BalanceStatus {
+  // Erro técnico de fetch OU status problemático na Meta
   if (a.error) return 'error';
-  const r = a.balance ?? 0;
+  if (a.account_status_label) return 'error';
+
+  // Pós-paga saudável: não é "OK" verde, é estado neutro próprio
+  if (a.is_prepaid === false) return 'postpaid';
+
+  // Pré-paga: avalia saldo disponível
+  const r = a.available_balance ?? a.balance ?? 0;
   if (r <= 0) return 'empty';
   if (r <= LOW_THRESHOLD) return 'low';
   return 'ok';
 }
 
 const STATUS_CONFIG = {
-  ok: { label: 'Saldo OK', icon: CheckCircle2, color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30', dot: 'bg-emerald-500', emoji: '🟢', order: 3 },
-  low: { label: 'Saldo baixo', icon: AlertTriangle, color: 'bg-amber-500/10 text-amber-400 border-amber-500/30', dot: 'bg-amber-500', emoji: '🟡', order: 1 },
-  empty: { label: 'Sem saldo', icon: XCircle, color: 'bg-red-500/10 text-red-400 border-red-500/30', dot: 'bg-red-500', emoji: '🔴', order: 0 },
-  error: { label: 'Erro / Inativa', icon: AlertCircle, color: 'bg-red-500/10 text-red-400 border-red-500/30', dot: 'bg-red-500', emoji: '🔴', order: 0 },
+  ok:       { label: 'Saldo OK',           icon: CheckCircle2,  color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30', dot: 'bg-emerald-500', emoji: '🟢', order: 4 },
+  postpaid: { label: 'Cartão de crédito',  icon: CreditCard,    color: 'bg-sky-500/10 text-sky-400 border-sky-500/30',             dot: 'bg-sky-500',     emoji: '💳', order: 3 },
+  low:      { label: 'Saldo baixo',        icon: AlertTriangle, color: 'bg-amber-500/10 text-amber-400 border-amber-500/30',       dot: 'bg-amber-500',   emoji: '🟡', order: 1 },
+  empty:    { label: 'Sem saldo',          icon: XCircle,       color: 'bg-red-500/10 text-red-400 border-red-500/30',             dot: 'bg-red-500',     emoji: '🔴', order: 0 },
+  error:    { label: 'Erro / Inativa',     icon: AlertCircle,   color: 'bg-red-500/10 text-red-400 border-red-500/30',             dot: 'bg-red-500',     emoji: '🔴', order: 0 },
 };
 
 /** Hook leve para somente contar contas problemáticas (badge) */
@@ -105,7 +123,9 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
       const sa = STATUS_CONFIG[getBalanceStatus(a)].order;
       const sb = STATUS_CONFIG[getBalanceStatus(b)].order;
       if (sa !== sb) return sa - sb;
-      return (a.balance ?? 0) - (b.balance ?? 0);
+      const va = a.available_balance ?? a.balance ?? Number.POSITIVE_INFINITY;
+      const vb = b.available_balance ?? b.balance ?? Number.POSITIVE_INFINITY;
+      return va - vb;
     });
   }, [accounts]);
 
@@ -182,6 +202,7 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
                 const st = getBalanceStatus(a);
                 const cfg = STATUS_CONFIG[st];
                 const Icon = cfg.icon;
+                const errMsg = a.error || a.account_status_label;
                 return (
                   <div key={a.account_id} className={`flex items-center justify-between gap-3 p-3 rounded-lg border ${cfg.color}`}>
                     <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -190,7 +211,12 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
                         <p className="text-sm font-semibold text-foreground truncate">
                           {a.account_name || 'Sem nome'}
                         </p>
-                        {a.error && <p className="text-[11px] text-red-400 mt-0.5">{a.error}</p>}
+                        {errMsg && <p className="text-[11px] text-red-400 mt-0.5">{errMsg}</p>}
+                        {!errMsg && st === 'postpaid' && (
+                          <p className="text-[11px] text-muted-foreground mt-0.5">
+                            {a.funding_label || 'Cartão de crédito'} • cobrança automática
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="text-right shrink-0">
@@ -199,9 +225,18 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
                         <Icon className="w-3 h-3" />
                         <span className="text-[10px] font-semibold uppercase tracking-wider">{cfg.label}</span>
                       </div>
-                      {!a.error && (
-                        <p className="text-lg font-bold text-foreground leading-tight">{fmt(a.balance, a.currency)}</p>
-                      )}
+                      {!errMsg && st === 'postpaid' ? (
+                        <>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider leading-tight">Fatura em aberto</p>
+                          <p className="text-base font-semibold text-foreground/80 leading-tight tabular-nums">
+                            {fmt(a.pending_bill ?? 0, a.currency)}
+                          </p>
+                        </>
+                      ) : !errMsg ? (
+                        <p className="text-lg font-bold text-foreground leading-tight tabular-nums">
+                          {fmt(a.available_balance ?? a.balance ?? 0, a.currency)}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 );

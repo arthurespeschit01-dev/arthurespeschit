@@ -138,10 +138,18 @@ export default function Clientes() {
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             Clientes
             {problemCount > 0 && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full bg-red-500/15 text-red-400 border border-red-500/30">
+              <button
+                type="button"
+                onClick={() => {
+                  const el = document.getElementById('account-balances-panel');
+                  el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500/25 transition-colors cursor-pointer"
+                title="Ver detalhes no painel de saldos"
+              >
                 <AlertTriangle className="w-3 h-3" />
-                {problemCount} {problemCount === 1 ? 'conta sem saldo' : 'contas sem saldo'}
-              </span>
+                {problemCount === 1 ? '1 conta com problema' : `${problemCount} contas com problema`}
+              </button>
             )}
           </h1>
           <p className="text-muted-foreground text-sm mt-1">Gerencie seus clientes</p>
@@ -193,7 +201,9 @@ export default function Clientes() {
       </div>
 
       {/* Painel de Saldos das Contas de Anúncio */}
-      <AccountBalancesPanel initialAccounts={balanceAccounts} onAccountsChange={setBalanceAccounts} />
+      <div id="account-balances-panel" className="scroll-mt-24">
+        <AccountBalancesPanel initialAccounts={balanceAccounts} onAccountsChange={setBalanceAccounts} defaultOpen={problemCount > 0} />
+      </div>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="bg-card border-border max-h-[85vh] overflow-y-auto">
           <DialogHeader>

@@ -29,16 +29,74 @@ function parseDisplayMoney(v: any): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function getAvailableFunds(account: any): number {
-  const displayedFunds = parseDisplayMoney(account.funding_source_details?.display_string);
-  if (account.funding_source_details?.type === 20 && displayedFunds !== null) {
-    return Number(displayedFunds.toFixed(2));
+/**
+ * Apenas contas PRÉ-PAGAS (funding type 20 — "Saldo disponível") possuem saldo
+ * real disponível. Em contas pós-pagas (cartão de crédito, débito automático,
+ * boleto, etc.) o campo `balance` da Meta representa **dívida pendente** (gasto
+ * já realizado e ainda não cobrado no método de pagamento), NÃO crédito.
+ *
+ * Retornar essa dívida como "saldo" engana o usuário — por isso, para contas
+ * pós-pagas, devolvemos `available_balance = null` e expomos `pending_bill`
+ * como info secundária.
+ */
+function computeBalance(account: any): {
+  available_balance: number | null;
+  pending_bill: number;
+  is_prepaid: boolean;
+  funding_type: number | null;
+  funding_label: string;
+} {
+  const fundingType = account.funding_source_details?.type ?? null;
+  const isPrepaid = fundingType === 20;
+  const pendingBill = toMoney(account.balance);
+  const fundingLabel = String(account.funding_source_details?.display_string || '').trim();
+
+  if (isPrepaid) {
+    const displayed = parseDisplayMoney(fundingLabel);
+    const value = displayed !== null ? displayed : pendingBill;
+    return {
+      available_balance: Number(value.toFixed(2)),
+      pending_bill: 0,
+      is_prepaid: true,
+      funding_type: fundingType,
+      funding_label: 'Saldo pré-pago',
+    };
   }
-  const billBalance = toMoney(account.balance);
-  const spendCap = toMoney(account.spend_cap);
-  const amountSpent = toMoney(account.amount_spent);
-  const remainingCap = spendCap > 0 ? Math.max(spendCap - amountSpent, 0) : 0;
-  return Number((spendCap > 0 ? remainingCap : billBalance).toFixed(2));
+
+  // Pós-pago: NÃO existe "saldo disponível" — só fatura em aberto
+  return {
+    available_balance: null,
+    pending_bill: Number(pendingBill.toFixed(2)),
+    is_prepaid: false,
+    funding_type: fundingType,
+    funding_label: fundingLabel || 'Cartão de crédito',
+  };
+}
+
+/**
+ * account_status da Meta:
+ *   1 = ATIVA
+ *   2 = DESABILITADA
+ *   3 = UNSETTLED (fatura não paga)
+ *   7 = PENDING_RISK_REVIEW
+ *   8 = PENDING_SETTLEMENT
+ *   9 = IN_GRACE_PERIOD
+ *   100 = PENDING_CLOSURE
+ *   101 = CLOSED
+ *   102 = ANY_ACTIVE
+ *   201 = ANY_CLOSED
+ */
+function statusProblem(status: number): string | null {
+  switch (status) {
+    case 2: return 'Conta desabilitada';
+    case 3: return 'Fatura em atraso';
+    case 7: return 'Em revisão de risco';
+    case 8: return 'Aguardando pagamento';
+    case 9: return 'Em período de carência';
+    case 100: return 'Encerramento pendente';
+    case 101: return 'Conta encerrada';
+    default: return null;
+  }
 }
 
 Deno.serve(async (req) => {
@@ -76,7 +134,7 @@ Deno.serve(async (req) => {
         const adAccountId = String(c.selected_ad_account_id).startsWith('act_')
           ? c.selected_ad_account_id
           : `act_${c.selected_ad_account_id}`;
-        const url = `${GRAPH}/${adAccountId}?fields=name,currency,balance,spend_cap,amount_spent,funding_source_details&access_token=${c.access_token}`;
+        const url = `${GRAPH}/${adAccountId}?fields=name,currency,balance,spend_cap,amount_spent,funding_source_details,account_status&access_token=${c.access_token}`;
         const r = await fetch(url);
         const j = await r.json();
         if (!r.ok) {
@@ -88,14 +146,23 @@ Deno.serve(async (req) => {
             error: j?.error?.message || 'Falha ao consultar conta',
           };
         }
-        const balance = getAvailableFunds(j);
+        const bal = computeBalance(j);
+        const accountStatus = Number(j.account_status ?? 1);
+        const statusErr = statusProblem(accountStatus);
         return {
           client_id: c.client_id,
           client_name: clientName.get(c.client_id) || '—',
           account_id: adAccountId,
           account_name: j.name || c.selected_ad_account_name,
           currency: j.currency || 'BRL',
-          balance,
+          available_balance: bal.available_balance,
+          pending_bill: bal.pending_bill,
+          is_prepaid: bal.is_prepaid,
+          funding_type: bal.funding_type,
+          funding_label: bal.funding_label,
+          account_status: accountStatus,
+          balance: bal.available_balance ?? 0,
+          ...(statusErr ? { account_status_label: statusErr } : {}),
         };
       } catch (e) {
         return {
