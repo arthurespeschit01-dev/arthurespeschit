@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Plus, Edit2, Trash2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import AccountBalancesPanel, { getBalanceStatus, type AccountBalance, useAccountBalancesCount } from '@/components/AccountBalancesPanel';
 
 interface AccountIds {
@@ -47,10 +48,24 @@ export default function Clientes() {
     setBalanceAccounts(preloadedBalanceAccounts);
   }, [preloadedBalanceAccounts]);
 
-  const problemCount = balanceAccounts.filter(a => {
+  const problemAccounts = balanceAccounts.filter(a => {
     const s = getBalanceStatus(a);
     return s === 'low' || s === 'empty' || s === 'error';
-  }).length;
+  });
+  const problemCount = problemAccounts.length;
+  const fmtMoney = (v: number | undefined | null, currency = 'BRL') => {
+    if (v === undefined || v === null) return '—';
+    try { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(v); }
+    catch { return `R$ ${(v as number).toFixed(2)}`; }
+  };
+  const reasonOf = (a: AccountBalance) => {
+    const s = getBalanceStatus(a);
+    if (a.error) return a.error;
+    if (a.account_status_label) return a.account_status_label;
+    if (s === 'empty') return 'Sem saldo';
+    if (s === 'low') return `Saldo baixo (${fmtMoney(a.available_balance ?? a.balance ?? 0, a.currency)})`;
+    return 'Problema';
+  };
   const [form, setForm] = useState({
     name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo',
     payment_day: '' as string, verba_mensal: 0, niche: '', phone: '',
@@ -138,18 +153,34 @@ export default function Clientes() {
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             Clientes
             {problemCount > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  const el = document.getElementById('account-balances-panel');
-                  el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }}
-                className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500/25 transition-colors cursor-pointer"
-                title="Ver detalhes no painel de saldos"
-              >
-                <AlertTriangle className="w-3 h-3" />
-                {problemCount === 1 ? '1 conta com problema' : `${problemCount} contas com problema`}
-              </button>
+              <TooltipProvider delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const el = document.getElementById('account-balances-panel');
+                        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500/25 transition-colors cursor-pointer"
+                    >
+                      <AlertTriangle className="w-3 h-3" />
+                      {problemCount === 1 ? '1 conta com problema' : `${problemCount} contas com problema`}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" align="start" className="max-w-sm">
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Contas com problema</p>
+                      {problemAccounts.map(a => (
+                        <div key={a.account_id} className="text-xs">
+                          <span className="font-semibold">{a.account_name || a.client_name || 'Sem nome'}</span>
+                          <span className="text-muted-foreground"> — {reasonOf(a)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
           </h1>
           <p className="text-muted-foreground text-sm mt-1">Gerencie seus clientes</p>

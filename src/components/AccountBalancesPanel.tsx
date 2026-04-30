@@ -6,6 +6,7 @@ import {
   ChevronDown, ChevronUp, CreditCard,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export interface AccountBalance {
   client_id: string;
@@ -129,18 +130,28 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
     });
   }, [accounts]);
 
-  const problemCount = useMemo(() => accounts.filter(a => {
+  const problemAccounts = useMemo(() => accounts.filter(a => {
     const s = getBalanceStatus(a);
     return s === 'low' || s === 'empty' || s === 'error';
-  }).length, [accounts]);
+  }), [accounts]);
+  const problemCount = problemAccounts.length;
 
-  const fmt = (v: number | undefined, currency = 'BRL') => {
+  const fmt = (v: number | undefined | null, currency = 'BRL') => {
     if (v === undefined || v === null) return '—';
     try {
       return new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(v);
     } catch {
       return `R$ ${v.toFixed(2)}`;
     }
+  };
+
+  const problemReason = (a: AccountBalance): string => {
+    const s = getBalanceStatus(a);
+    if (a.error) return a.error;
+    if (a.account_status_label) return a.account_status_label;
+    if (s === 'empty') return 'Sem saldo';
+    if (s === 'low') return `Saldo baixo (${fmt(a.available_balance ?? a.balance ?? 0, a.currency)})`;
+    return 'Problema';
   };
 
   return (
@@ -159,9 +170,29 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
               Saldos das Contas
               {problemCount > 0 && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/30">
-                  {problemCount} com problema
-                </span>
+                <TooltipProvider delayDuration={150}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span
+                        className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/30 cursor-help"
+                        onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+                      >
+                        {problemCount} com problema
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" align="start" className="max-w-xs">
+                      <div className="space-y-1.5">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Contas com problema</p>
+                        {problemAccounts.map(a => (
+                          <div key={a.account_id} className="text-xs">
+                            <span className="font-semibold">{a.account_name || 'Sem nome'}</span>
+                            <span className="text-muted-foreground"> — {problemReason(a)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
             </h3>
             <p className="text-[11px] text-muted-foreground">
@@ -225,18 +256,24 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
                         <Icon className="w-3 h-3" />
                         <span className="text-[10px] font-semibold uppercase tracking-wider">{cfg.label}</span>
                       </div>
-                      {!errMsg && st === 'postpaid' ? (
+                      {a.is_prepaid === false ? (
+                        // Pós-paga: SEMPRE mostra a fatura em aberto em destaque,
+                        // mesmo quando há erro/status (ex.: "Fatura em atraso").
                         <>
                           <p className="text-[10px] text-muted-foreground uppercase tracking-wider leading-tight">Fatura em aberto</p>
-                          <p className="text-base font-semibold text-foreground/80 leading-tight tabular-nums">
-                            {fmt(a.pending_bill ?? 0, a.currency)}
+                          <p className={`text-lg font-bold leading-tight tabular-nums ${errMsg ? 'text-red-400' : 'text-foreground/90'}`}>
+                            {fmt(a.pending_bill ?? a.balance ?? 0, a.currency)}
                           </p>
                         </>
                       ) : !errMsg ? (
                         <p className="text-lg font-bold text-foreground leading-tight tabular-nums">
                           {fmt(a.available_balance ?? a.balance ?? 0, a.currency)}
                         </p>
-                      ) : null}
+                      ) : (
+                        <p className="text-lg font-bold text-red-400 leading-tight tabular-nums">
+                          {fmt(a.available_balance ?? a.balance ?? 0, a.currency)}
+                        </p>
+                      )}
                     </div>
                   </div>
                 );
