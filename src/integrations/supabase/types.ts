@@ -25,6 +25,7 @@ export type Database = {
           created_at: string
           ctr: number | null
           daily_budget: number | null
+          destination_type: string | null
           end_time: string | null
           engagements: number
           followers: number
@@ -62,6 +63,7 @@ export type Database = {
           created_at?: string
           ctr?: number | null
           daily_budget?: number | null
+          destination_type?: string | null
           end_time?: string | null
           engagements?: number
           followers?: number
@@ -99,6 +101,7 @@ export type Database = {
           created_at?: string
           ctr?: number | null
           daily_budget?: number | null
+          destination_type?: string | null
           end_time?: string | null
           engagements?: number
           followers?: number
@@ -179,6 +182,7 @@ export type Database = {
           created_at: string
           ctr: number | null
           date_preset: string | null
+          destination_type: string | null
           engagements: number
           followers: number
           frequency: number | null
@@ -218,6 +222,7 @@ export type Database = {
           created_at?: string
           ctr?: number | null
           date_preset?: string | null
+          destination_type?: string | null
           engagements?: number
           followers?: number
           frequency?: number | null
@@ -257,6 +262,7 @@ export type Database = {
           created_at?: string
           ctr?: number | null
           date_preset?: string | null
+          destination_type?: string | null
           engagements?: number
           followers?: number
           frequency?: number | null
