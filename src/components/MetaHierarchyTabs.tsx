@@ -684,7 +684,7 @@ export default function MetaHierarchyTabs({
                             </div>
                           </button>
                         </td>
-                        {renderMetricsCells(ins, objectiveFor(a.campaign_id), a.optimization_goal || optGoalForCampaign(a.campaign_id), destTypeForCampaign(a.campaign_id))}
+                        {renderMetricsCells(ins, objectiveFor(a.campaign_id), adsetsExtraCols, a.optimization_goal || optGoalForCampaign(a.campaign_id), destTypeForCampaign(a.campaign_id))}
                         <td className="px-3 py-2 w-0"></td>
                         <td className="px-2 py-2 text-right">
                           <EntityActionsMenu
