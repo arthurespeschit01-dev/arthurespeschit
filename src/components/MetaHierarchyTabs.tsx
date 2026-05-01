@@ -159,8 +159,10 @@ export default function MetaHierarchyTabs({
     setLoadingCreatives(false);
   }, [campaigns]);
 
-  useEffect(() => { if (level === 'adsets') loadAllAdsets(); }, [level, loadAllAdsets]);
-  useEffect(() => { if (level === 'ads') loadAllCreatives(); }, [level, loadAllCreatives]);
+  // Carrega conjuntos e criativos imediatamente quando há campanhas Meta,
+  // para que apareçam ao trocar de aba sem precisar clicar em "Importar".
+  useEffect(() => { loadAllAdsets(); }, [loadAllAdsets]);
+  useEffect(() => { loadAllCreatives(); }, [loadAllCreatives]);
 
   // Reseta sort ao trocar de nível para o default desse nível
   useEffect(() => {
