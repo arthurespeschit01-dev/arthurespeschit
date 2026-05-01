@@ -134,7 +134,7 @@ Deno.serve(async (req) => {
         const adAccountId = String(c.selected_ad_account_id).startsWith('act_')
           ? c.selected_ad_account_id
           : `act_${c.selected_ad_account_id}`;
-        const url = `${GRAPH}/${adAccountId}?fields=name,currency,balance,spend_cap,amount_spent,funding_source_details,account_status&access_token=${c.access_token}`;
+        const url = `${GRAPH}/${adAccountId}?fields=name,currency,balance,spend_cap,amount_spent,funding_source_details,account_status,business&access_token=${c.access_token}`;
         const r = await fetch(url);
         const j = await r.json();
         if (!r.ok) {
