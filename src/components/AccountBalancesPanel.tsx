@@ -298,6 +298,13 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
           )}
         </div>
       )}
+
+      <AccountBalanceActionDialog
+        open={!!actionAccount}
+        onOpenChange={(v) => { if (!v) { setActionAccount(null); setActionStatus(null); } }}
+        account={actionAccount}
+        status={actionStatus}
+      />
     </div>
   );
 }
