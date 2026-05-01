@@ -98,23 +98,39 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
     await loadConnection();
     setSelecting(null);
 
-    // Importação automática de campanhas
+    // Importação automática inicial: campanhas → conjuntos + criativos (em paralelo)
     setImporting(true);
-    toast.loading('Carregando campanhas da Meta...', { id: 'meta-import' });
+    setImportStartedAt(Date.now());
+    setImportStep('campaigns');
+    toast.loading('Etapa 1/2 — Carregando campanhas da Meta...', { id: 'meta-import' });
     const { data: imp, error: impErr } = await supabase.functions.invoke('meta-import-campaigns', {
       body: { client_id: clientId },
     });
     if (impErr || imp?.error) {
       setImporting(false);
+      setImportStep('idle');
+      setImportStartedAt(null);
       toast.error('Falha ao importar campanhas', { id: 'meta-import' });
       return;
     }
-    toast.loading('Carregando criativos da Meta...', { id: 'meta-import' });
-    const { data: cre } = await supabase.functions.invoke('meta-import-creatives', {
-      body: { client_id: clientId },
-    });
+    setImportStep('children');
+    toast.loading(
+      `Etapa 2/2 — ${imp?.imported ?? 0} campanhas ok. Carregando conjuntos e criativos...`,
+      { id: 'meta-import' }
+    );
+    const [adsetsRes, creativesRes] = await Promise.allSettled([
+      supabase.functions.invoke('meta-import-adsets', { body: { client_id: clientId } }),
+      supabase.functions.invoke('meta-import-creatives', { body: { client_id: clientId } }),
+    ]);
+    const adsetsCount = adsetsRes.status === 'fulfilled' ? (adsetsRes.value.data?.imported ?? 0) : 0;
+    const creativesCount = creativesRes.status === 'fulfilled' ? (creativesRes.value.data?.imported ?? 0) : 0;
     setImporting(false);
-    toast.success(`${imp?.imported ?? 0} campanhas e ${cre?.imported ?? 0} criativos importados`, { id: 'meta-import' });
+    setImportStep('idle');
+    setImportStartedAt(null);
+    toast.success(
+      `${imp?.imported ?? 0} campanhas, ${adsetsCount} conjuntos e ${creativesCount} criativos importados`,
+      { id: 'meta-import' }
+    );
     onCampaignsImported?.();
   };
 
