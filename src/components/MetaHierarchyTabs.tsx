@@ -164,6 +164,16 @@ export default function MetaHierarchyTabs({
 
   const [sort, setSort] = useState<SortState>({ key: 'spend', dir: 'desc' });
 
+  // Quick Edit dialog
+  const [quickEditAdset, setQuickEditAdset] = useState<AdSet | null>(null);
+  const COLS_STORAGE_KEY = `meta-hidden-cols:${clientId}`;
+  const [hiddenColKeys, setHiddenColKeys] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem(COLS_STORAGE_KEY) || '[]'); } catch { return []; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(COLS_STORAGE_KEY, JSON.stringify(hiddenColKeys)); } catch {}
+  }, [hiddenColKeys, COLS_STORAGE_KEY]);
+
   const loadAllAdsets = useCallback(async () => {
     const metaCampIds = campaigns.filter(c => c.source === 'meta').map(c => c.id);
     if (metaCampIds.length === 0) { setAdsets([]); return; }
