@@ -33,7 +33,10 @@ export default function AccountBalanceActionDialog({ open, onOpenChange, account
   const balance = account.available_balance ?? account.balance ?? 0;
 
   const adsManagerUrl = `https://www.facebook.com/adsmanager/manage/campaigns?act=${accId}`;
-  const billingUrl = `https://business.facebook.com/billing_hub/payment_settings?asset_id=${accId}`;
+  // URL do Ads Manager com âncora de billing — redireciona para a central de
+  // cobrança correta de qualquer conta (com ou sem business portfolio),
+  // evitando o ERR_BLOCKED_BY_RESPONSE do billing_hub direto.
+  const billingUrl = `https://adsmanager.facebook.com/adsmanager/manage/accounts?act=${accId}&nav_entry_point=lfb_billing&nav_source=billing`;
 
   const Icon = isEmpty ? XCircle : AlertTriangle;
   const headerColor = isEmpty
