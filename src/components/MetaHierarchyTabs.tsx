@@ -428,10 +428,10 @@ export default function MetaHierarchyTabs({
     await loadAllCreatives();
   };
 
-  // Header de métricas: fixas + extras dinâmicas (uma coluna por métrica)
+  // Header de métricas: colunas escolhidas pelo usuário + extras detectadas pelo objetivo
   const renderMetricsHeader = (extraCols: string[]) => (
     <>
-      {FIXED_METRIC_COLS.map(col => (
+      {selectedFixedCols.map(col => (
         <th key={col.key} className="px-3 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">
           <SortHeader
             label={col.label}
@@ -450,7 +450,7 @@ export default function MetaHierarchyTabs({
     </>
   );
 
-  // Renderiza células de métricas: fixas + uma coluna para cada extra dinâmica
+  // Renderiza células: colunas fixas escolhidas + extras detectadas
   const renderMetricsCells = (
     ins: CampaignInsights,
     objective: string,
@@ -462,11 +462,11 @@ export default function MetaHierarchyTabs({
     const extrasMap = new Map(dynamicCells.map(c => [c.label, c]));
     return (
       <>
-        {FIXED_METRIC_COLS.map(col => {
-          const v = (ins as any)[col.key] || 0;
+        {selectedFixedCols.map(col => {
+          const v = Number((ins as any)[col.key]) || 0;
           return (
             <td key={col.key} className="px-3 py-2 text-right tabular-nums whitespace-nowrap text-foreground">
-              {v > 0 ? col.fmt(v) : <span className="text-muted-foreground/40">—</span>}
+              {v > 0 ? formatMetric(col.key, v) : <span className="text-muted-foreground/40">—</span>}
             </td>
           );
         })}
