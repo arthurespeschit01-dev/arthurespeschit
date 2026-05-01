@@ -564,6 +564,17 @@ export default function MetaHierarchyTabs({
         {/* Espaço de separação entre grupos */}
         <div className="flex gap-2 items-center flex-wrap ml-6">
           <DateRangePicker value={dateRange} onChange={onDateRangeChange} />
+          {/* Personalizar colunas — sempre visível em todos os níveis */}
+          <Button
+            onClick={() => setColumnsDialogOpen(true)}
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            title="Escolher quais métricas aparecem nas tabelas"
+          >
+            <SlidersHorizontal className="w-3 h-3" /> Personalizar colunas
+            <span className="ml-1 text-[10px] text-muted-foreground">({visibleColumnKeys.length})</span>
+          </Button>
           {level === 'campaigns' && (
             <Button onClick={onExportPDF} variant="outline" size="sm" className="gap-2">
               <FileText className="w-3 h-3" /> Exportar PDF
