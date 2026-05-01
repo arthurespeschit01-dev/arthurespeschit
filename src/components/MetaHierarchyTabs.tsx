@@ -466,6 +466,7 @@ export default function MetaHierarchyTabs({
   };
 
   return (
+    <>
     <div className="space-y-4">
       {/* Barra de abas hierárquicas estilo Meta */}
       <div className="glass-surface rounded-xl p-2 flex items-center gap-1 overflow-x-auto">
