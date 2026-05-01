@@ -9,6 +9,7 @@ import {
 import { toast } from 'sonner';
 import EntityActionsMenu from '@/components/EntityActionsMenu';
 import EntityStatusToggle from '@/components/EntityStatusToggle';
+import QuickEditDialog from '@/components/QuickEditDialog';
 import { DateRangePicker, type DateRangeValue } from '@/components/DateRangePicker';
 import { metricsForObjective, type CampaignInsights } from '@/lib/campaignMetrics';
 
@@ -162,6 +163,16 @@ export default function MetaHierarchyTabs({
   const [importingAds, setImportingAds] = useState(false);
 
   const [sort, setSort] = useState<SortState>({ key: 'spend', dir: 'desc' });
+
+  // Quick Edit dialog
+  const [quickEditAdset, setQuickEditAdset] = useState<AdSet | null>(null);
+  const COLS_STORAGE_KEY = `meta-hidden-cols:${clientId}`;
+  const [hiddenColKeys, setHiddenColKeys] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem(COLS_STORAGE_KEY) || '[]'); } catch { return []; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(COLS_STORAGE_KEY, JSON.stringify(hiddenColKeys)); } catch {}
+  }, [hiddenColKeys, COLS_STORAGE_KEY]);
 
   const loadAllAdsets = useCallback(async () => {
     const metaCampIds = campaigns.filter(c => c.source === 'meta').map(c => c.id);
@@ -455,6 +466,7 @@ export default function MetaHierarchyTabs({
   };
 
   return (
+    <>
     <div className="space-y-4">
       {/* Barra de abas hierárquicas estilo Meta */}
       <div className="glass-surface rounded-xl p-2 flex items-center gap-1 overflow-x-auto">
@@ -687,11 +699,23 @@ export default function MetaHierarchyTabs({
                         {renderMetricsCells(ins, objectiveFor(a.campaign_id), adsetsExtraCols, a.optimization_goal || optGoalForCampaign(a.campaign_id), destTypeForCampaign(a.campaign_id))}
                         <td className="px-3 py-2 w-0"></td>
                         <td className="px-2 py-2 text-right">
-                          <EntityActionsMenu
-                            clientId={clientId} entityType="adset"
-                            metaId={a.meta_adset_id} status={a.status}
-                            onChanged={() => loadAllAdsets()}
-                          />
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => setQuickEditAdset(a)}
+                              disabled={!a.meta_adset_id}
+                              title={a.meta_adset_id ? 'Edição rápida' : 'Disponível só para conjuntos importados da Meta'}
+                            >
+                              <Edit2 className="w-3 h-3 mr-1" /> Editar
+                            </Button>
+                            <EntityActionsMenu
+                              clientId={clientId} entityType="adset"
+                              metaId={a.meta_adset_id} status={a.status}
+                              onChanged={() => loadAllAdsets()}
+                            />
+                          </div>
                         </td>
                       </tr>
                     );
@@ -791,5 +815,58 @@ export default function MetaHierarchyTabs({
         </div>
       )}
     </div>
+    {quickEditAdset && (
+      <QuickEditDialog
+        open={!!quickEditAdset}
+        onClose={() => setQuickEditAdset(null)}
+        clientId={clientId}
+        adset={{
+          id: quickEditAdset.id,
+          name: quickEditAdset.name,
+          meta_adset_id: quickEditAdset.meta_adset_id,
+          status: quickEditAdset.status,
+          daily_budget: quickEditAdset.daily_budget,
+          lifetime_budget: quickEditAdset.lifetime_budget,
+          optimization_goal: quickEditAdset.optimization_goal,
+        }}
+        creatives={creatives
+          .filter(cr => cr.meta_adset_id && cr.meta_adset_id === quickEditAdset.meta_adset_id)
+          .map(cr => ({
+            id: cr.id,
+            name: cr.name,
+            meta_ad_id: cr.meta_ad_id,
+            meta_adset_id: cr.meta_adset_id,
+            thumbnail_url: cr.thumbnail_url,
+            body: cr.body,
+            title: cr.title,
+          }))}
+        metricColumns={[
+          { key: 'spend', label: 'Gasto' },
+          { key: 'reach', label: 'Alcance' },
+          { key: 'impressions', label: 'Impressões' },
+          { key: 'cpm', label: 'CPM' },
+          { key: 'frequency', label: 'Frequência' },
+          { key: 'ctr', label: 'CTR' },
+          { key: 'cpc', label: 'CPC' },
+          { key: 'leads', label: 'Leads' },
+          { key: 'cpa', label: 'CPA' },
+          { key: 'roas', label: 'ROAS' },
+          { key: 'purchases', label: 'Compras' },
+          { key: 'revenue', label: 'Receita' },
+          { key: 'messages', label: 'Mensagens' },
+          { key: 'link_clicks', label: 'Cliques no link' },
+        ]}
+        visibleColumnKeys={['spend','reach','impressions','cpm','frequency'].concat(
+          ['ctr','cpc','leads','cpa','roas','purchases','revenue','messages','link_clicks']
+            .filter(k => !hiddenColKeys.includes(k))
+        )}
+        onColumnsChange={(keys) => {
+          const all = ['ctr','cpc','leads','cpa','roas','purchases','revenue','messages','link_clicks'];
+          setHiddenColKeys(all.filter(k => !keys.includes(k)));
+        }}
+        onChanged={() => { loadAllAdsets(); loadAllCreatives(); }}
+      />
+    )}
+    </>
   );
 }
