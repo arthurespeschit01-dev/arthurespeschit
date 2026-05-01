@@ -344,8 +344,32 @@ export default function MetaHierarchyTabs({
     await loadAllCreatives();
   };
 
-  // Header de métricas reutilizável
-  const renderMetricsHeader = () => (
+  // Calcula a união ordenada de métricas extras (não-fixas) presentes em um conjunto de linhas.
+  // Mantém a ordem da primeira aparição para que o header e as células fiquem consistentes.
+  const computeExtraColumns = (
+    rows: { item: { objective?: string; optimization_goal?: string | null; destination_type?: string | null; campaign_id?: string }; ins: CampaignInsights }[],
+    objectiveResolver?: (campaignId: string) => string,
+    optGoalResolver?: (item: any) => string,
+    destResolver?: (item: any) => string,
+  ): string[] => {
+    const fixedKeys = new Set<string>(FIXED_METRIC_COLS.map(c => c.label));
+    const ordered: string[] = [];
+    const seen = new Set<string>();
+    for (const { item, ins } of rows) {
+      const obj = (item as any).objective || (objectiveResolver && (item as any).campaign_id ? objectiveResolver((item as any).campaign_id) : '');
+      const og = optGoalResolver ? optGoalResolver(item) : ((item as any).optimization_goal || '');
+      const dt = destResolver ? destResolver(item) : ((item as any).destination_type || '');
+      const cells = metricsForObjective(obj, ins, og, dt);
+      for (const c of cells) {
+        if (fixedKeys.has(c.label)) continue;
+        if (!seen.has(c.label)) { seen.add(c.label); ordered.push(c.label); }
+      }
+    }
+    return ordered;
+  };
+
+  // Header de métricas: fixas + extras dinâmicas (uma coluna por métrica)
+  const renderMetricsHeader = (extraCols: string[]) => (
     <>
       {FIXED_METRIC_COLS.map(col => (
         <th key={col.key} className="px-3 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">
@@ -358,15 +382,24 @@ export default function MetaHierarchyTabs({
           />
         </th>
       ))}
+      {extraCols.map(label => (
+        <th key={label} className="px-3 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">
+          {label}
+        </th>
+      ))}
     </>
   );
 
-  // Renderiza células de métricas fixas + extras dinâmicas baseadas em objective + destination_type (fonte da verdade Meta)
-  const renderMetricsCells = (ins: CampaignInsights, objective: string, optimizationGoal?: string, destinationType?: string) => {
+  // Renderiza células de métricas: fixas + uma coluna para cada extra dinâmica
+  const renderMetricsCells = (
+    ins: CampaignInsights,
+    objective: string,
+    extraCols: string[],
+    optimizationGoal?: string,
+    destinationType?: string,
+  ) => {
     const dynamicCells = metricsForObjective(objective, ins, optimizationGoal, destinationType);
-    // mostra extras (que não já estão no fixo)
-    const fixedKeys = new Set<string>(FIXED_METRIC_COLS.map(c => c.label));
-    const extras = dynamicCells.filter(c => !fixedKeys.has(c.label));
+    const extrasMap = new Map(dynamicCells.map(c => [c.label, c]));
     return (
       <>
         {FIXED_METRIC_COLS.map(col => {
@@ -377,18 +410,22 @@ export default function MetaHierarchyTabs({
             </td>
           );
         })}
-        {extras.length > 0 && (
-          <td className="px-3 py-2 whitespace-nowrap align-middle">
-            <div className="flex justify-end gap-4 text-[11px]">
-              {extras.map((m, i) => (
-                <div key={i} className="text-right min-w-[70px] flex flex-col justify-center">
-                  <div className="text-muted-foreground leading-tight">{m.label}</div>
-                  <div className={`font-semibold tabular-nums leading-tight ${m.highlight ? 'text-primary' : 'text-foreground'}`}>{m.value}</div>
-                </div>
-              ))}
-            </div>
-          </td>
-        )}
+        {extraCols.map(label => {
+          const m = extrasMap.get(label);
+          if (!m) {
+            return (
+              <td key={label} className="px-3 py-2 text-right tabular-nums whitespace-nowrap text-muted-foreground/40">—</td>
+            );
+          }
+          return (
+            <td
+              key={label}
+              className={`px-3 py-2 text-right tabular-nums whitespace-nowrap ${m.highlight ? 'text-primary font-semibold' : 'text-foreground'}`}
+            >
+              {m.value}
+            </td>
+          );
+        })}
       </>
     );
   };
