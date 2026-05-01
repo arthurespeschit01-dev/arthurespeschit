@@ -310,6 +310,30 @@ export default function MetaHierarchyTabs({
     return sortRows(rows);
   }, [filteredAds, sort]);
 
+  // Colunas extras (não-fixas) presentes em cada nível — calculadas a partir das linhas visíveis
+  const campaignsExtraCols = useMemo(
+    () => computeExtraColumns(sortedCampaigns as any),
+    [sortedCampaigns],
+  );
+  const adsetsExtraCols = useMemo(
+    () => computeExtraColumns(
+      sortedAdsets as any,
+      (cid: string) => objectiveFor(cid),
+      (a: any) => a.optimization_goal || optGoalForCampaign(a.campaign_id),
+      (a: any) => destTypeForCampaign(a.campaign_id),
+    ),
+    [sortedAdsets, campaigns],
+  );
+  const adsExtraCols = useMemo(
+    () => computeExtraColumns(
+      sortedAds as any,
+      (cid: string) => objectiveFor(cid),
+      (cr: any) => cr.optimization_goal || optGoalForCampaign(cr.campaign_id),
+      (cr: any) => destTypeForCampaign(cr.campaign_id),
+    ),
+    [sortedAds, campaigns],
+  );
+
   // Imports por nível
   const importAdsetsForSelection = async () => {
     setImportingAdsets(true);
@@ -344,8 +368,32 @@ export default function MetaHierarchyTabs({
     await loadAllCreatives();
   };
 
-  // Header de métricas reutilizável
-  const renderMetricsHeader = () => (
+  // Calcula a união ordenada de métricas extras (não-fixas) presentes em um conjunto de linhas.
+  // Mantém a ordem da primeira aparição para que o header e as células fiquem consistentes.
+  const computeExtraColumns = (
+    rows: { item: { objective?: string; optimization_goal?: string | null; destination_type?: string | null; campaign_id?: string }; ins: CampaignInsights }[],
+    objectiveResolver?: (campaignId: string) => string,
+    optGoalResolver?: (item: any) => string,
+    destResolver?: (item: any) => string,
+  ): string[] => {
+    const fixedKeys = new Set<string>(FIXED_METRIC_COLS.map(c => c.label));
+    const ordered: string[] = [];
+    const seen = new Set<string>();
+    for (const { item, ins } of rows) {
+      const obj = (item as any).objective || (objectiveResolver && (item as any).campaign_id ? objectiveResolver((item as any).campaign_id) : '');
+      const og = optGoalResolver ? optGoalResolver(item) : ((item as any).optimization_goal || '');
+      const dt = destResolver ? destResolver(item) : ((item as any).destination_type || '');
+      const cells = metricsForObjective(obj, ins, og, dt);
+      for (const c of cells) {
+        if (fixedKeys.has(c.label)) continue;
+        if (!seen.has(c.label)) { seen.add(c.label); ordered.push(c.label); }
+      }
+    }
+    return ordered;
+  };
+
+  // Header de métricas: fixas + extras dinâmicas (uma coluna por métrica)
+  const renderMetricsHeader = (extraCols: string[]) => (
     <>
       {FIXED_METRIC_COLS.map(col => (
         <th key={col.key} className="px-3 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">
@@ -358,15 +406,24 @@ export default function MetaHierarchyTabs({
           />
         </th>
       ))}
+      {extraCols.map(label => (
+        <th key={label} className="px-3 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">
+          {label}
+        </th>
+      ))}
     </>
   );
 
-  // Renderiza células de métricas fixas + extras dinâmicas baseadas em objective + destination_type (fonte da verdade Meta)
-  const renderMetricsCells = (ins: CampaignInsights, objective: string, optimizationGoal?: string, destinationType?: string) => {
+  // Renderiza células de métricas: fixas + uma coluna para cada extra dinâmica
+  const renderMetricsCells = (
+    ins: CampaignInsights,
+    objective: string,
+    extraCols: string[],
+    optimizationGoal?: string,
+    destinationType?: string,
+  ) => {
     const dynamicCells = metricsForObjective(objective, ins, optimizationGoal, destinationType);
-    // mostra extras (que não já estão no fixo)
-    const fixedKeys = new Set<string>(FIXED_METRIC_COLS.map(c => c.label));
-    const extras = dynamicCells.filter(c => !fixedKeys.has(c.label));
+    const extrasMap = new Map(dynamicCells.map(c => [c.label, c]));
     return (
       <>
         {FIXED_METRIC_COLS.map(col => {
@@ -377,18 +434,22 @@ export default function MetaHierarchyTabs({
             </td>
           );
         })}
-        {extras.length > 0 && (
-          <td className="px-3 py-2 whitespace-nowrap align-middle">
-            <div className="flex justify-end gap-4 text-[11px]">
-              {extras.map((m, i) => (
-                <div key={i} className="text-right min-w-[70px] flex flex-col justify-center">
-                  <div className="text-muted-foreground leading-tight">{m.label}</div>
-                  <div className={`font-semibold tabular-nums leading-tight ${m.highlight ? 'text-primary' : 'text-foreground'}`}>{m.value}</div>
-                </div>
-              ))}
-            </div>
-          </td>
-        )}
+        {extraCols.map(label => {
+          const m = extrasMap.get(label);
+          if (!m) {
+            return (
+              <td key={label} className="px-3 py-2 text-right tabular-nums whitespace-nowrap text-muted-foreground/40">—</td>
+            );
+          }
+          return (
+            <td
+              key={label}
+              className={`px-3 py-2 text-right tabular-nums whitespace-nowrap ${m.highlight ? 'text-primary font-semibold' : 'text-foreground'}`}
+            >
+              {m.value}
+            </td>
+          );
+        })}
       </>
     );
   };
@@ -498,7 +559,7 @@ export default function MetaHierarchyTabs({
                   <th className="px-3 py-2 text-muted-foreground font-medium min-w-[260px]">
                     <SortHeader label="Campanha" active={sort.key === 'name'} dir={sort.dir} onClick={() => toggleSort('name')} />
                   </th>
-                  {renderMetricsHeader()}
+                  {renderMetricsHeader(campaignsExtraCols)}
                   <th className="px-3 py-2"></th>
                   <th className="px-2 py-2 w-10"></th>
                 </tr>
@@ -548,7 +609,7 @@ export default function MetaHierarchyTabs({
                           </div>
                         </button>
                       </td>
-                      {renderMetricsCells(ins, c.objective, c.optimization_goal || '', c.destination_type || '')}
+                      {renderMetricsCells(ins, c.objective, campaignsExtraCols, c.optimization_goal || '', c.destination_type || '')}
                       <td className="px-3 py-2 w-0"></td>
                       <td className="px-2 py-2 text-right">
                         {isMeta ? (
@@ -588,7 +649,7 @@ export default function MetaHierarchyTabs({
                     <th className="px-3 py-2 text-muted-foreground font-medium min-w-[260px]">
                       <SortHeader label="Conjunto" active={sort.key === 'name'} dir={sort.dir} onClick={() => toggleSort('name')} />
                     </th>
-                    {renderMetricsHeader()}
+                    {renderMetricsHeader(adsetsExtraCols)}
                     <th className="px-3 py-2"></th>
                     <th className="px-2 py-2 w-10"></th>
                   </tr>
@@ -623,7 +684,7 @@ export default function MetaHierarchyTabs({
                             </div>
                           </button>
                         </td>
-                        {renderMetricsCells(ins, objectiveFor(a.campaign_id), a.optimization_goal || optGoalForCampaign(a.campaign_id), destTypeForCampaign(a.campaign_id))}
+                        {renderMetricsCells(ins, objectiveFor(a.campaign_id), adsetsExtraCols, a.optimization_goal || optGoalForCampaign(a.campaign_id), destTypeForCampaign(a.campaign_id))}
                         <td className="px-3 py-2 w-0"></td>
                         <td className="px-2 py-2 text-right">
                           <EntityActionsMenu
@@ -656,7 +717,7 @@ export default function MetaHierarchyTabs({
                     <th className="px-3 py-2 text-muted-foreground font-medium min-w-[280px]">
                       <SortHeader label="Anúncio" active={sort.key === 'name'} dir={sort.dir} onClick={() => toggleSort('name')} />
                     </th>
-                    {renderMetricsHeader()}
+                    {renderMetricsHeader(adsExtraCols)}
                     <th className="px-3 py-2"></th>
                     <th className="px-2 py-2 w-10"></th>
                   </tr>
@@ -704,7 +765,7 @@ export default function MetaHierarchyTabs({
                             </button>
                           </div>
                         </td>
-                        {renderMetricsCells(ins, objectiveFor(cr.campaign_id), cr.optimization_goal || optGoalForCampaign(cr.campaign_id), destTypeForCampaign(cr.campaign_id))}
+                        {renderMetricsCells(ins, objectiveFor(cr.campaign_id), adsExtraCols, cr.optimization_goal || optGoalForCampaign(cr.campaign_id), destTypeForCampaign(cr.campaign_id))}
                         <td className="px-3 py-2 w-0"></td>
                         <td className="px-2 py-2 text-right">
                           {isMeta ? (
