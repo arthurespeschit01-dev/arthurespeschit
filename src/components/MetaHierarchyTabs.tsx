@@ -9,6 +9,7 @@ import {
 import { toast } from 'sonner';
 import EntityActionsMenu from '@/components/EntityActionsMenu';
 import EntityStatusToggle from '@/components/EntityStatusToggle';
+import QuickEditDialog from '@/components/QuickEditDialog';
 import { DateRangePicker, type DateRangeValue } from '@/components/DateRangePicker';
 import { metricsForObjective, type CampaignInsights } from '@/lib/campaignMetrics';
 
