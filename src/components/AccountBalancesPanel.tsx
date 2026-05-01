@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import AccountBalanceActionDialog from './AccountBalanceActionDialog';
 
 export interface AccountBalance {
   client_id: string;
@@ -92,6 +93,8 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
   const [loading, setLoading] = useState(false);
   const [accounts, setAccounts] = useState<AccountBalance[]>(initialAccounts || []);
   const [hasLoaded, setHasLoaded] = useState(!!initialAccounts?.length);
+  const [actionAccount, setActionAccount] = useState<AccountBalance | null>(null);
+  const [actionStatus, setActionStatus] = useState<BalanceStatus | null>(null);
 
   useEffect(() => {
     if (initialAccounts && initialAccounts.length) {
@@ -234,8 +237,21 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
                 const cfg = STATUS_CONFIG[st];
                 const Icon = cfg.icon;
                 const errMsg = a.error || a.account_status_label;
+                const clickable = st === 'low' || st === 'empty';
                 return (
-                  <div key={a.account_id} className={`flex items-center justify-between gap-3 p-3 rounded-lg border ${cfg.color}`}>
+                  <div
+                    key={a.account_id}
+                    role={clickable ? 'button' : undefined}
+                    tabIndex={clickable ? 0 : undefined}
+                    onClick={clickable ? () => { setActionAccount(a); setActionStatus(st); } : undefined}
+                    onKeyDown={clickable ? (e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setActionAccount(a); setActionStatus(st);
+                      }
+                    } : undefined}
+                    className={`flex items-center justify-between gap-3 p-3 rounded-lg border ${cfg.color} ${clickable ? 'cursor-pointer hover:brightness-110 transition-all focus:outline-none focus:ring-2 focus:ring-ring' : ''}`}
+                  >
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${cfg.dot}`} />
                       <div className="min-w-0">
@@ -282,6 +298,13 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
           )}
         </div>
       )}
+
+      <AccountBalanceActionDialog
+        open={!!actionAccount}
+        onOpenChange={(v) => { if (!v) { setActionAccount(null); setActionStatus(null); } }}
+        account={actionAccount}
+        status={actionStatus}
+      />
     </div>
   );
 }
