@@ -1,52 +1,44 @@
-## Problema
+Vou corrigir o botão “Ir para Pagamentos” para replicar o link que funcionou e evitar o caminho que está gerando `ERR_BLOCKED_BY_RESPONSE`.
 
-O botão "Ir para Pagamentos" às vezes abre uma tela genérica do Billing Hub em vez de abrir direto a página de cobrança da conta de anúncio do cliente que está sendo visualizado.
+O problema mais provável é este: para essa mesma conta, o link que funcionou tinha `business_id`, `payment_account_id_from_jsmodule`, `payment_account_id` e `entrypoint`. Agora o navegador caiu em `/latest/billing_hub/payment_settings/?asset_id=...`, que é o fallback sem `business_id`. Ou seja, em algumas contas o sistema não está recebendo/enviando o `business_id`, então ele monta um link incompleto.
 
-A URL canônica da Meta (que comprovadamente funciona) tem este formato:
+Plano de correção:
 
+1. Ajustar a busca dos saldos/contas
+   - Na função que carrega as contas Meta, também buscar `account_ids` do cliente.
+   - Usar como `business_id` principal o retorno da Meta (`business.id`).
+   - Se a Meta não retornar `business.id`, usar o campo “BM (Business Manager)” salvo no cadastro do cliente (`account_ids.bm`) como fallback.
+   - Sanitizar o ID para remover caracteres que não sejam números.
+
+2. Replicar exatamente o formato do link que funcionou
+   - Para contas com `business_id`, montar:
+
+```text
+https://business.facebook.com/billing_hub/accounts/details/?placement=ads_manager&asset_id=CONTA&business_id=BM&payment_account_id_from_jsmodule=CONTA&payment_account_id=CONTA&entrypoint=ads_ecosystem_navigation_ads_billing_tool_plugin
 ```
-https://business.facebook.com/billing_hub/accounts/details/
-  ?placement=ads_manager
-  &asset_id={ID_DA_CONTA}
-  &business_id={ID_DO_BUSINESS}
-  &payment_account_id_from_jsmodule={ID_DA_CONTA}
-  &payment_account_id={ID_DA_CONTA}
-  &entrypoint=ads_ecosystem_navigation_ads_billing_tool_plugin
+
+   - Manter `asset_id`, `payment_account_id_from_jsmodule` e `payment_account_id` sempre com o ID da conta sem `act_`.
+
+3. Remover o fallback problemático
+   - Não usar mais diretamente:
+
+```text
+business.facebook.com/billing_hub/payment_settings?asset_id=...
 ```
 
-Hoje o sistema só envia `asset_id`, `business_id` e `placement`, faltando os parâmetros `payment_account_id*` e `entrypoint`, que são o que ancoram a navegação na conta certa.
+   - Esse é o caminho que aparece no print com erro.
+   - Quando não houver BM disponível, o fallback será o Gerenciador de Anúncios na área de cobrança:
 
-## Correção
+```text
+https://adsmanager.facebook.com/adsmanager/manage/billing?act=CONTA
+```
 
-Atualizar a construção da URL em `src/components/AccountBalanceActionDialog.tsx` para usar o formato canônico completo, sempre derivado dos dados do cliente atualmente selecionado no popup (`accId` e `account.business_id`):
+4. Melhorar a segurança contra dados incompletos
+   - Se a conta não tiver `business_id`, ainda abrir uma tela útil de cobrança pelo Ads Manager, em vez de abrir uma página bloqueada.
+   - Isso garante que todos os clientes tenham comportamento consistente: abrir cobrança/pagamentos da conta correta quando houver BM e abrir cobrança no Gerenciador quando não houver.
 
-1. **Quando a conta tem `business_id`** (caso da maioria — Business Portfolio):
-   ```
-   https://business.facebook.com/billing_hub/accounts/details/
-     ?placement=ads_manager
-     &asset_id={accId}
-     &business_id={business_id}
-     &payment_account_id={accId}
-     &payment_account_id_from_jsmodule={accId}
-     &entrypoint=ads_ecosystem_navigation_ads_billing_tool_plugin
-   ```
-   → Abre direto a página de cobrança da conta do cliente.
+Arquivos a alterar:
 
-2. **Fallback (sem `business_id`** — conta pessoal sem Business):
-   ```
-   https://business.facebook.com/billing_hub/payment_settings?asset_id={accId}
-   ```
-   → Billing Hub aceita `asset_id` sem `business_id` para contas pessoais.
-
-3. Garantir que a URL é reconstruída a cada abertura do dialog (já é, pois `accId` e `account.business_id` vêm do `account` passado por prop — cada cliente clicado gera sua própria URL).
-
-## Detalhes técnicos
-
-- **Arquivo único alterado:** `src/components/AccountBalanceActionDialog.tsx` (linhas 39-41) — substituir o cálculo de `billingUrl`.
-- Usar `encodeURIComponent` nos valores por segurança (apesar de IDs serem numéricos).
-- Nenhuma mudança em edge function, schema ou outros componentes — `business_id` já é retornado por `meta-account-balances` e propagado via `AccountBalance.business_id`.
-- O botão "Abrir Gerenciador de Anúncios" continua igual (já funciona corretamente por cliente via `act={accId}`).
-
-## Resultado esperado
-
-Ao clicar em qualquer cliente com saldo baixo/sem saldo e depois em "Ir para Pagamentos", o Meta abre **direto na página de cobrança específica daquele cliente**, exatamente como o link que você colou manualmente — sem cair em tela genérica.
+- `supabase/functions/meta-account-balances/index.ts`
+- `src/components/AccountBalanceActionDialog.tsx`
+- Se necessário, apenas ajuste de tipo em `src/components/AccountBalancesPanel.tsx` já que `business_id` já existe na interface.
