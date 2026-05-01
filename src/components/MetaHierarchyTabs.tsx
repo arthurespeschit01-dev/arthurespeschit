@@ -170,13 +170,31 @@ export default function MetaHierarchyTabs({
 
   // Quick Edit dialog
   const [quickEditAdset, setQuickEditAdset] = useState<AdSet | null>(null);
-  const COLS_STORAGE_KEY = `meta-hidden-cols:${clientId}`;
-  const [hiddenColKeys, setHiddenColKeys] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem(COLS_STORAGE_KEY) || '[]'); } catch { return []; }
+
+  // Personalização de colunas (compartilhada entre Campanhas, Conjuntos e Anúncios).
+  // Persistida por cliente em localStorage.
+  const COLS_STORAGE_KEY = `meta-visible-cols:${clientId}`;
+  const [visibleColumnKeys, setVisibleColumnKeys] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem(COLS_STORAGE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch { /* ignore */ }
+    return [...DEFAULT_VISIBLE_COLUMNS];
   });
   useEffect(() => {
-    try { localStorage.setItem(COLS_STORAGE_KEY, JSON.stringify(hiddenColKeys)); } catch {}
-  }, [hiddenColKeys, COLS_STORAGE_KEY]);
+    try { localStorage.setItem(COLS_STORAGE_KEY, JSON.stringify(visibleColumnKeys)); } catch { /* ignore */ }
+  }, [visibleColumnKeys, COLS_STORAGE_KEY]);
+  const [columnsDialogOpen, setColumnsDialogOpen] = useState(false);
+
+  // Colunas fixas selecionadas pelo usuário (preserva ordem do catálogo) — vão sempre aparecer no header.
+  const selectedFixedCols = useMemo(
+    () => ALL_METRIC_COLUMNS.filter(c => visibleColumnKeys.includes(c.key)),
+    [visibleColumnKeys],
+  );
+  const selectedFixedLabels = useMemo(
+    () => new Set(selectedFixedCols.map(c => c.label)),
+    [selectedFixedCols],
+  );
 
   const loadAllAdsets = useCallback(async () => {
     const metaCampIds = campaigns.filter(c => c.source === 'meta').map(c => c.id);
