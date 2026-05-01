@@ -117,6 +117,30 @@ function SortHeader({ label, active, dir, onClick, align = 'left' }: {
   );
 }
 
+// Calcula a união ordenada de métricas extras (não-fixas) presentes em um conjunto de linhas.
+// Mantém a ordem da primeira aparição para que o header e as células fiquem consistentes.
+function computeExtraColumns(
+  rows: { item: { objective?: string; optimization_goal?: string | null; destination_type?: string | null; campaign_id?: string }; ins: CampaignInsights }[],
+  objectiveResolver?: (campaignId: string) => string,
+  optGoalResolver?: (item: any) => string,
+  destResolver?: (item: any) => string,
+): string[] {
+  const fixedKeys = new Set<string>(FIXED_METRIC_COLS.map(c => c.label));
+  const ordered: string[] = [];
+  const seen = new Set<string>();
+  for (const { item, ins } of rows) {
+    const obj = (item as any).objective || (objectiveResolver && (item as any).campaign_id ? objectiveResolver((item as any).campaign_id) : '');
+    const og = optGoalResolver ? optGoalResolver(item) : ((item as any).optimization_goal || '');
+    const dt = destResolver ? destResolver(item) : ((item as any).destination_type || '');
+    const cells = metricsForObjective(obj, ins, og, dt);
+    for (const c of cells) {
+      if (fixedKeys.has(c.label)) continue;
+      if (!seen.has(c.label)) { seen.add(c.label); ordered.push(c.label); }
+    }
+  }
+  return ordered;
+}
+
 export default function MetaHierarchyTabs({
   clientId, campaigns, insightsByCamp, loadingInsights,
   dateRange, onDateRangeChange,
@@ -366,30 +390,6 @@ export default function MetaHierarchyTabs({
     if (error || data?.error) { toast.error('Falha ao importar anúncios', { id: 'imp-ads' }); return; }
     toast.success(`${data?.imported ?? 0} anúncios importados`, { id: 'imp-ads' });
     await loadAllCreatives();
-  };
-
-  // Calcula a união ordenada de métricas extras (não-fixas) presentes em um conjunto de linhas.
-  // Mantém a ordem da primeira aparição para que o header e as células fiquem consistentes.
-  const computeExtraColumns = (
-    rows: { item: { objective?: string; optimization_goal?: string | null; destination_type?: string | null; campaign_id?: string }; ins: CampaignInsights }[],
-    objectiveResolver?: (campaignId: string) => string,
-    optGoalResolver?: (item: any) => string,
-    destResolver?: (item: any) => string,
-  ): string[] => {
-    const fixedKeys = new Set<string>(FIXED_METRIC_COLS.map(c => c.label));
-    const ordered: string[] = [];
-    const seen = new Set<string>();
-    for (const { item, ins } of rows) {
-      const obj = (item as any).objective || (objectiveResolver && (item as any).campaign_id ? objectiveResolver((item as any).campaign_id) : '');
-      const og = optGoalResolver ? optGoalResolver(item) : ((item as any).optimization_goal || '');
-      const dt = destResolver ? destResolver(item) : ((item as any).destination_type || '');
-      const cells = metricsForObjective(obj, ins, og, dt);
-      for (const c of cells) {
-        if (fixedKeys.has(c.label)) continue;
-        if (!seen.has(c.label)) { seen.add(c.label); ordered.push(c.label); }
-      }
-    }
-    return ordered;
   };
 
   // Header de métricas: fixas + extras dinâmicas (uma coluna por métrica)
