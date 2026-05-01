@@ -121,15 +121,16 @@ function SortHeader({ label, active, dir, onClick, align = 'left' }: {
   );
 }
 
-// Calcula a união ordenada de métricas extras (não-fixas) presentes em um conjunto de linhas.
-// Mantém a ordem da primeira aparição para que o header e as células fiquem consistentes.
+// Calcula a união ordenada de métricas extras (não cobertas por colunas fixas selecionadas)
+// detectadas dinamicamente a partir do objetivo de cada linha.
+// `visibleLabelSet` evita duplicar uma coluna que já vai aparecer pela seleção fixa do usuário.
 function computeExtraColumns(
   rows: { item: { objective?: string; optimization_goal?: string | null; destination_type?: string | null; campaign_id?: string }; ins: CampaignInsights }[],
+  visibleLabelSet: Set<string>,
   objectiveResolver?: (campaignId: string) => string,
   optGoalResolver?: (item: any) => string,
   destResolver?: (item: any) => string,
 ): string[] {
-  const fixedKeys = new Set<string>(FIXED_METRIC_COLS.map(c => c.label));
   const ordered: string[] = [];
   const seen = new Set<string>();
   for (const { item, ins } of rows) {
@@ -138,7 +139,7 @@ function computeExtraColumns(
     const dt = destResolver ? destResolver(item) : ((item as any).destination_type || '');
     const cells = metricsForObjective(obj, ins, og, dt);
     for (const c of cells) {
-      if (fixedKeys.has(c.label)) continue;
+      if (visibleLabelSet.has(c.label)) continue;
       if (!seen.has(c.label)) { seen.add(c.label); ordered.push(c.label); }
     }
   }
