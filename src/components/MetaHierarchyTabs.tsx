@@ -376,12 +376,12 @@ export default function MetaHierarchyTabs({
           );
         })}
         {extras.length > 0 && (
-          <td className="px-3 py-2 whitespace-nowrap">
-            <div className="flex gap-3 text-[11px]">
+          <td className="px-3 py-2 whitespace-nowrap align-middle">
+            <div className="flex justify-end gap-4 text-[11px]">
               {extras.map((m, i) => (
-                <div key={i} className="text-right">
-                  <div className="text-muted-foreground">{m.label}</div>
-                  <div className={`font-semibold tabular-nums ${m.highlight ? 'text-primary' : 'text-foreground'}`}>{m.value}</div>
+                <div key={i} className="text-right min-w-[70px] flex flex-col justify-center">
+                  <div className="text-muted-foreground leading-tight">{m.label}</div>
+                  <div className={`font-semibold tabular-nums leading-tight ${m.highlight ? 'text-primary' : 'text-foreground'}`}>{m.value}</div>
                 </div>
               ))}
             </div>
