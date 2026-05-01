@@ -162,6 +162,7 @@ Deno.serve(async (req) => {
           funding_label: bal.funding_label,
           account_status: accountStatus,
           balance: bal.available_balance ?? 0,
+          business_id: j.business?.id || null,
           ...(statusErr ? { account_status_label: statusErr } : {}),
         };
       } catch (e) {
