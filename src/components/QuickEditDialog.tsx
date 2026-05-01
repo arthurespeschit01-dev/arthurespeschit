@@ -52,10 +52,9 @@ const GENDER_OPTIONS = [
 ];
 
 export default function QuickEditDialog({
-  open, onClose, clientId, adset, creatives,
-  metricColumns, visibleColumnKeys, onColumnsChange, onChanged,
+  open, onClose, clientId, adset, creatives, onChanged,
 }: Props) {
-  const [tab, setTab] = useState<'columns' | 'audience' | 'creatives'>('audience');
+  const [tab, setTab] = useState<'audience' | 'creatives'>('audience');
 
   // ---------- Audience ----------
   const [loadingAdset, setLoadingAdset] = useState(false);
