@@ -310,6 +310,30 @@ export default function MetaHierarchyTabs({
     return sortRows(rows);
   }, [filteredAds, sort]);
 
+  // Colunas extras (não-fixas) presentes em cada nível — calculadas a partir das linhas visíveis
+  const campaignsExtraCols = useMemo(
+    () => computeExtraColumns(sortedCampaigns as any),
+    [sortedCampaigns],
+  );
+  const adsetsExtraCols = useMemo(
+    () => computeExtraColumns(
+      sortedAdsets as any,
+      (cid: string) => objectiveFor(cid),
+      (a: any) => a.optimization_goal || optGoalForCampaign(a.campaign_id),
+      (a: any) => destTypeForCampaign(a.campaign_id),
+    ),
+    [sortedAdsets, campaigns],
+  );
+  const adsExtraCols = useMemo(
+    () => computeExtraColumns(
+      sortedAds as any,
+      (cid: string) => objectiveFor(cid),
+      (cr: any) => cr.optimization_goal || optGoalForCampaign(cr.campaign_id),
+      (cr: any) => destTypeForCampaign(cr.campaign_id),
+    ),
+    [sortedAds, campaigns],
+  );
+
   // Imports por nível
   const importAdsetsForSelection = async () => {
     setImportingAdsets(true);
