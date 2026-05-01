@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import AccountBalanceActionDialog from './AccountBalanceActionDialog';
 
 export interface AccountBalance {
   client_id: string;
