@@ -33,12 +33,29 @@ export default function AccountBalanceActionDialog({ open, onOpenChange, account
   const balance = account.available_balance ?? account.balance ?? 0;
 
   const adsManagerUrl = `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${accId}`;
-  // URL da central de cobrança. Quando temos o business_id da conta, usamos o
-  // billing_hub canônico (que precisa dele). Sem business_id, caímos na URL
-  // do Ads Manager com âncora de billing — funciona em qualquer conta.
-  const billingUrl = account.business_id
-    ? `https://business.facebook.com/billing_hub/accounts/details/?asset_id=${accId}&business_id=${account.business_id}&placement=ads_manager`
-    : `https://adsmanager.facebook.com/adsmanager/manage/billing?act=${accId}`;
+
+  // URL da central de cobrança específica DESTA conta de anúncio.
+  // Replica o formato canônico do Billing Hub (mesmo que a Meta gera ao
+  // navegar manualmente), incluindo payment_account_id e entrypoint —
+  // sem esses parâmetros o Meta cai numa tela genérica.
+  const buildBillingUrl = () => {
+    const aid = encodeURIComponent(accId);
+    if (account.business_id) {
+      const bid = encodeURIComponent(account.business_id);
+      const params = new URLSearchParams({
+        placement: 'ads_manager',
+        asset_id: accId,
+        business_id: account.business_id,
+        payment_account_id: accId,
+        payment_account_id_from_jsmodule: accId,
+        entrypoint: 'ads_ecosystem_navigation_ads_billing_tool_plugin',
+      });
+      return `https://business.facebook.com/billing_hub/accounts/details/?${params.toString()}`;
+    }
+    // Conta pessoal sem Business Portfolio: payment_settings aceita asset_id sozinho.
+    return `https://business.facebook.com/billing_hub/payment_settings?asset_id=${aid}`;
+  };
+  const billingUrl = buildBillingUrl();
 
   const Icon = isEmpty ? XCircle : AlertTriangle;
   const headerColor = isEmpty
