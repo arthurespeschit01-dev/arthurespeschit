@@ -649,7 +649,7 @@ export default function MetaHierarchyTabs({
                     <th className="px-3 py-2 text-muted-foreground font-medium min-w-[260px]">
                       <SortHeader label="Conjunto" active={sort.key === 'name'} dir={sort.dir} onClick={() => toggleSort('name')} />
                     </th>
-                    {renderMetricsHeader()}
+                    {renderMetricsHeader(adsetsExtraCols)}
                     <th className="px-3 py-2"></th>
                     <th className="px-2 py-2 w-10"></th>
                   </tr>
