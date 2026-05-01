@@ -100,7 +100,7 @@ export default function QuickEditDialog({
         setAgeMin(t.age_min ?? 18);
         setAgeMax(t.age_max ?? 65);
         setGenders((t.genders && t.genders[0]) || 0);
-        setAdvantageAudience((ad.targeting_automation?.advantage_audience ?? 0) === 1);
+        setAdvantageAudience(((t.targeting_automation?.advantage_audience ?? ad.targeting_automation?.advantage_audience) ?? 0) === 1);
         setConfirmAdvantage(false);
 
         const g: GeoEntry[] = [];
