@@ -698,11 +698,23 @@ export default function MetaHierarchyTabs({
                         {renderMetricsCells(ins, objectiveFor(a.campaign_id), adsetsExtraCols, a.optimization_goal || optGoalForCampaign(a.campaign_id), destTypeForCampaign(a.campaign_id))}
                         <td className="px-3 py-2 w-0"></td>
                         <td className="px-2 py-2 text-right">
-                          <EntityActionsMenu
-                            clientId={clientId} entityType="adset"
-                            metaId={a.meta_adset_id} status={a.status}
-                            onChanged={() => loadAllAdsets()}
-                          />
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => setQuickEditAdset(a)}
+                              disabled={!a.meta_adset_id}
+                              title={a.meta_adset_id ? 'Edição rápida' : 'Disponível só para conjuntos importados da Meta'}
+                            >
+                              <Edit2 className="w-3 h-3 mr-1" /> Editar
+                            </Button>
+                            <EntityActionsMenu
+                              clientId={clientId} entityType="adset"
+                              metaId={a.meta_adset_id} status={a.status}
+                              onChanged={() => loadAllAdsets()}
+                            />
+                          </div>
                         </td>
                       </tr>
                     );
