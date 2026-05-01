@@ -24,6 +24,8 @@ export interface AccountBalance {
   funding_label?: string;
   account_status?: number;
   account_status_label?: string;
+  /** ID do business portfolio (Meta Business) dono da conta. */
+  business_id?: string | null;
   /** Compat retroativo — não usar para decisões. */
   balance?: number;
   error?: string;
