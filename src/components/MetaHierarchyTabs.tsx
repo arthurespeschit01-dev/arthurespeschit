@@ -814,5 +814,58 @@ export default function MetaHierarchyTabs({
         </div>
       )}
     </div>
+    {quickEditAdset && (
+      <QuickEditDialog
+        open={!!quickEditAdset}
+        onClose={() => setQuickEditAdset(null)}
+        clientId={clientId}
+        adset={{
+          id: quickEditAdset.id,
+          name: quickEditAdset.name,
+          meta_adset_id: quickEditAdset.meta_adset_id,
+          status: quickEditAdset.status,
+          daily_budget: quickEditAdset.daily_budget,
+          lifetime_budget: quickEditAdset.lifetime_budget,
+          optimization_goal: quickEditAdset.optimization_goal,
+        }}
+        creatives={creatives
+          .filter(cr => cr.meta_adset_id && cr.meta_adset_id === quickEditAdset.meta_adset_id)
+          .map(cr => ({
+            id: cr.id,
+            name: cr.name,
+            meta_ad_id: cr.meta_ad_id,
+            meta_adset_id: cr.meta_adset_id,
+            thumbnail_url: cr.thumbnail_url,
+            body: cr.body,
+            title: cr.title,
+          }))}
+        metricColumns={[
+          { key: 'spend', label: 'Gasto' },
+          { key: 'reach', label: 'Alcance' },
+          { key: 'impressions', label: 'Impressões' },
+          { key: 'cpm', label: 'CPM' },
+          { key: 'frequency', label: 'Frequência' },
+          { key: 'ctr', label: 'CTR' },
+          { key: 'cpc', label: 'CPC' },
+          { key: 'leads', label: 'Leads' },
+          { key: 'cpa', label: 'CPA' },
+          { key: 'roas', label: 'ROAS' },
+          { key: 'purchases', label: 'Compras' },
+          { key: 'revenue', label: 'Receita' },
+          { key: 'messages', label: 'Mensagens' },
+          { key: 'link_clicks', label: 'Cliques no link' },
+        ]}
+        visibleColumnKeys={['spend','reach','impressions','cpm','frequency'].concat(
+          ['ctr','cpc','leads','cpa','roas','purchases','revenue','messages','link_clicks']
+            .filter(k => !hiddenColKeys.includes(k))
+        )}
+        onColumnsChange={(keys) => {
+          const all = ['ctr','cpc','leads','cpa','roas','purchases','revenue','messages','link_clicks'];
+          setHiddenColKeys(all.filter(k => !keys.includes(k)));
+        }}
+        onChanged={() => { loadAllAdsets(); loadAllCreatives(); }}
+      />
+    )}
+    </>
   );
 }
