@@ -367,28 +367,31 @@ export default function MetaHierarchyTabs({
     return sortRows(rows);
   }, [filteredAds, sort]);
 
-  // Colunas extras (não-fixas) presentes em cada nível — calculadas a partir das linhas visíveis
+  // Colunas extras: métricas relevantes pelo objetivo da campanha que NÃO foram
+  // selecionadas manualmente pelo usuário em "Personalizar colunas".
   const campaignsExtraCols = useMemo(
-    () => computeExtraColumns(sortedCampaigns as any),
-    [sortedCampaigns],
+    () => computeExtraColumns(sortedCampaigns as any, selectedFixedLabels),
+    [sortedCampaigns, selectedFixedLabels],
   );
   const adsetsExtraCols = useMemo(
     () => computeExtraColumns(
       sortedAdsets as any,
+      selectedFixedLabels,
       (cid: string) => objectiveFor(cid),
       (a: any) => a.optimization_goal || optGoalForCampaign(a.campaign_id),
       (a: any) => destTypeForCampaign(a.campaign_id),
     ),
-    [sortedAdsets, campaigns],
+    [sortedAdsets, campaigns, selectedFixedLabels],
   );
   const adsExtraCols = useMemo(
     () => computeExtraColumns(
       sortedAds as any,
+      selectedFixedLabels,
       (cid: string) => objectiveFor(cid),
       (cr: any) => cr.optimization_goal || optGoalForCampaign(cr.campaign_id),
       (cr: any) => destTypeForCampaign(cr.campaign_id),
     ),
-    [sortedAds, campaigns],
+    [sortedAds, campaigns, selectedFixedLabels],
   );
 
   // Imports por nível
