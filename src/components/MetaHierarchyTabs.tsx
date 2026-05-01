@@ -4,12 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Folder, LayoutGrid, Image as ImageIcon, Loader2, Download, X, Plus, Edit2, Trash2, FileText, Link2, ExternalLink,
-  ArrowUp, ArrowDown, ChevronsUpDown,
+  ArrowUp, ArrowDown, ChevronsUpDown, SlidersHorizontal,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import EntityActionsMenu from '@/components/EntityActionsMenu';
 import EntityStatusToggle from '@/components/EntityStatusToggle';
 import QuickEditDialog from '@/components/QuickEditDialog';
+import ColumnsCustomizerDialog, { ALL_METRIC_COLUMNS, DEFAULT_VISIBLE_COLUMNS } from '@/components/ColumnsCustomizerDialog';
 import { DateRangePicker, type DateRangeValue } from '@/components/DateRangePicker';
 import { metricsForObjective, type CampaignInsights } from '@/lib/campaignMetrics';
 
