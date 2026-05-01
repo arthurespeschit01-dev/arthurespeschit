@@ -35,13 +35,12 @@ export default function AccountBalanceActionDialog({ open, onOpenChange, account
   const adsManagerUrl = `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${accId}`;
 
   // URL da central de cobrança específica DESTA conta de anúncio.
-  // Replica o formato canônico do Billing Hub (mesmo que a Meta gera ao
-  // navegar manualmente), incluindo payment_account_id e entrypoint —
-  // sem esses parâmetros o Meta cai numa tela genérica.
+  // Replica EXATAMENTE o formato canônico que a Meta gera ao navegar
+  // manualmente (com business_id, payment_account_id, payment_account_id_from_jsmodule
+  // e entrypoint). Sem esses parâmetros, ou sem business_id, a Meta bloqueia
+  // a página com ERR_BLOCKED_BY_RESPONSE em /billing_hub/payment_settings.
   const buildBillingUrl = () => {
-    const aid = encodeURIComponent(accId);
     if (account.business_id) {
-      const bid = encodeURIComponent(account.business_id);
       const params = new URLSearchParams({
         placement: 'ads_manager',
         asset_id: accId,
@@ -52,8 +51,10 @@ export default function AccountBalanceActionDialog({ open, onOpenChange, account
       });
       return `https://business.facebook.com/billing_hub/accounts/details/?${params.toString()}`;
     }
-    // Conta pessoal sem Business Portfolio: payment_settings aceita asset_id sozinho.
-    return `https://business.facebook.com/billing_hub/payment_settings?asset_id=${aid}`;
+    // Sem Business Portfolio identificado: cair no Gerenciador de Anúncios
+    // direto na aba de cobrança da conta. Evita a tela bloqueada do
+    // billing_hub/payment_settings.
+    return `https://adsmanager.facebook.com/adsmanager/manage/billing?act=${accId}`;
   };
   const billingUrl = buildBillingUrl();
 
