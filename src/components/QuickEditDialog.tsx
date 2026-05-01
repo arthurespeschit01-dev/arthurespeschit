@@ -39,9 +39,6 @@ interface Props {
   clientId: string;
   adset: AdSetLite;
   creatives: CreativeLite[];
-  metricColumns: { key: string; label: string }[];
-  visibleColumnKeys: string[];
-  onColumnsChange: (keys: string[]) => void;
   onChanged: () => void;
 }
 
