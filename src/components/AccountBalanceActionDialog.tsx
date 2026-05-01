@@ -33,7 +33,7 @@ export default function AccountBalanceActionDialog({ open, onOpenChange, account
   const balance = account.available_balance ?? account.balance ?? 0;
 
   const adsManagerUrl = `https://www.facebook.com/adsmanager/manage/campaigns?act=${accId}`;
-  const billingUrl = `https://www.facebook.com/adsmanager/manage/billing?act=${accId}`;
+  const billingUrl = `https://business.facebook.com/billing_hub/accounts/details?asset_id=${accId}&placement=ads_manager`;
 
   const Icon = isEmpty ? XCircle : AlertTriangle;
   const headerColor = isEmpty
