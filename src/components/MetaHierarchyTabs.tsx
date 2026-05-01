@@ -88,14 +88,16 @@ const fmtBRL = (v: number) => `R$ ${(v || 0).toLocaleString('pt-BR', { minimumFr
 const fmtInt = (v: number) => (v || 0).toLocaleString('pt-BR');
 const fmtNum = (v: number, d = 2) => (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
 
-// Colunas de métricas comuns/fixas exibidas na tabela
-const FIXED_METRIC_COLS = [
-  { key: 'spend', label: 'Gasto', fmt: fmtBRL },
-  { key: 'reach', label: 'Alcance', fmt: fmtInt },
-  { key: 'impressions', label: 'Impressões', fmt: fmtInt },
-  { key: 'cpm', label: 'CPM', fmt: fmtBRL },
-  { key: 'frequency', label: 'Frequência', fmt: (v: number) => fmtNum(v, 2) },
-] as const;
+// Formatadores por chave de métrica. Toda métrica que aparece em ALL_METRIC_COLUMNS
+// precisa ter um formatador aqui (cai no default fmtInt se não houver).
+const METRIC_FORMATTERS: Record<string, (v: number) => string> = {
+  spend: fmtBRL, cpm: fmtBRL, cpc: fmtBRL, cpl: fmtBRL, cpa: fmtBRL, cpp: fmtBRL,
+  cpm_msg: fmtBRL, cost_per_engagement: fmtBRL, cost_per_follower: fmtBRL, revenue: fmtBRL,
+  ctr: (v) => `${(v || 0).toFixed(2)}%`,
+  frequency: (v) => fmtNum(v, 2),
+  roas: (v) => `${fmtNum(v, 2)}x`,
+};
+const formatMetric = (key: string, v: number): string => (METRIC_FORMATTERS[key] || fmtInt)(v);
 
 type SortDir = 'asc' | 'desc';
 interface SortState { key: string; dir: SortDir; }
