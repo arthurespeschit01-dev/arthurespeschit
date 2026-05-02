@@ -327,6 +327,51 @@ export default function ClientDetail() {
 
   useEffect(() => { loadInsights(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [campaigns.length, dateRange.preset, dateRange.since, dateRange.until]);
 
+  // ---- Auto-sync de conjuntos e anúncios em background ----
+  // Sempre que entramos na tela (ou trocamos o período), disparamos meta-import-adsets
+  // e meta-import-creatives em paralelo para garantir que os dados de conjuntos e
+  // criativos venham atualizados sem precisar clicar em "Importar". Usa um sessionStorage
+  // de "last sync" por cliente+período para evitar refazer a importação a cada
+  // re-render (TTL de 60s). O resultado dispara um evento que o MetaHierarchyTabs
+  // escuta para recarregar do banco.
+  const AUTO_SYNC_TTL_MS = 60_000;
+  useEffect(() => {
+    if (!id) return;
+    const metaCampaigns = campaigns.filter(c => c.source === 'meta' && c.meta_campaign_id);
+    if (metaCampaigns.length === 0) return;
+    const periodKey = dateRange.preset === 'custom'
+      ? `custom:${dateRange.since}:${dateRange.until}`
+      : (dateRange.preset || 'maximum');
+    const cacheKey = `meta-auto-sync:${id}:${periodKey}`;
+    try {
+      const last = Number(sessionStorage.getItem(cacheKey) || 0);
+      if (last && Date.now() - last < AUTO_SYNC_TTL_MS) return; // já sincronizado recentemente
+    } catch { /* ignore */ }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const period = buildPeriodBodyFrom(dateRange);
+        const [adsetsRes, creativesRes] = await Promise.allSettled([
+          supabase.functions.invoke('meta-import-adsets', { body: { client_id: id, ...period } }),
+          supabase.functions.invoke('meta-import-creatives', { body: { client_id: id, ...period } }),
+        ]);
+        if (cancelled) return;
+        try { sessionStorage.setItem(cacheKey, String(Date.now())); } catch { /* ignore */ }
+        const ok = (r: PromiseSettledResult<any>) =>
+          r.status === 'fulfilled' && !r.value?.error && !r.value?.data?.error;
+        if (ok(adsetsRes) || ok(creativesRes)) {
+          // Avisa o MetaHierarchyTabs para recarregar do banco silenciosamente.
+          window.dispatchEvent(new CustomEvent('meta-auto-sync-done', { detail: { clientId: id } }));
+        }
+      } catch (e) {
+        console.warn('[auto-sync meta] falhou:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [id, campaigns.length, dateRange.preset, dateRange.since, dateRange.until]);
+
   const saveClient = async () => {
     await supabase.from('clients').update({
       name: clientForm.name, services: clientForm.services, monthly_fee: clientForm.monthly_fee,
