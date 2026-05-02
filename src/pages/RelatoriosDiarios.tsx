@@ -422,7 +422,10 @@ function TemplatesList({
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" onClick={resetDefaults}>
+          <RefreshCw className="w-4 h-4 mr-2" /> Atualizar templates padrão
+        </Button>
         <Button onClick={onCreate}>
           <Plus className="w-4 h-4 mr-2" /> Novo Template
         </Button>
