@@ -838,6 +838,8 @@ function ReportGenerator({
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
   const [adsets, setAdsets] = useState<AdSetRow[]>([]);
   const [selectedCampaignIds, setSelectedCampaignIds] = useState<Set<string>>(new Set());
+  const [campaignSearch, setCampaignSearch] = useState('');
+  const [campaignStatusFilter, setCampaignStatusFilter] = useState<'all' | 'active' | 'paused' | 'archived'>('all');
   const [client, setClient] = useState<any>(null);
   const [accountBalance, setAccountBalance] = useState<string>('—');
   const [generated, setGenerated] = useState<string>('');
