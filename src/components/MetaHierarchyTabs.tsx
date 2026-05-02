@@ -121,12 +121,41 @@ function SortHeader({ label, active, dir, onClick, align = 'left' }: {
   );
 }
 
-// Calcula a união ordenada de métricas extras (não cobertas por colunas fixas selecionadas)
-// detectadas dinamicamente a partir do objetivo de cada linha.
-// `visibleLabelSet` evita duplicar uma coluna que já vai aparecer pela seleção fixa do usuário.
+// Mapeia o label que metricsForObjective usa para a chave do catálogo de colunas.
+// Usado para que o usuário consiga remover/incluir extras pelo "Personalizar colunas"
+// SEM alterar a captura/cálculo dos dados.
+const EXTRA_LABEL_TO_KEY: Record<string, string> = {
+  'Gasto': 'spend',
+  'Alcance': 'reach',
+  'Impressões': 'impressions',
+  'CPM': 'cpm',
+  'Frequência': 'frequency',
+  'Cliques no link': 'link_clicks',
+  'CTR': 'ctr',
+  'CPC': 'cpc',
+  'Mensagens': 'messages',
+  'Custo/Msg': 'cpm_msg',
+  'Engajamentos': 'engagements',
+  'Custo/Eng.': 'cost_per_engagement',
+  'Visualizações de vídeo': 'video_views',
+  'Leads': 'leads',
+  'CPL': 'cpl',
+  'Instalações/Eventos': 'purchases',
+  'Custo por evento': 'cpp',
+  'Compras': 'purchases',
+  'Custo/Compra': 'cpp',
+  'Receita': 'revenue',
+  'ROAS': 'roas',
+};
+
+// Calcula a união ordenada de métricas extras (detectadas pelo objetivo) que:
+//  - NÃO duplicam uma coluna já selecionada como fixa, e
+//  - estão na seleção do usuário (visibleColumnKeys), quando há mapeamento conhecido.
+// Labels sem mapeamento (caso futuro) aparecem por padrão para não esconder dados novos.
 function computeExtraColumns(
   rows: { item: { objective?: string; optimization_goal?: string | null; destination_type?: string | null; campaign_id?: string }; ins: CampaignInsights }[],
   visibleLabelSet: Set<string>,
+  visibleKeySet: Set<string>,
   objectiveResolver?: (campaignId: string) => string,
   optGoalResolver?: (item: any) => string,
   destResolver?: (item: any) => string,
@@ -140,6 +169,8 @@ function computeExtraColumns(
     const cells = metricsForObjective(obj, ins, og, dt);
     for (const c of cells) {
       if (visibleLabelSet.has(c.label)) continue;
+      const mappedKey = EXTRA_LABEL_TO_KEY[c.label];
+      if (mappedKey && !visibleKeySet.has(mappedKey)) continue; // usuário desmarcou — não mostrar
       if (!seen.has(c.label)) { seen.add(c.label); ordered.push(c.label); }
     }
   }
