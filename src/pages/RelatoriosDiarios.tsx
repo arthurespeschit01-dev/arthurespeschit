@@ -300,7 +300,7 @@ function TemplatesList({
     if (list.length === 0) {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const inserts = DEFAULT_TEMPLATES.map(t => ({ ...t, user_id: user.id }));
+        const inserts = DEFAULT_TEMPLATES.map(t => ({ ...t, user_id: user.id })) as any;
         const { data: seeded } = await supabase.from('report_templates').insert(inserts).select('id,name,description,blocks,created_at');
         if (seeded) list = seeded.map((d: any) => ({ ...d, blocks: d.blocks || [] })) as Template[];
       }
