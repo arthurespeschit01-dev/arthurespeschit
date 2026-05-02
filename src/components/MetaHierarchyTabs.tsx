@@ -252,6 +252,20 @@ export default function MetaHierarchyTabs({
   useEffect(() => { loadAllAdsets(); }, [loadAllAdsets]);
   useEffect(() => { loadAllCreatives(); }, [loadAllCreatives]);
 
+  // Quando o ClientDetail termina o auto-sync com a Meta em background,
+  // recarregamos as listas direto do banco para refletir os dados atualizados
+  // sem o usuário precisar clicar em "Importar".
+  useEffect(() => {
+    const onSync = (e: Event) => {
+      const detail = (e as CustomEvent).detail || {};
+      if (detail.clientId && detail.clientId !== clientId) return;
+      loadAllAdsets();
+      loadAllCreatives();
+    };
+    window.addEventListener('meta-auto-sync-done', onSync);
+    return () => window.removeEventListener('meta-auto-sync-done', onSync);
+  }, [clientId, loadAllAdsets, loadAllCreatives]);
+
   // Reseta sort ao trocar de nível para o default desse nível
   useEffect(() => {
     setSort({ key: 'spend', dir: 'desc' });
