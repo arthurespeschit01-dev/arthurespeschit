@@ -194,6 +194,13 @@ export default function MetaHierarchyTabs({
   const [creatives, setCreatives] = useState<Creative[]>([]);
   const [loadingAdsets, setLoadingAdsets] = useState(false);
   const [loadingCreatives, setLoadingCreatives] = useState(false);
+
+  // Insights AO VIVO da Meta para conjuntos e anúncios — buscados no MESMO período
+  // selecionado em dateRange usando exatamente o mesmo parsing de meta-campaign-insights.
+  // Isso garante paridade 100% com o Gerenciador de Anúncios e consistência entre
+  // as abas Campanha / Conjunto / Anúncio (sem depender de dados antigos do banco).
+  const [liveAdsetIns, setLiveAdsetIns] = useState<Record<string, CampaignInsights>>({});
+  const [liveAdIns, setLiveAdIns] = useState<Record<string, CampaignInsights>>({});
   const [importingAdsets, setImportingAdsets] = useState(false);
   const [importingAds, setImportingAds] = useState(false);
 
@@ -266,6 +273,37 @@ export default function MetaHierarchyTabs({
     return () => window.removeEventListener('meta-auto-sync-done', onSync);
   }, [clientId, loadAllAdsets, loadAllCreatives]);
 
+  // Busca insights AO VIVO de conjuntos e anúncios para o período selecionado.
+  // Usa o mesmo parsing/atribuição de meta-campaign-insights -> números 100%
+  // idênticos entre as abas Campanhas, Conjuntos e Anúncios e iguais ao
+  // Gerenciador de Anúncios.
+  useEffect(() => {
+    if (!clientId) return;
+    const hasMeta = campaigns.some(c => c.source === 'meta');
+    if (!hasMeta) { setLiveAdsetIns({}); setLiveAdIns({}); return; }
+    const period = buildPeriodBody();
+    let cancelled = false;
+    (async () => {
+      try {
+        const [adsetRes, adRes] = await Promise.allSettled([
+          supabase.functions.invoke('meta-adset-insights', { body: { client_id: clientId, ...period } }),
+          supabase.functions.invoke('meta-ad-insights',    { body: { client_id: clientId, ...period } }),
+        ]);
+        if (cancelled) return;
+        if (adsetRes.status === 'fulfilled' && !adsetRes.value.error) {
+          setLiveAdsetIns((adsetRes.value.data?.insights || {}) as any);
+        }
+        if (adRes.status === 'fulfilled' && !adRes.value.error) {
+          setLiveAdIns((adRes.value.data?.insights || {}) as any);
+        }
+      } catch (e) {
+        console.warn('[live insights adset/ad] falhou:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [clientId, campaigns.length, dateRange.preset, dateRange.since, dateRange.until]);
+
   // Reseta sort ao trocar de nível para o default desse nível
   useEffect(() => {
     setSort({ key: 'spend', dir: 'desc' });
@@ -321,32 +359,50 @@ export default function MetaHierarchyTabs({
     cpl: 0, cpp: 0, cpm_msg: 0, roas: 0, engagements: 0, frequency: 0, cost_per_engagement: 0,
     followers: 0, profile_visits: 0, cost_per_follower: 0,
   };
-  const insightsFromAdSet = (a: AdSet): CampaignInsights => ({
-    spend: Number(a.spend) || 0, impressions: Number(a.impressions) || 0, clicks: Number(a.clicks) || 0,
-    ctr: Number(a.ctr) || 0, cpc: Number(a.cpc) || 0, cpm: Number(a.cpm) || 0, reach: Number(a.reach) || 0,
-    leads: Number(a.leads) || 0, purchases: Number(a.purchases) || 0, messages: Number(a.messages) || 0,
-    link_clicks: Number(a.link_clicks) || 0, revenue: Number(a.revenue) || 0,
-    cpl: Number(a.leads) > 0 ? Number(a.spend) / Number(a.leads) : 0,
-    cpp: Number(a.purchases) > 0 ? Number(a.spend) / Number(a.purchases) : 0,
-    cpm_msg: Number(a.messages) > 0 ? Number(a.spend) / Number(a.messages) : 0,
-    roas: Number(a.roas) || 0, engagements: Number(a.engagements) || 0, frequency: Number(a.frequency) || 0,
-    cost_per_engagement: Number(a.engagements) > 0 ? Number(a.spend) / Number(a.engagements) : 0,
-    followers: Number(a.followers) || 0, profile_visits: Number(a.profile_visits) || 0,
-    cost_per_follower: Number(a.followers) > 0 ? Number(a.spend) / Number(a.followers) : 0,
-  });
-  const insightsFromCreative = (cr: Creative): CampaignInsights => ({
-    spend: Number(cr.spend) || 0, impressions: Number(cr.impressions) || 0, clicks: Number(cr.clicks) || 0,
-    ctr: Number(cr.ctr) || 0, cpc: Number(cr.cpc) || 0, cpm: Number(cr.cpm) || 0, reach: Number(cr.reach) || 0,
-    leads: Number(cr.leads) || 0, purchases: Number(cr.purchases) || 0, messages: Number(cr.messages) || 0,
-    link_clicks: Number(cr.link_clicks) || 0, revenue: Number(cr.revenue) || 0,
-    cpl: Number(cr.leads) > 0 ? Number(cr.spend) / Number(cr.leads) : 0,
-    cpp: Number(cr.purchases) > 0 ? Number(cr.spend) / Number(cr.purchases) : 0,
-    cpm_msg: Number(cr.messages) > 0 ? Number(cr.spend) / Number(cr.messages) : 0,
-    roas: Number(cr.roas) || 0, engagements: Number(cr.engagements) || 0, frequency: Number(cr.frequency) || 0,
-    cost_per_engagement: Number(cr.engagements) > 0 ? Number(cr.spend) / Number(cr.engagements) : 0,
-    followers: Number(cr.followers) || 0, profile_visits: Number(cr.profile_visits) || 0,
-    cost_per_follower: Number(cr.followers) > 0 ? Number(cr.spend) / Number(cr.followers) : 0,
-  });
+  // Prefere SEMPRE os insights ao vivo da Meta (mesmo período/atribuição da aba
+  // Campanhas). Cai no banco apenas se a Meta ainda não respondeu — nunca mistura.
+  const emptyIns: CampaignInsights = {
+    spend: 0, impressions: 0, clicks: 0, ctr: 0, cpc: 0, cpm: 0, reach: 0,
+    leads: 0, purchases: 0, messages: 0, link_clicks: 0, revenue: 0,
+    cpl: 0, cpp: 0, cpm_msg: 0, roas: 0, engagements: 0, frequency: 0, cost_per_engagement: 0,
+    followers: 0, profile_visits: 0, cost_per_follower: 0,
+  };
+  const insightsFromAdSet = (a: AdSet): CampaignInsights => {
+    const live = a.meta_adset_id ? liveAdsetIns[a.meta_adset_id] : undefined;
+    if (live) return { ...emptyIns, ...live };
+    return {
+      ...emptyIns,
+      spend: Number(a.spend) || 0, impressions: Number(a.impressions) || 0, clicks: Number(a.clicks) || 0,
+      ctr: Number(a.ctr) || 0, cpc: Number(a.cpc) || 0, cpm: Number(a.cpm) || 0, reach: Number(a.reach) || 0,
+      leads: Number(a.leads) || 0, purchases: Number(a.purchases) || 0, messages: Number(a.messages) || 0,
+      link_clicks: Number(a.link_clicks) || 0, revenue: Number(a.revenue) || 0,
+      cpl: Number(a.leads) > 0 ? Number(a.spend) / Number(a.leads) : 0,
+      cpp: Number(a.purchases) > 0 ? Number(a.spend) / Number(a.purchases) : 0,
+      cpm_msg: Number(a.messages) > 0 ? Number(a.spend) / Number(a.messages) : 0,
+      roas: Number(a.roas) || 0, engagements: Number(a.engagements) || 0, frequency: Number(a.frequency) || 0,
+      cost_per_engagement: Number(a.engagements) > 0 ? Number(a.spend) / Number(a.engagements) : 0,
+      followers: Number(a.followers) || 0, profile_visits: Number(a.profile_visits) || 0,
+      cost_per_follower: Number(a.followers) > 0 ? Number(a.spend) / Number(a.followers) : 0,
+    };
+  };
+  const insightsFromCreative = (cr: Creative): CampaignInsights => {
+    const live = cr.meta_ad_id ? liveAdIns[cr.meta_ad_id] : undefined;
+    if (live) return { ...emptyIns, ...live };
+    return {
+      ...emptyIns,
+      spend: Number(cr.spend) || 0, impressions: Number(cr.impressions) || 0, clicks: Number(cr.clicks) || 0,
+      ctr: Number(cr.ctr) || 0, cpc: Number(cr.cpc) || 0, cpm: Number(cr.cpm) || 0, reach: Number(cr.reach) || 0,
+      leads: Number(cr.leads) || 0, purchases: Number(cr.purchases) || 0, messages: Number(cr.messages) || 0,
+      link_clicks: Number(cr.link_clicks) || 0, revenue: Number(cr.revenue) || 0,
+      cpl: Number(cr.leads) > 0 ? Number(cr.spend) / Number(cr.leads) : 0,
+      cpp: Number(cr.purchases) > 0 ? Number(cr.spend) / Number(cr.purchases) : 0,
+      cpm_msg: Number(cr.messages) > 0 ? Number(cr.spend) / Number(cr.messages) : 0,
+      roas: Number(cr.roas) || 0, engagements: Number(cr.engagements) || 0, frequency: Number(cr.frequency) || 0,
+      cost_per_engagement: Number(cr.engagements) > 0 ? Number(cr.spend) / Number(cr.engagements) : 0,
+      followers: Number(cr.followers) || 0, profile_visits: Number(cr.profile_visits) || 0,
+      cost_per_follower: Number(cr.followers) > 0 ? Number(cr.spend) / Number(cr.followers) : 0,
+    };
+  };
 
   const campaignFor = (campId: string) => campaigns.find(c => c.id === campId);
   const objectiveFor = (campId: string) => campaignFor(campId)?.objective || '';
@@ -405,12 +461,12 @@ export default function MetaHierarchyTabs({
   const sortedAdsets = useMemo(() => {
     const rows = filteredAdsets.map(a => ({ item: a, ins: insightsFromAdSet(a) }));
     return sortRows(rows);
-  }, [filteredAdsets, sort]);
+  }, [filteredAdsets, sort, liveAdsetIns]);
 
   const sortedAds = useMemo(() => {
     const rows = filteredAds.map(cr => ({ item: cr, ins: insightsFromCreative(cr) }));
     return sortRows(rows);
-  }, [filteredAds, sort]);
+  }, [filteredAds, sort, liveAdIns]);
 
   // Colunas extras: métricas relevantes pelo objetivo da campanha, filtradas pela seleção
   // do usuário em "Personalizar colunas" (também removíveis/incluíveis).
