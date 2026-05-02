@@ -1289,6 +1289,20 @@ function ReportGenerator({
             <CardContent className="space-y-3">
               {generated ? (
                 <>
+                  {lastSyncAt && syncedRange && (
+                    <div className="text-[11px] text-muted-foreground bg-secondary/40 border border-border/40 rounded-md px-2 py-1.5 flex items-start gap-2">
+                      <RefreshCw className="w-3 h-3 mt-0.5 text-primary shrink-0" />
+                      <span>
+                        Dados sincronizados em{' '}
+                        <strong className="text-foreground">
+                          {lastSyncAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </strong>{' '}
+                        — período: <strong className="text-foreground">{syncedRange.start}</strong> a{' '}
+                        <strong className="text-foreground">{syncedRange.end}</strong>.
+                        <span className="block opacity-70">Esta nota não é copiada para a mensagem.</span>
+                      </span>
+                    </div>
+                  )}
                   <WhatsAppPreview text={generated} />
                   <Button onClick={copyToClipboard} className="w-full" size="lg">
                     <ClipboardCopy className="w-4 h-4 mr-2" /> Copiar Mensagem
