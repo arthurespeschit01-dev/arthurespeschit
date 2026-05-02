@@ -57,6 +57,9 @@ interface CampaignRow {
   purchases?: number;
   messages?: number;
   frequency?: number;
+  reach?: number;
+  link_clicks?: number;
+  video_views?: number;
   meta_campaign_id?: string | null;
 }
 interface AdSetRow {
@@ -73,6 +76,7 @@ interface AdSetRow {
   leads?: number;
   messages?: number;
   frequency?: number;
+  reach?: number;
 }
 
 // =====================================================================
