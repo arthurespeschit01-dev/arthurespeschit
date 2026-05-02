@@ -939,6 +939,23 @@ function ReportGenerator({
 
       for (const c of campaigns.filter(c => selectedCampaignIds.has(c.id))) {
         const conv = getConversoes(c);
+        const spend = Number(c.spend || 0);
+        const leadsN = Number(c.leads || 0);
+        const msgsN = Number(c.messages || 0);
+        const purchasesN = Number(c.purchases || 0);
+        const cpl = leadsN > 0 ? spend / leadsN : 0;
+        const cpMsg = msgsN > 0 ? spend / msgsN : 0;
+        const videoViews = Number(c.video_views || 0);
+        const cpv = videoViews > 0 ? spend / videoViews : 0;
+        const linkClicks = Number(c.link_clicks || 0);
+        const cpcLink = linkClicks > 0 ? spend / linkClicks : 0;
+        // Resultado principal: depende do objetivo
+        let resultado = conv;
+        if (purchasesN > 0) resultado = purchasesN;
+        else if (leadsN > 0) resultado = leadsN;
+        else if (msgsN > 0) resultado = msgsN;
+        const cpResult = resultado > 0 ? spend / resultado : 0;
+
         const cCtx: Record<string, string> = {
           ...headerCtx,
           nome_campanha: c.name,
@@ -954,6 +971,34 @@ function ReportGenerator({
           cpa: formatBRL(c.cpa),
           conversoes: String(conv),
           freq: (Number(c.frequency || 0)).toFixed(2).replace('.', ','),
+          // Mensagens
+          mensagens: formatInt(msgsN),
+          custo_por_mensagem: formatBRL(cpMsg),
+          // Leads
+          leads: formatInt(leadsN),
+          cpl: formatBRL(cpl),
+          // Alcance
+          alcance: formatInt(c.reach),
+          frequencia: (Number(c.frequency || 0)).toFixed(2).replace('.', ','),
+          // Vídeo
+          visualizacoes_video: formatInt(videoViews),
+          custo_por_visualizacao: formatBRL(cpv),
+          reproducoes_3s: formatInt(videoViews),
+          reproducoes_thruplay: '—',
+          // Engajamento
+          curtidas: '—',
+          comentarios: '—',
+          compartilhamentos: '—',
+          cliques_link: formatInt(linkClicks),
+          custo_por_clique_link: formatBRL(cpcLink),
+          // Resultados gerais
+          resultado: String(resultado),
+          custo_por_resultado: formatBRL(cpResult),
+          roas: (Number((c as any).roas || 0)).toFixed(2).replace('.', ','),
+          // Comparativo (sem dados ainda)
+          variacao_gasto: '—',
+          variacao_resultado: '—',
+          variacao_cpa: '—',
         };
         if (campaignTpl) out.push(fillVars(campaignTpl.text, cCtx));
 
@@ -961,6 +1006,10 @@ function ReportGenerator({
           const adsetsForCampaign = adsets.filter(a => a.campaign_id === c.id);
           for (const a of adsetsForCampaign) {
             const aConv = getConversoes(a);
+            const aSpend = Number(a.spend || 0);
+            const aLeads = Number(a.leads || 0);
+            const aMsgs = Number(a.messages || 0);
+            const aCpl = aLeads > 0 ? aSpend / aLeads : 0;
             const aCtx: Record<string, string> = {
               ...cCtx,
               nome_conjunto: a.name,
@@ -970,6 +1019,10 @@ function ReportGenerator({
               ctr_conjunto: formatPct(a.ctr),
               cpa_conjunto: formatBRL(a.cpa),
               conversoes_conjunto: String(aConv),
+              mensagens_conjunto: formatInt(aMsgs),
+              leads_conjunto: formatInt(aLeads),
+              cpl_conjunto: formatBRL(aCpl),
+              alcance_conjunto: formatInt(a.reach),
             };
             out.push(fillVars(adsetTpl.text, aCtx));
           }
