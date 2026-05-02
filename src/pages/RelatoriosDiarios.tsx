@@ -584,34 +584,7 @@ function TemplateEditor({
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-primary" /> Variáveis disponíveis
-              </CardTitle>
-              <p className="text-[11px] text-muted-foreground">Clique para inserir no bloco selecionado.</p>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {VARIABLES.map(g => (
-                <div key={g.group}>
-                  <div className="text-[11px] font-medium text-muted-foreground mb-1">{g.group}</div>
-                  <div className="flex flex-wrap gap-1">
-                    {g.vars.map(v => (
-                      <button
-                        key={v.key}
-                        type="button"
-                        onClick={() => insertVar(v.key)}
-                        className="text-[11px] px-2 py-1 rounded bg-secondary hover:bg-secondary/80 border border-border/40"
-                        title={v.label}
-                      >
-                        {`{{${v.key}}}`}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+          <VariablesPanel onInsert={insertVar} />
         </div>
 
         {/* Preview (direita) */}
