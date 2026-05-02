@@ -316,7 +316,7 @@ export default function RelatoriosDiarios() {
           </p>
         </div>
         {view === 'list' && (
-          <Button onClick={() => { setEditing(null); setView('generator'); }}>
+          <Button onClick={() => { setEditing(null); setGeneratingFromId(null); setView('generator'); }}>
             <Send className="w-4 h-4 mr-2" /> Gerar relatório
           </Button>
         )}
@@ -340,6 +340,15 @@ export default function RelatoriosDiarios() {
         <ReportGenerator
           initialTemplateId={generatingFromId}
           onBack={() => { setGeneratingFromId(null); setView('list'); }}
+          onCustomize={(preset) => {
+            setEditing({
+              id: '',
+              name: preset.name,
+              description: preset.description,
+              blocks: preset.blocks,
+            } as any);
+            setView('editor');
+          }}
         />
       )}
     </div>
