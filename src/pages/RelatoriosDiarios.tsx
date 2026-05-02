@@ -1161,133 +1161,14 @@ function ReportGenerator({
     });
   }
 
-  // ----- Renderização por passo -----
-  if (step === 'kind') {
-    return (
-      <div className="space-y-4 animate-fade-in">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft className="w-4 h-4 mr-1" /> Voltar
-        </Button>
-        <div>
-          <h2 className="text-lg font-semibold">Que tipo de relatório você quer gerar?</h2>
-          <p className="text-sm text-muted-foreground">Escolha o objetivo principal das campanhas. Você poderá personalizar depois.</p>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {REPORT_KINDS.map(k => {
-            const active = selectedKind === k.id;
-            return (
-              <button
-                key={k.id}
-                type="button"
-                onClick={() => {
-                  setSelectedKind(k.id);
-                  if (k.id === 'custom') {
-                    const preset = getPresetsByKind('custom')[0];
-                    onCustomize({ name: 'Novo template', description: '', blocks: preset.blocks as any });
-                    return;
-                  }
-                  setStep('variant');
-                }}
-                className={`group rounded-xl border p-4 text-left transition-all hover-scale ${
-                  active
-                    ? 'border-primary bg-primary/10 shadow-[0_0_0_1px_hsl(var(--primary))]'
-                    : 'border-border/40 bg-card/50 hover:border-primary/50'
-                }`}
-              >
-                <div className="text-3xl mb-2">{k.emoji}</div>
-                <div className="font-semibold text-sm">{k.label}</div>
-                <div className="text-[11px] text-muted-foreground mt-1 line-clamp-2">{k.description}</div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  if (step === 'variant' && selectedKind) {
-    const kindMeta = REPORT_KINDS.find(k => k.id === selectedKind)!;
-    const presets = getPresetsByKind(selectedKind);
-    return (
-      <div className="space-y-4 animate-fade-in">
-        <Button variant="ghost" size="sm" onClick={() => { setSelectedKind(null); setStep('kind'); }}>
-          <ArrowLeft className="w-4 h-4 mr-1" /> Trocar tipo
-        </Button>
-        <div>
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <span className="text-2xl">{kindMeta.emoji}</span> {kindMeta.label} — escolha o modelo
-          </h2>
-          <p className="text-sm text-muted-foreground">3 variações otimizadas para esse objetivo.</p>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {(['short', 'detailed', 'executive'] as ReportVariant[]).map(v => {
-            const preset = presets.find(p => p.variant === v);
-            if (!preset) return null;
-            const previewText = preset.blocks.map(b => b.text).join('\n').slice(0, 220);
-            return (
-              <Card key={v} className="border-border/40 hover:border-primary transition-colors flex flex-col">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">{VARIANT_LABEL[v]}</CardTitle>
-                    <Badge variant="secondary" className="text-[10px]">PRÉ-PRONTO</Badge>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">{VARIANT_DESC[v]}</p>
-                </CardHeader>
-                <CardContent className="flex-1 flex flex-col gap-2">
-                  <pre className="text-[10px] whitespace-pre-wrap break-words font-sans bg-secondary/40 rounded p-2 max-h-32 overflow-hidden text-muted-foreground">
-                    {previewText}…
-                  </pre>
-                  <div className="flex gap-2 mt-auto">
-                    <Button
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => { setSelectedPreset(preset); setStep('config'); }}
-                    >
-                      Usar este
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => onCustomize({ name: preset.name, description: preset.description, blocks: preset.blocks as any })}
-                    >
-                      <Edit2 className="w-3 h-3 mr-1" /> Personalizar
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
+  // Lista de variações disponíveis para o tipo selecionado.
+  const presetsForKind = selectedKind ? getPresetsByKind(selectedKind) : [];
 
   return (
     <div className="space-y-3">
-      <Button variant="ghost" size="sm" onClick={() => {
-        if (selectedPreset) { setStep('variant'); setSelectedPreset(null); setGenerated(''); }
-        else onBack();
-      }}>
+      <Button variant="ghost" size="sm" onClick={onBack}>
         <ArrowLeft className="w-4 h-4 mr-1" /> Voltar
       </Button>
-
-      {selectedPreset && (
-        <div className="flex items-center gap-2 flex-wrap p-2 rounded-md border border-primary/40 bg-primary/5">
-          <Badge className="bg-primary text-primary-foreground">
-            {REPORT_KINDS.find(k => k.id === selectedPreset.kind)?.emoji} {REPORT_KINDS.find(k => k.id === selectedPreset.kind)?.label}
-          </Badge>
-          <span className="text-sm font-medium">{VARIANT_LABEL[selectedPreset.variant]}</span>
-          <Badge variant="secondary" className="text-[10px]">PRÉ-PRONTO</Badge>
-          <div className="ml-auto flex gap-1">
-            <Button size="sm" variant="ghost" onClick={() => { setStep('variant'); setSelectedPreset(null); setGenerated(''); }}>
-              Trocar modelo
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => onCustomize({ name: selectedPreset.name, description: selectedPreset.description, blocks: selectedPreset.blocks as any })}>
-              <Edit2 className="w-3 h-3 mr-1" /> Personalizar este template
-            </Button>
-          </div>
-        </div>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Configurações */}
@@ -1295,27 +1176,118 @@ function ReportGenerator({
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm">Configurações</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              <div className={`grid grid-cols-1 ${selectedPreset ? '' : 'sm:grid-cols-2'} gap-3`}>
-                {!selectedPreset && (
-                  <div>
-                    <Label className="text-xs">Template</Label>
-                    <Select value={templateId} onValueChange={setTemplateId}>
-                      <SelectTrigger><SelectValue placeholder="Selecionar..." /></SelectTrigger>
+              {/* ===== Modelo do relatório (tipo + variação) ===== */}
+              <div className="space-y-3 rounded-md border border-border/40 p-3 bg-secondary/20">
+                <Label className="text-xs">Modelo do relatório</Label>
+
+                {/* Linha 1: tipo de campanha */}
+                <div>
+                  <p className="text-[11px] text-muted-foreground mb-1">Tipo de campanha</p>
+                  <div className="flex flex-wrap gap-1">
+                    {REPORT_KINDS.map(k => {
+                      const active = selectedKind === k.id;
+                      return (
+                        <button
+                          key={k.id}
+                          type="button"
+                          onClick={() => {
+                            if (k.id === 'custom') {
+                              const preset = getPresetsByKind('custom')[0];
+                              onCustomize({ name: 'Novo template', description: '', blocks: preset.blocks as any });
+                              return;
+                            }
+                            setSelectedKind(k.id);
+                            const presets = getPresetsByKind(k.id);
+                            const next = presets.find(p => p.variant === (selectedPreset?.variant || 'short')) || presets[0];
+                            setSelectedPreset(next || null);
+                            setTemplateId('');
+                          }}
+                          className={`text-[11px] px-2.5 py-1.5 rounded-md border inline-flex items-center gap-1 transition-all ${
+                            active
+                              ? 'border-primary bg-primary/15 text-primary'
+                              : 'border-border/40 bg-card hover:border-primary/50'
+                          }`}
+                        >
+                          <span>{k.emoji}</span>
+                          <span>{k.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Linha 2: variação (após escolher tipo) */}
+                {selectedKind && selectedKind !== 'custom' && (
+                  <div className="animate-fade-in">
+                    <p className="text-[11px] text-muted-foreground mb-1">Modelo</p>
+                    <div className="grid grid-cols-3 gap-1">
+                      {(['short', 'detailed', 'executive'] as ReportVariant[]).map(v => {
+                        const preset = presetsForKind.find(p => p.variant === v);
+                        if (!preset) return null;
+                        const active = selectedPreset?.variant === v && selectedPreset?.kind === selectedKind;
+                        return (
+                          <button
+                            key={v}
+                            type="button"
+                            onClick={() => { setSelectedPreset(preset); setTemplateId(''); }}
+                            className={`text-left rounded-md border p-2 transition-all ${
+                              active
+                                ? 'border-primary bg-primary/15'
+                                : 'border-border/40 bg-card hover:border-primary/50'
+                            }`}
+                          >
+                            <div className="text-[12px] font-semibold flex items-center gap-1 flex-wrap">
+                              {VARIANT_LABEL[v]}
+                              {active && <Badge variant="secondary" className="text-[9px] py-0 px-1">PRÉ-PRONTO</Badge>}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground line-clamp-2 mt-0.5">{VARIANT_DESC[v]}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {selectedPreset && (
+                      <div className="flex justify-end mt-1">
+                        <Button
+                          size="sm"
+                          variant="link"
+                          className="h-6 text-[11px] px-1"
+                          onClick={() => onCustomize({ name: selectedPreset.name, description: selectedPreset.description, blocks: selectedPreset.blocks as any })}
+                        >
+                          <Edit2 className="w-3 h-3 mr-1" /> Personalizar este template
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Atalho para template salvo do usuário */}
+                {templates.length > 0 && (
+                  <div className="pt-2 border-t border-border/30">
+                    <p className="text-[11px] text-muted-foreground mb-1">Ou usar um template salvo</p>
+                    <Select
+                      value={templateId}
+                      onValueChange={(v) => { setTemplateId(v); setSelectedPreset(null); setSelectedKind(null); }}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Selecionar template salvo..." />
+                      </SelectTrigger>
                       <SelectContent>
                         {templates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                 )}
-                <div>
-                  <Label className="text-xs">Cliente</Label>
-                  <Select value={clientId} onValueChange={setClientId}>
-                    <SelectTrigger><SelectValue placeholder="Selecionar..." /></SelectTrigger>
-                    <SelectContent>
-                      {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
+              </div>
+
+              {/* ===== Cliente ===== */}
+              <div>
+                <Label className="text-xs">Cliente</Label>
+                <Select value={clientId} onValueChange={setClientId}>
+                  <SelectTrigger><SelectValue placeholder="Selecionar..." /></SelectTrigger>
+                  <SelectContent>
+                    {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
