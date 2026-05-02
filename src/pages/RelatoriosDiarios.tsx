@@ -896,9 +896,15 @@ function ReportGenerator({
       const { data } = await supabase.from('campaigns').select('*').eq('client_id', clientId).order('name');
       const list = (data || []) as CampaignRow[];
       setCampaigns(list);
-      setSelectedCampaignIds(new Set(list.map(c => c.id)));
+      // Nenhuma campanha pré-selecionada — usuário escolhe explicitamente
+      setSelectedCampaignIds(new Set());
       if (list.length > 0) {
-        const { data: ads } = await supabase.from('ad_sets').select('*').in('campaign_id', list.map(c => c.id));
+        // Buscar apenas conjuntos ATIVOS (filtragem na origem dos dados)
+        const { data: ads } = await supabase
+          .from('ad_sets')
+          .select('*')
+          .in('campaign_id', list.map(c => c.id))
+          .in('status', ['Ativa', 'Ativo', 'ACTIVE', 'active']);
         setAdsets((ads || []) as AdSetRow[]);
       } else {
         setAdsets([]);
