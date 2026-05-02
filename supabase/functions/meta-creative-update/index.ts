@@ -43,6 +43,7 @@ Deno.serve(async (req) => {
       page_id,
       // creative fields:
       message, link, headline, description, call_to_action_type,
+      greeting, prefilled_message,
       image_hash, video_id, thumbnail_url,
       name,
     } = body;
@@ -73,6 +74,29 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Monta CTA value adequado
+    function buildCtaValue(): any {
+      const cta = call_to_action_type;
+      if (!cta) return undefined;
+      if (cta === 'WHATSAPP_MESSAGE') {
+        const v: any = { app_destination: 'WHATSAPP' };
+        if (greeting) v.welcome_message = greeting;
+        if (prefilled_message) v.lead_gen_form_id = undefined; // placeholder; usamos message_prompts via app_destination
+        if (prefilled_message) v.app_destination = 'WHATSAPP';
+        if (prefilled_message) v.message_prompts = [prefilled_message];
+        return v;
+      }
+      if (cta === 'MESSAGE_PAGE') {
+        const v: any = { app_destination: 'MESSENGER' };
+        if (greeting) v.welcome_message = greeting;
+        if (prefilled_message) v.message_prompts = [prefilled_message];
+        return v;
+      }
+      // CTAs com link
+      if (currentLinkUrl) return { link: currentLinkUrl };
+      return undefined;
+    }
+
     // Monta object_story_spec novo
     const linkData: any = {};
     if (currentSpec?.link_data) Object.assign(linkData, currentSpec.link_data);
@@ -80,7 +104,9 @@ Deno.serve(async (req) => {
     if (message !== undefined) linkData.message = message;
     if (headline !== undefined) linkData.name = headline;
     if (description !== undefined) linkData.description = description;
-    if (call_to_action_type) linkData.call_to_action = { type: call_to_action_type, value: { link: linkData.link } };
+    if (call_to_action_type) {
+      linkData.call_to_action = { type: call_to_action_type, value: buildCtaValue() };
+    }
     if (image_hash) linkData.image_hash = image_hash;
     if (video_id) {
       linkData.video_id = video_id;
