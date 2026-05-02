@@ -460,12 +460,12 @@ export default function MetaHierarchyTabs({
 
   const sortedAdsets = useMemo(() => {
     const rows = filteredAdsets.map(a => ({ item: a, ins: insightsFromAdSet(a) }));
-    return sortRows(rows, sort);
+    return sortRows(rows);
   }, [filteredAdsets, sort, liveAdsetIns]);
 
   const sortedAds = useMemo(() => {
     const rows = filteredAds.map(cr => ({ item: cr, ins: insightsFromCreative(cr) }));
-    return sortRows(rows, sort);
+    return sortRows(rows);
   }, [filteredAds, sort, liveAdIns]);
 
   // Colunas extras: métricas relevantes pelo objetivo da campanha, filtradas pela seleção
