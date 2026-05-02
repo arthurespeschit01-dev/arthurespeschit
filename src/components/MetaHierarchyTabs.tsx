@@ -273,6 +273,37 @@ export default function MetaHierarchyTabs({
     return () => window.removeEventListener('meta-auto-sync-done', onSync);
   }, [clientId, loadAllAdsets, loadAllCreatives]);
 
+  // Busca insights AO VIVO de conjuntos e anúncios para o período selecionado.
+  // Usa o mesmo parsing/atribuição de meta-campaign-insights -> números 100%
+  // idênticos entre as abas Campanhas, Conjuntos e Anúncios e iguais ao
+  // Gerenciador de Anúncios.
+  useEffect(() => {
+    if (!clientId) return;
+    const hasMeta = campaigns.some(c => c.source === 'meta');
+    if (!hasMeta) { setLiveAdsetIns({}); setLiveAdIns({}); return; }
+    const period = buildPeriodBody();
+    let cancelled = false;
+    (async () => {
+      try {
+        const [adsetRes, adRes] = await Promise.allSettled([
+          supabase.functions.invoke('meta-adset-insights', { body: { client_id: clientId, ...period } }),
+          supabase.functions.invoke('meta-ad-insights',    { body: { client_id: clientId, ...period } }),
+        ]);
+        if (cancelled) return;
+        if (adsetRes.status === 'fulfilled' && !adsetRes.value.error) {
+          setLiveAdsetIns((adsetRes.value.data?.insights || {}) as any);
+        }
+        if (adRes.status === 'fulfilled' && !adRes.value.error) {
+          setLiveAdIns((adRes.value.data?.insights || {}) as any);
+        }
+      } catch (e) {
+        console.warn('[live insights adset/ad] falhou:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [clientId, campaigns.length, dateRange.preset, dateRange.since, dateRange.until]);
+
   // Reseta sort ao trocar de nível para o default desse nível
   useEffect(() => {
     setSort({ key: 'spend', dir: 'desc' });
