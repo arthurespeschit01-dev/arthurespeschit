@@ -4,12 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Folder, LayoutGrid, Image as ImageIcon, Loader2, Download, X, Plus, Edit2, Trash2, FileText, Link2, ExternalLink,
-  ArrowUp, ArrowDown, ChevronsUpDown,
+  ArrowUp, ArrowDown, ChevronsUpDown, SlidersHorizontal,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import EntityActionsMenu from '@/components/EntityActionsMenu';
 import EntityStatusToggle from '@/components/EntityStatusToggle';
 import QuickEditDialog from '@/components/QuickEditDialog';
+import ColumnsCustomizerDialog, { ALL_METRIC_COLUMNS, DEFAULT_VISIBLE_COLUMNS } from '@/components/ColumnsCustomizerDialog';
 import { DateRangePicker, type DateRangeValue } from '@/components/DateRangePicker';
 import { metricsForObjective, type CampaignInsights } from '@/lib/campaignMetrics';
 
@@ -87,14 +88,16 @@ const fmtBRL = (v: number) => `R$ ${(v || 0).toLocaleString('pt-BR', { minimumFr
 const fmtInt = (v: number) => (v || 0).toLocaleString('pt-BR');
 const fmtNum = (v: number, d = 2) => (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
 
-// Colunas de métricas comuns/fixas exibidas na tabela
-const FIXED_METRIC_COLS = [
-  { key: 'spend', label: 'Gasto', fmt: fmtBRL },
-  { key: 'reach', label: 'Alcance', fmt: fmtInt },
-  { key: 'impressions', label: 'Impressões', fmt: fmtInt },
-  { key: 'cpm', label: 'CPM', fmt: fmtBRL },
-  { key: 'frequency', label: 'Frequência', fmt: (v: number) => fmtNum(v, 2) },
-] as const;
+// Formatadores por chave de métrica. Toda métrica que aparece em ALL_METRIC_COLUMNS
+// precisa ter um formatador aqui (cai no default fmtInt se não houver).
+const METRIC_FORMATTERS: Record<string, (v: number) => string> = {
+  spend: fmtBRL, cpm: fmtBRL, cpc: fmtBRL, cpl: fmtBRL, cpa: fmtBRL, cpp: fmtBRL,
+  cpm_msg: fmtBRL, cost_per_engagement: fmtBRL, cost_per_follower: fmtBRL, revenue: fmtBRL,
+  ctr: (v) => `${(v || 0).toFixed(2)}%`,
+  frequency: (v) => fmtNum(v, 2),
+  roas: (v) => `${fmtNum(v, 2)}x`,
+};
+const formatMetric = (key: string, v: number): string => (METRIC_FORMATTERS[key] || fmtInt)(v);
 
 type SortDir = 'asc' | 'desc';
 interface SortState { key: string; dir: SortDir; }
@@ -118,15 +121,16 @@ function SortHeader({ label, active, dir, onClick, align = 'left' }: {
   );
 }
 
-// Calcula a união ordenada de métricas extras (não-fixas) presentes em um conjunto de linhas.
-// Mantém a ordem da primeira aparição para que o header e as células fiquem consistentes.
+// Calcula a união ordenada de métricas extras (não cobertas por colunas fixas selecionadas)
+// detectadas dinamicamente a partir do objetivo de cada linha.
+// `visibleLabelSet` evita duplicar uma coluna que já vai aparecer pela seleção fixa do usuário.
 function computeExtraColumns(
   rows: { item: { objective?: string; optimization_goal?: string | null; destination_type?: string | null; campaign_id?: string }; ins: CampaignInsights }[],
+  visibleLabelSet: Set<string>,
   objectiveResolver?: (campaignId: string) => string,
   optGoalResolver?: (item: any) => string,
   destResolver?: (item: any) => string,
 ): string[] {
-  const fixedKeys = new Set<string>(FIXED_METRIC_COLS.map(c => c.label));
   const ordered: string[] = [];
   const seen = new Set<string>();
   for (const { item, ins } of rows) {
@@ -135,7 +139,7 @@ function computeExtraColumns(
     const dt = destResolver ? destResolver(item) : ((item as any).destination_type || '');
     const cells = metricsForObjective(obj, ins, og, dt);
     for (const c of cells) {
-      if (fixedKeys.has(c.label)) continue;
+      if (visibleLabelSet.has(c.label)) continue;
       if (!seen.has(c.label)) { seen.add(c.label); ordered.push(c.label); }
     }
   }
@@ -166,13 +170,31 @@ export default function MetaHierarchyTabs({
 
   // Quick Edit dialog
   const [quickEditAdset, setQuickEditAdset] = useState<AdSet | null>(null);
-  const COLS_STORAGE_KEY = `meta-hidden-cols:${clientId}`;
-  const [hiddenColKeys, setHiddenColKeys] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem(COLS_STORAGE_KEY) || '[]'); } catch { return []; }
+
+  // Personalização de colunas (compartilhada entre Campanhas, Conjuntos e Anúncios).
+  // Persistida por cliente em localStorage.
+  const COLS_STORAGE_KEY = `meta-visible-cols:${clientId}`;
+  const [visibleColumnKeys, setVisibleColumnKeys] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem(COLS_STORAGE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch { /* ignore */ }
+    return [...DEFAULT_VISIBLE_COLUMNS];
   });
   useEffect(() => {
-    try { localStorage.setItem(COLS_STORAGE_KEY, JSON.stringify(hiddenColKeys)); } catch {}
-  }, [hiddenColKeys, COLS_STORAGE_KEY]);
+    try { localStorage.setItem(COLS_STORAGE_KEY, JSON.stringify(visibleColumnKeys)); } catch { /* ignore */ }
+  }, [visibleColumnKeys, COLS_STORAGE_KEY]);
+  const [columnsDialogOpen, setColumnsDialogOpen] = useState(false);
+
+  // Colunas fixas selecionadas pelo usuário (preserva ordem do catálogo) — vão sempre aparecer no header.
+  const selectedFixedCols = useMemo(
+    () => ALL_METRIC_COLUMNS.filter(c => visibleColumnKeys.includes(c.key)),
+    [visibleColumnKeys],
+  );
+  const selectedFixedLabels = useMemo(
+    () => new Set(selectedFixedCols.map(c => c.label)),
+    [selectedFixedCols],
+  );
 
   const loadAllAdsets = useCallback(async () => {
     const metaCampIds = campaigns.filter(c => c.source === 'meta').map(c => c.id);
@@ -345,28 +367,31 @@ export default function MetaHierarchyTabs({
     return sortRows(rows);
   }, [filteredAds, sort]);
 
-  // Colunas extras (não-fixas) presentes em cada nível — calculadas a partir das linhas visíveis
+  // Colunas extras: métricas relevantes pelo objetivo da campanha que NÃO foram
+  // selecionadas manualmente pelo usuário em "Personalizar colunas".
   const campaignsExtraCols = useMemo(
-    () => computeExtraColumns(sortedCampaigns as any),
-    [sortedCampaigns],
+    () => computeExtraColumns(sortedCampaigns as any, selectedFixedLabels),
+    [sortedCampaigns, selectedFixedLabels],
   );
   const adsetsExtraCols = useMemo(
     () => computeExtraColumns(
       sortedAdsets as any,
+      selectedFixedLabels,
       (cid: string) => objectiveFor(cid),
       (a: any) => a.optimization_goal || optGoalForCampaign(a.campaign_id),
       (a: any) => destTypeForCampaign(a.campaign_id),
     ),
-    [sortedAdsets, campaigns],
+    [sortedAdsets, campaigns, selectedFixedLabels],
   );
   const adsExtraCols = useMemo(
     () => computeExtraColumns(
       sortedAds as any,
+      selectedFixedLabels,
       (cid: string) => objectiveFor(cid),
       (cr: any) => cr.optimization_goal || optGoalForCampaign(cr.campaign_id),
       (cr: any) => destTypeForCampaign(cr.campaign_id),
     ),
-    [sortedAds, campaigns],
+    [sortedAds, campaigns, selectedFixedLabels],
   );
 
   // Imports por nível
@@ -403,10 +428,10 @@ export default function MetaHierarchyTabs({
     await loadAllCreatives();
   };
 
-  // Header de métricas: fixas + extras dinâmicas (uma coluna por métrica)
+  // Header de métricas: colunas escolhidas pelo usuário + extras detectadas pelo objetivo
   const renderMetricsHeader = (extraCols: string[]) => (
     <>
-      {FIXED_METRIC_COLS.map(col => (
+      {selectedFixedCols.map(col => (
         <th key={col.key} className="px-3 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">
           <SortHeader
             label={col.label}
@@ -425,7 +450,7 @@ export default function MetaHierarchyTabs({
     </>
   );
 
-  // Renderiza células de métricas: fixas + uma coluna para cada extra dinâmica
+  // Renderiza células: colunas fixas escolhidas + extras detectadas
   const renderMetricsCells = (
     ins: CampaignInsights,
     objective: string,
@@ -437,11 +462,11 @@ export default function MetaHierarchyTabs({
     const extrasMap = new Map(dynamicCells.map(c => [c.label, c]));
     return (
       <>
-        {FIXED_METRIC_COLS.map(col => {
-          const v = (ins as any)[col.key] || 0;
+        {selectedFixedCols.map(col => {
+          const v = Number((ins as any)[col.key]) || 0;
           return (
             <td key={col.key} className="px-3 py-2 text-right tabular-nums whitespace-nowrap text-foreground">
-              {v > 0 ? col.fmt(v) : <span className="text-muted-foreground/40">—</span>}
+              {v > 0 ? formatMetric(col.key, v) : <span className="text-muted-foreground/40">—</span>}
             </td>
           );
         })}
@@ -539,6 +564,17 @@ export default function MetaHierarchyTabs({
         {/* Espaço de separação entre grupos */}
         <div className="flex gap-2 items-center flex-wrap ml-6">
           <DateRangePicker value={dateRange} onChange={onDateRangeChange} />
+          {/* Personalizar colunas — sempre visível em todos os níveis */}
+          <Button
+            onClick={() => setColumnsDialogOpen(true)}
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            title="Escolher quais métricas aparecem nas tabelas"
+          >
+            <SlidersHorizontal className="w-3 h-3" /> Personalizar colunas
+            <span className="ml-1 text-[10px] text-muted-foreground">({visibleColumnKeys.length})</span>
+          </Button>
           {level === 'campaigns' && (
             <Button onClick={onExportPDF} variant="outline" size="sm" className="gap-2">
               <FileText className="w-3 h-3" /> Exportar PDF
@@ -840,33 +876,15 @@ export default function MetaHierarchyTabs({
             body: cr.body,
             title: cr.title,
           }))}
-        metricColumns={[
-          { key: 'spend', label: 'Gasto' },
-          { key: 'reach', label: 'Alcance' },
-          { key: 'impressions', label: 'Impressões' },
-          { key: 'cpm', label: 'CPM' },
-          { key: 'frequency', label: 'Frequência' },
-          { key: 'ctr', label: 'CTR' },
-          { key: 'cpc', label: 'CPC' },
-          { key: 'leads', label: 'Leads' },
-          { key: 'cpa', label: 'CPA' },
-          { key: 'roas', label: 'ROAS' },
-          { key: 'purchases', label: 'Compras' },
-          { key: 'revenue', label: 'Receita' },
-          { key: 'messages', label: 'Mensagens' },
-          { key: 'link_clicks', label: 'Cliques no link' },
-        ]}
-        visibleColumnKeys={['spend','reach','impressions','cpm','frequency'].concat(
-          ['ctr','cpc','leads','cpa','roas','purchases','revenue','messages','link_clicks']
-            .filter(k => !hiddenColKeys.includes(k))
-        )}
-        onColumnsChange={(keys) => {
-          const all = ['ctr','cpc','leads','cpa','roas','purchases','revenue','messages','link_clicks'];
-          setHiddenColKeys(all.filter(k => !keys.includes(k)));
-        }}
         onChanged={() => { loadAllAdsets(); loadAllCreatives(); }}
       />
     )}
+    <ColumnsCustomizerDialog
+      open={columnsDialogOpen}
+      onClose={() => setColumnsDialogOpen(false)}
+      visibleKeys={visibleColumnKeys}
+      onChange={setVisibleColumnKeys}
+    />
     </>
   );
 }

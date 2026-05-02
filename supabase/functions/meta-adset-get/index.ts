@@ -15,7 +15,7 @@ const FIELDS = [
   'daily_budget', 'lifetime_budget',
   'optimization_goal', 'billing_event', 'bid_strategy',
   'start_time', 'end_time',
-  'targeting', 'targeting_automation',
+  'targeting',
   'promoted_object',
 ].join(',');
 

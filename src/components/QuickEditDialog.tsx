@@ -39,9 +39,6 @@ interface Props {
   clientId: string;
   adset: AdSetLite;
   creatives: CreativeLite[];
-  metricColumns: { key: string; label: string }[];
-  visibleColumnKeys: string[];
-  onColumnsChange: (keys: string[]) => void;
   onChanged: () => void;
 }
 
@@ -55,10 +52,9 @@ const GENDER_OPTIONS = [
 ];
 
 export default function QuickEditDialog({
-  open, onClose, clientId, adset, creatives,
-  metricColumns, visibleColumnKeys, onColumnsChange, onChanged,
+  open, onClose, clientId, adset, creatives, onChanged,
 }: Props) {
-  const [tab, setTab] = useState<'columns' | 'audience' | 'creatives'>('audience');
+  const [tab, setTab] = useState<'audience' | 'creatives'>('audience');
 
   // ---------- Audience ----------
   const [loadingAdset, setLoadingAdset] = useState(false);
@@ -100,7 +96,7 @@ export default function QuickEditDialog({
         setAgeMin(t.age_min ?? 18);
         setAgeMax(t.age_max ?? 65);
         setGenders((t.genders && t.genders[0]) || 0);
-        setAdvantageAudience((ad.targeting_automation?.advantage_audience ?? 0) === 1);
+        setAdvantageAudience(((t.targeting_automation?.advantage_audience ?? ad.targeting_automation?.advantage_audience) ?? 0) === 1);
         setConfirmAdvantage(false);
 
         const g: GeoEntry[] = [];
@@ -339,12 +335,6 @@ export default function QuickEditDialog({
     }
   }
 
-  // ---------- Columns ----------
-  const toggleColumn = (key: string) => {
-    if (visibleColumnKeys.includes(key)) onColumnsChange(visibleColumnKeys.filter(k => k !== key));
-    else onColumnsChange([...visibleColumnKeys, key]);
-  };
-
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -352,14 +342,13 @@ export default function QuickEditDialog({
           <DialogTitle className="flex items-center gap-2">
             <Edit2 className="w-4 h-4" /> Editar — {adset.name}
           </DialogTitle>
-          <DialogDescription>Ajuste público, criativos e colunas sem sair da plataforma.</DialogDescription>
+          <DialogDescription>Ajuste público e criativos sem sair da plataforma.</DialogDescription>
         </DialogHeader>
 
         <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="audience">Público</TabsTrigger>
             <TabsTrigger value="creatives">Criativos</TabsTrigger>
-            <TabsTrigger value="columns">Colunas</TabsTrigger>
           </TabsList>
 
           {/* AUDIENCE */}
@@ -616,24 +605,6 @@ export default function QuickEditDialog({
                 </div>
               </>
             )}
-          </TabsContent>
-
-          {/* COLUMNS */}
-          <TabsContent value="columns" className="space-y-3 pt-4">
-            <p className="text-xs text-muted-foreground">Escolha quais métricas aparecem na tabela.</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {metricColumns.map(c => (
-                <label key={c.key} className="flex items-center gap-2 text-xs p-2 rounded border border-border/40 hover:bg-secondary/40">
-                  <Checkbox checked={visibleColumnKeys.includes(c.key)} onCheckedChange={() => toggleColumn(c.key)} />
-                  {c.label}
-                </label>
-              ))}
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => onColumnsChange(metricColumns.map(c => c.key))}>Marcar todas</Button>
-              <Button variant="outline" onClick={() => onColumnsChange([])}>Limpar</Button>
-              <Button onClick={onClose}>Concluir</Button>
-            </div>
           </TabsContent>
         </Tabs>
       </DialogContent>
