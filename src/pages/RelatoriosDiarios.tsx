@@ -1298,7 +1298,16 @@ function ReportGenerator({
                 })()}
               </div>
 
-              <Button onClick={generate} disabled={generating || !templateId || !clientId} className="w-full">
+              {selectedCampaignIds.size === 0 && (
+                <p className="text-xs text-muted-foreground text-center">
+                  Selecione ao menos uma campanha para gerar o relatório
+                </p>
+              )}
+              <Button
+                onClick={generate}
+                disabled={generating || !templateId || !clientId || selectedCampaignIds.size === 0}
+                className="w-full"
+              >
                 {generating ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <ArrowRight className="w-4 h-4 mr-2" />}
                 Gerar relatório
               </Button>
