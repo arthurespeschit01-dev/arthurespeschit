@@ -849,6 +849,8 @@ function ReportGenerator({
   const [accountBalance, setAccountBalance] = useState<string>('—');
   const [generated, setGenerated] = useState<string>('');
   const [generating, setGenerating] = useState(false);
+  const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
+  const [syncedRange, setSyncedRange] = useState<{ start: string; end: string } | null>(null);
 
   // Load templates + clients
   useEffect(() => {
