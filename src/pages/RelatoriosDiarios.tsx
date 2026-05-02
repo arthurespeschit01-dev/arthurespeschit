@@ -896,9 +896,15 @@ function ReportGenerator({
       const { data } = await supabase.from('campaigns').select('*').eq('client_id', clientId).order('name');
       const list = (data || []) as CampaignRow[];
       setCampaigns(list);
-      setSelectedCampaignIds(new Set(list.map(c => c.id)));
+      // Nenhuma campanha pré-selecionada — usuário escolhe explicitamente
+      setSelectedCampaignIds(new Set());
       if (list.length > 0) {
-        const { data: ads } = await supabase.from('ad_sets').select('*').in('campaign_id', list.map(c => c.id));
+        // Buscar apenas conjuntos ATIVOS (filtragem na origem dos dados)
+        const { data: ads } = await supabase
+          .from('ad_sets')
+          .select('*')
+          .in('campaign_id', list.map(c => c.id))
+          .in('status', ['Ativa', 'Ativo', 'ACTIVE', 'active']);
         setAdsets((ads || []) as AdSetRow[]);
       } else {
         setAdsets([]);
@@ -1067,7 +1073,11 @@ function ReportGenerator({
         if (campaignTpl) out.push(fillVars(campaignTpl.text, cCtx));
 
         if (adsetTpl) {
-          const adsetsForCampaign = adsets.filter(a => a.campaign_id === c.id);
+          const isActive = (s: any) => {
+            const v = String(s || '').toLowerCase();
+            return v === 'ativa' || v === 'ativo' || v === 'active';
+          };
+          const adsetsForCampaign = adsets.filter(a => a.campaign_id === c.id && isActive((a as any).status));
           for (const a of adsetsForCampaign as any[]) {
             const live = a.meta_adset_id ? adsetInsights[a.meta_adset_id] : null;
             const merged = live ? { ...a, ...live } : a;
@@ -1288,7 +1298,16 @@ function ReportGenerator({
                 })()}
               </div>
 
-              <Button onClick={generate} disabled={generating || !templateId || !clientId} className="w-full">
+              {selectedCampaignIds.size === 0 && (
+                <p className="text-xs text-muted-foreground text-center">
+                  Selecione ao menos uma campanha para gerar o relatório
+                </p>
+              )}
+              <Button
+                onClick={generate}
+                disabled={generating || !templateId || !clientId || selectedCampaignIds.size === 0}
+                className="w-full"
+              >
                 {generating ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <ArrowRight className="w-4 h-4 mr-2" />}
                 Gerar relatório
               </Button>
