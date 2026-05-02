@@ -194,6 +194,13 @@ export default function MetaHierarchyTabs({
   const [creatives, setCreatives] = useState<Creative[]>([]);
   const [loadingAdsets, setLoadingAdsets] = useState(false);
   const [loadingCreatives, setLoadingCreatives] = useState(false);
+
+  // Insights AO VIVO da Meta para conjuntos e anúncios — buscados no MESMO período
+  // selecionado em dateRange usando exatamente o mesmo parsing de meta-campaign-insights.
+  // Isso garante paridade 100% com o Gerenciador de Anúncios e consistência entre
+  // as abas Campanha / Conjunto / Anúncio (sem depender de dados antigos do banco).
+  const [liveAdsetIns, setLiveAdsetIns] = useState<Record<string, CampaignInsights>>({});
+  const [liveAdIns, setLiveAdIns] = useState<Record<string, CampaignInsights>>({});
   const [importingAdsets, setImportingAdsets] = useState(false);
   const [importingAds, setImportingAds] = useState(false);
 
