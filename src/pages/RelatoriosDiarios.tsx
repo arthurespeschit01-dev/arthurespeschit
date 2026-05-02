@@ -1089,6 +1089,8 @@ function ReportGenerator({
     } finally {
       setGenerating(false);
     }
+  }
+
 
   async function copyToClipboard() {
     try {
