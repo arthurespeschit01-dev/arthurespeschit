@@ -862,11 +862,17 @@ function WhatsAppPreview({ text }: { text: string }) {
 // Gerador de Relatório
 // =====================================================================
 function ReportGenerator({
-  initialTemplateId, onBack,
+  initialTemplateId, onBack, onCustomize,
 }: {
   initialTemplateId: string | null;
   onBack: () => void;
+  onCustomize: (preset: { name: string; description: string; blocks: Block[] }) => void;
 }) {
+  // Passo 1: tipo de campanha. Passo 2: variação. Passo 3: configurar e gerar.
+  const [step, setStep] = useState<'kind' | 'variant' | 'config'>(initialTemplateId ? 'config' : 'kind');
+  const [selectedKind, setSelectedKind] = useState<ReportKind | null>(null);
+  const [selectedPreset, setSelectedPreset] = useState<PresetTemplate | null>(null);
+
   const [templates, setTemplates] = useState<Template[]>([]);
   const [templateId, setTemplateId] = useState<string>(initialTemplateId || '');
   const [clients, setClients] = useState<ClientRow[]>([]);
