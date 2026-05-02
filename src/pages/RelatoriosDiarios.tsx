@@ -1073,7 +1073,11 @@ function ReportGenerator({
         if (campaignTpl) out.push(fillVars(campaignTpl.text, cCtx));
 
         if (adsetTpl) {
-          const adsetsForCampaign = adsets.filter(a => a.campaign_id === c.id);
+          const isActive = (s: any) => {
+            const v = String(s || '').toLowerCase();
+            return v === 'ativa' || v === 'ativo' || v === 'active';
+          };
+          const adsetsForCampaign = adsets.filter(a => a.campaign_id === c.id && isActive((a as any).status));
           for (const a of adsetsForCampaign as any[]) {
             const live = a.meta_adset_id ? adsetInsights[a.meta_adset_id] : null;
             const merged = live ? { ...a, ...live } : a;
