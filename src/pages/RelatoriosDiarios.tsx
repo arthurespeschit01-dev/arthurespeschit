@@ -1062,34 +1062,106 @@ function ReportGenerator({
 
               <div>
                 <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center justify-between">
                   <Label className="text-xs">Campanhas a incluir</Label>
-                  {campaigns.length > 0 && (
-                    <div className="flex gap-1">
-                      <Button size="sm" variant="ghost" className="h-6 text-[11px]"
-                        onClick={() => setSelectedCampaignIds(new Set(campaigns.map(c => c.id)))}>
-                        Todas
-                      </Button>
-                      <Button size="sm" variant="ghost" className="h-6 text-[11px]"
-                        onClick={() => setSelectedCampaignIds(new Set())}>
-                        Nenhuma
-                      </Button>
-                    </div>
-                  )}
                 </div>
-                <div className="border border-border/40 rounded-md p-2 max-h-56 overflow-y-auto space-y-1 mt-1">
-                  {!clientId && <p className="text-[11px] text-muted-foreground">Selecione um cliente.</p>}
-                  {clientId && campaigns.length === 0 && <p className="text-[11px] text-muted-foreground">Nenhuma campanha encontrada.</p>}
-                  {campaigns.map(c => (
-                    <label key={c.id} className="flex items-center gap-2 text-xs cursor-pointer">
-                      <Checkbox
-                        checked={selectedCampaignIds.has(c.id)}
-                        onCheckedChange={() => toggleCampaign(c.id)}
-                      />
-                      <span className="flex-1 truncate">{c.name}</span>
-                      <span className="text-muted-foreground text-[10px]">{formatBRL(c.spend)}</span>
-                    </label>
+
+                {/* Filtros de status */}
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {([
+                    { v: 'all', l: 'Todas' },
+                    { v: 'active', l: 'Ativas' },
+                    { v: 'paused', l: 'Pausadas' },
+                    { v: 'archived', l: 'Concluídas' },
+                  ] as const).map(f => (
+                    <Button
+                      key={f.v}
+                      type="button"
+                      size="sm"
+                      variant={campaignStatusFilter === f.v ? 'default' : 'outline'}
+                      className="h-7 text-[11px]"
+                      onClick={() => setCampaignStatusFilter(f.v)}
+                    >
+                      {f.l}
+                    </Button>
                   ))}
                 </div>
+
+                {/* Busca */}
+                <div className="relative mt-2">
+                  <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={campaignSearch}
+                    onChange={e => setCampaignSearch(e.target.value)}
+                    placeholder="Buscar campanha pelo nome..."
+                    className="pl-7 h-8 text-xs"
+                  />
+                </div>
+
+                {(() => {
+                  const q = campaignSearch.trim().toLowerCase();
+                  const matchStatus = (s?: string) => {
+                    const v = (s || '').toLowerCase();
+                    if (campaignStatusFilter === 'all') return true;
+                    if (campaignStatusFilter === 'active') return v === 'ativa' || v === 'ativo' || v === 'active';
+                    if (campaignStatusFilter === 'paused') return v === 'pausada' || v === 'pausado' || v === 'paused';
+                    if (campaignStatusFilter === 'archived') return v === 'concluída' || v === 'concluida' || v === 'concluído' || v === 'archived' || v === 'finalizada' || v === 'encerrada';
+                    return true;
+                  };
+                  const visible = campaigns.filter(c =>
+                    matchStatus(c.status) && (!q || c.name.toLowerCase().includes(q))
+                  );
+                  const dotColor = (s?: string) => {
+                    const v = (s || '').toLowerCase();
+                    if (v === 'ativa' || v === 'ativo' || v === 'active') return 'bg-emerald-500';
+                    if (v === 'pausada' || v === 'pausado' || v === 'paused') return 'bg-amber-500';
+                    return 'bg-muted-foreground/50';
+                  };
+
+                  return (
+                    <>
+                      {visible.length > 0 && (
+                        <div className="flex gap-1 mt-2">
+                          <Button size="sm" variant="ghost" className="h-6 text-[11px]"
+                            onClick={() => setSelectedCampaignIds(prev => {
+                              const next = new Set(prev);
+                              visible.forEach(c => next.add(c.id));
+                              return next;
+                            })}>
+                            Selecionar todas
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-6 text-[11px]"
+                            onClick={() => setSelectedCampaignIds(prev => {
+                              const next = new Set(prev);
+                              visible.forEach(c => next.delete(c.id));
+                              return next;
+                            })}>
+                            Nenhuma
+                          </Button>
+                        </div>
+                      )}
+                      <div className="border border-border/40 rounded-md p-2 max-h-56 overflow-y-auto space-y-1 mt-1">
+                        {!clientId && <p className="text-[11px] text-muted-foreground">Selecione um cliente.</p>}
+                        {clientId && campaigns.length === 0 && <p className="text-[11px] text-muted-foreground">Nenhuma campanha encontrada.</p>}
+                        {clientId && campaigns.length > 0 && visible.length === 0 && (
+                          <p className="text-[11px] text-muted-foreground">Nenhuma campanha bate com o filtro.</p>
+                        )}
+                        {visible.map(c => (
+                          <label key={c.id} className="flex items-center gap-2 text-xs cursor-pointer">
+                            <Checkbox
+                              checked={selectedCampaignIds.has(c.id)}
+                              onCheckedChange={() => toggleCampaign(c.id)}
+                            />
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor(c.status)}`} title={c.status || ''} />
+                            <span className="flex-1 truncate">{c.name}</span>
+                            <span className="text-muted-foreground text-[10px]">{formatBRL(c.spend)}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
 
               <Button onClick={generate} disabled={generating || !templateId || !clientId} className="w-full">
