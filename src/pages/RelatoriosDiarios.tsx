@@ -449,7 +449,7 @@ function TemplateEditor({
       if (error) { toast.error('Falha ao salvar', { description: error.message }); setSaving(false); return; }
       toast.success('Template atualizado');
     } else {
-      const { error } = await supabase.from('report_templates').insert({ ...payload, user_id: user.id });
+      const { error } = await supabase.from('report_templates').insert({ ...payload, user_id: user.id } as any);
       if (error) { toast.error('Falha ao salvar', { description: error.message }); setSaving(false); return; }
       toast.success('Template criado');
     }
