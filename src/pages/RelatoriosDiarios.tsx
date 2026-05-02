@@ -1062,8 +1062,6 @@ function ReportGenerator({
 
               <div>
                 <div className="flex items-center justify-between">
-              <div>
-                <div className="flex items-center justify-between">
                   <Label className="text-xs">Campanhas a incluir</Label>
                 </div>
 
