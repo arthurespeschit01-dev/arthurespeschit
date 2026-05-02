@@ -402,6 +402,24 @@ function TemplatesList({
     load();
   }
 
+  async function resetDefaults() {
+    if (!confirm('Atualizar os templates padrão (Resumo Rápido, Detalhado, Executivo) para a versão mais recente? Templates personalizados criados por você não serão alterados.')) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    for (const def of DEFAULT_TEMPLATES) {
+      const existing = templates.find(t => t.name === def.name);
+      if (existing) {
+        await supabase.from('report_templates').update({
+          description: def.description, blocks: def.blocks,
+        } as any).eq('id', existing.id);
+      } else {
+        await supabase.from('report_templates').insert({ ...def, user_id: user.id } as any);
+      }
+    }
+    toast.success('Templates padrão atualizados');
+    load();
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex justify-end">
