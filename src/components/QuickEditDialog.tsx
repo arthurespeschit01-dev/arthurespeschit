@@ -335,12 +335,6 @@ export default function QuickEditDialog({
     }
   }
 
-  // ---------- Columns ----------
-  const toggleColumn = (key: string) => {
-    if (visibleColumnKeys.includes(key)) onColumnsChange(visibleColumnKeys.filter(k => k !== key));
-    else onColumnsChange([...visibleColumnKeys, key]);
-  };
-
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -348,14 +342,13 @@ export default function QuickEditDialog({
           <DialogTitle className="flex items-center gap-2">
             <Edit2 className="w-4 h-4" /> Editar — {adset.name}
           </DialogTitle>
-          <DialogDescription>Ajuste público, criativos e colunas sem sair da plataforma.</DialogDescription>
+          <DialogDescription>Ajuste público e criativos sem sair da plataforma.</DialogDescription>
         </DialogHeader>
 
         <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="audience">Público</TabsTrigger>
             <TabsTrigger value="creatives">Criativos</TabsTrigger>
-            <TabsTrigger value="columns">Colunas</TabsTrigger>
           </TabsList>
 
           {/* AUDIENCE */}
