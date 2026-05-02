@@ -1451,7 +1451,7 @@ function ReportGenerator({
               )}
               <Button
                 onClick={generate}
-                disabled={generating || !templateId || !clientId || selectedCampaignIds.size === 0}
+                disabled={generating || (!templateId && !selectedPreset) || !clientId || selectedCampaignIds.size === 0}
                 className="w-full"
               >
                 {generating ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <ArrowRight className="w-4 h-4 mr-2" />}
