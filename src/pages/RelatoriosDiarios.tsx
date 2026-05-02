@@ -959,7 +959,10 @@ function ReportGenerator({
   }
 
   async function generate() {
-    const tpl = templates.find(t => t.id === templateId);
+    // Pode vir de um preset (passo inicial) OU de um template salvo (lista).
+    const tpl: { blocks: Block[] } | undefined = selectedPreset
+      ? { blocks: selectedPreset.blocks as Block[] }
+      : templates.find(t => t.id === templateId);
     if (!tpl) { toast.error('Selecione um template'); return; }
     if (!clientId) { toast.error('Selecione um cliente'); return; }
     setGenerating(true);
