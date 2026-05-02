@@ -1248,18 +1248,6 @@ function ReportGenerator({
                         );
                       })}
                     </div>
-                    {selectedPreset && (
-                      <div className="flex justify-end mt-1">
-                        <Button
-                          size="sm"
-                          variant="link"
-                          className="h-6 text-[11px] px-1"
-                          onClick={() => onCustomize({ name: selectedPreset.name, description: selectedPreset.description, blocks: selectedPreset.blocks as any })}
-                        >
-                          <Edit2 className="w-3 h-3 mr-1" /> Personalizar este template
-                        </Button>
-                      </div>
-                    )}
                   </div>
                 )}
 
