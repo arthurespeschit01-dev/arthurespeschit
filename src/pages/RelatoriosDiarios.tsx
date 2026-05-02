@@ -231,22 +231,22 @@ const DEFAULT_TEMPLATES: Omit<Template, 'id' | 'created_at'>[] = [
   },
   {
     name: 'Detalhado',
-    description: 'Todas as métricas + comparativos por conjunto.',
+    description: 'Todas as métricas, uma por linha — pronto para WhatsApp.',
     blocks: [
       {
         id: 'h1',
         kind: 'header',
-        text: '📊 Relatório {{tipo_relatorio}} — {{nome_cliente}}\n📅 {{data_hoje}} — {{hora_envio}}\n💼 Investimento previsto: {{valor_investimento}}\n💳 Saldo da conta: {{saldo_da_conta}}',
+        text: '📊 *Relatório {{tipo_relatorio}} — {{nome_cliente}}*\n📅 {{data_hoje}} — {{hora_envio}}\n📆 Período: {{inicio_do_periodo}} a {{fim_do_periodo}}\n💼 Investimento previsto: {{valor_investimento}}\n💳 Saldo da conta: {{saldo_da_conta}}\n———————————',
       },
       {
         id: 'c1',
         kind: 'campaign',
-        text: '\n━━━━━━━━━━━━━━\n✅ {{nome_campanha}} ({{status_campanha}})\n🎯 {{objetivo}} · {{plataforma}}\n💰 Gasto: {{gasto}} · CPM: {{cpm}} · CPC: {{cpc}}\n👁 {{impressoes}} impressões · 🖱 {{cliques}} cliques · CTR {{ctr}}\n📈 {{conversoes}} conversões · CPA {{cpa}} · Freq {{freq}}',
+        text: '\n✅ *{{nome_campanha}}* ({{status_campanha}})\n🎯 {{objetivo}} · {{plataforma}}\n\n💰 Investimento: {{gasto}}\n📊 CPM: {{cpm}}\n🖱 CPC: {{cpc}}\n👁 Impressões: {{impressoes}}\n🔗 Cliques: {{cliques}}\n📈 CTR: {{ctr}}\n🔄 Frequência: {{freq}}\n✉️ Conversões: {{conversoes}}\n💵 CPA: {{cpa}}',
       },
       {
         id: 'a1',
         kind: 'adset',
-        text: '   • {{nome_conjunto}}\n     👁 {{impressoes_conjunto}} · 💰 {{gasto_conjunto}}\n     {{conversoes_conjunto}} conv. · CPA {{cpa_conjunto}} · CTR {{ctr_conjunto}}',
+        text: '\n📦 *{{nome_conjunto}}*\n👁 Impressões: {{impressoes_conjunto}}\n💰 Gasto: {{gasto_conjunto}}\n✉️ Conversões: {{conversoes_conjunto}}\n💵 CPA: {{cpa_conjunto}}\n📈 CTR: {{ctr_conjunto}}',
       },
     ],
   },
