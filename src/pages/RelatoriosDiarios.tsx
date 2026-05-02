@@ -918,7 +918,7 @@ function ReportGenerator({
     if (!clientId) { toast.error('Selecione um cliente'); return; }
     setGenerating(true);
     try {
-      // Tenta puxar saldo da conta (best-effort)
+      // Saldo da conta (best-effort)
       try {
         const { data } = await supabase.functions.invoke('meta-account-balances', {
           body: { client_id: clientId },
@@ -927,7 +927,43 @@ function ReportGenerator({
         if (bal != null) setAccountBalance(formatBRL(Number(bal)));
       } catch { /* ignore */ }
 
+      const range = getDateRange();
       const { start, end, label, days } = getPeriodLabels();
+
+      // ====== MESMA FONTE DA ABA CAMPANHAS ======
+      // Busca insights via edge functions, idêntico ao que ClientDetail usa.
+      const selectedCampaigns = campaigns.filter(c => selectedCampaignIds.has(c.id));
+      const metaCampaigns = selectedCampaigns.filter(c => c.meta_campaign_id);
+
+      let campaignInsights: Record<string, any> = {};
+      let adsetInsights: Record<string, any> = {};
+      try {
+        if (metaCampaigns.length > 0) {
+          campaignInsights = await getCampaignInsights({
+            client_id: clientId,
+            meta_campaign_ids: metaCampaigns.map(c => c.meta_campaign_id!) as string[],
+            range,
+          });
+          adsetInsights = await getAdsetInsights({ client_id: clientId, range });
+        }
+      } catch (e) {
+        console.warn('[relatorios] insights live falhou, usando fallback do banco:', e);
+      }
+      setLastSyncAt(new Date());
+      setSyncedRange({ start, end });
+
+      // Mescla métrica live com a row do banco (live tem prioridade)
+      const mergedCampaigns = selectedCampaigns.map(c => {
+        const live = c.meta_campaign_id ? campaignInsights[c.meta_campaign_id] : null;
+        if (!live) return c;
+        return { ...c, ...live };
+      });
+
+      const totalSpend = mergedCampaigns.reduce((s, c: any) => s + Number(c.spend || 0), 0);
+      const totalImpr = mergedCampaigns.reduce((s, c: any) => s + Number(c.impressions || 0), 0);
+      const totalClicks = mergedCampaigns.reduce((s, c: any) => s + Number(c.clicks || 0), 0);
+      const totalConv = mergedCampaigns.reduce((s, c: any) => s + getConversoes(c), 0);
+
       const headerCtx: Record<string, string> = {
         nome_cliente: client?.name || '—',
         tipo_relatorio: label,
@@ -939,11 +975,9 @@ function ReportGenerator({
         fim_do_periodo: end,
         periodo_dias: days,
         periodo_meses: '0',
-        valor_investimento: formatBRL(client?.verba_mensal || 0),
+        valor_investimento: fmtBRL(client?.verba_mensal || 0),
         saldo_da_conta: accountBalance,
-        gasto_periodo: formatBRL(
-          campaigns.filter(c => selectedCampaignIds.has(c.id)).reduce((s, c) => s + Number(c.spend || 0), 0)
-        ),
+        gasto_periodo: fmtBRL(totalSpend),
       };
 
       const headers = tpl.blocks.filter(b => b.kind === 'header');
@@ -953,7 +987,7 @@ function ReportGenerator({
       const out: string[] = [];
       for (const h of headers) out.push(fillVars(h.text, headerCtx));
 
-      for (const c of campaigns.filter(c => selectedCampaignIds.has(c.id))) {
+      for (const c of mergedCampaigns as any[]) {
         const conv = getConversoes(c);
         const spend = Number(c.spend || 0);
         const leadsN = Number(c.leads || 0);
@@ -965,7 +999,7 @@ function ReportGenerator({
         const cpv = videoViews > 0 ? spend / videoViews : 0;
         const linkClicks = Number(c.link_clicks || 0);
         const cpcLink = linkClicks > 0 ? spend / linkClicks : 0;
-        // Resultado principal: depende do objetivo
+        const cpaCalc = Number(c.cpa || 0) || (conv > 0 ? spend / conv : 0);
         let resultado = conv;
         if (purchasesN > 0) resultado = purchasesN;
         else if (leadsN > 0) resultado = leadsN;
@@ -975,43 +1009,36 @@ function ReportGenerator({
         const cCtx: Record<string, string> = {
           ...headerCtx,
           nome_campanha: c.name,
-          plataforma: c.platform || 'Meta',
+          plataforma: c.platform || 'Meta Ads',
           objetivo: c.objective || '—',
           status_campanha: c.status || '—',
-          gasto: formatBRL(c.spend),
-          impressoes: formatInt(c.impressions),
-          cliques: formatInt(c.clicks),
-          ctr: formatPct(c.ctr),
-          cpc: formatBRL(c.cpc),
-          cpm: formatBRL(c.cpm),
-          cpa: formatBRL(c.cpa),
+          gasto: fmtBRL(spend),
+          impressoes: fmtInt(c.impressions),
+          cliques: fmtInt(c.clicks),
+          ctr: fmtPct(c.ctr),
+          cpc: fmtBRL(c.cpc),
+          cpm: fmtBRL(c.cpm),
+          cpa: fmtBRL(cpaCalc),
           conversoes: String(conv),
-          freq: (Number(c.frequency || 0)).toFixed(2).replace('.', ','),
-          // Mensagens
-          mensagens: formatInt(msgsN),
-          custo_por_mensagem: formatBRL(cpMsg),
-          // Leads
-          leads: formatInt(leadsN),
-          cpl: formatBRL(cpl),
-          // Alcance
-          alcance: formatInt(c.reach),
-          frequencia: (Number(c.frequency || 0)).toFixed(2).replace('.', ','),
-          // Vídeo
-          visualizacoes_video: formatInt(videoViews),
-          custo_por_visualizacao: formatBRL(cpv),
-          reproducoes_3s: formatInt(videoViews),
+          freq: fmtDec(c.frequency),
+          mensagens: fmtInt(msgsN),
+          custo_por_mensagem: fmtBRL(cpMsg),
+          leads: fmtInt(leadsN),
+          cpl: fmtBRL(cpl),
+          alcance: fmtInt(c.reach),
+          frequencia: fmtDec(c.frequency),
+          visualizacoes_video: fmtInt(videoViews),
+          custo_por_visualizacao: fmtBRL(cpv),
+          reproducoes_3s: fmtInt(videoViews),
           reproducoes_thruplay: '—',
-          // Engajamento
           curtidas: '—',
           comentarios: '—',
           compartilhamentos: '—',
-          cliques_link: formatInt(linkClicks),
-          custo_por_clique_link: formatBRL(cpcLink),
-          // Resultados gerais
+          cliques_link: fmtInt(linkClicks),
+          custo_por_clique_link: fmtBRL(cpcLink),
           resultado: String(resultado),
-          custo_por_resultado: formatBRL(cpResult),
-          roas: (Number((c as any).roas || 0)).toFixed(2).replace('.', ','),
-          // Comparativo (sem dados ainda)
+          custo_por_resultado: fmtBRL(cpResult),
+          roas: fmtDec(c.roas),
           variacao_gasto: '—',
           variacao_resultado: '—',
           variacao_cpa: '—',
@@ -1020,35 +1047,48 @@ function ReportGenerator({
 
         if (adsetTpl) {
           const adsetsForCampaign = adsets.filter(a => a.campaign_id === c.id);
-          for (const a of adsetsForCampaign) {
-            const aConv = getConversoes(a);
-            const aSpend = Number(a.spend || 0);
-            const aLeads = Number(a.leads || 0);
-            const aMsgs = Number(a.messages || 0);
+          for (const a of adsetsForCampaign as any[]) {
+            const live = a.meta_adset_id ? adsetInsights[a.meta_adset_id] : null;
+            const merged = live ? { ...a, ...live } : a;
+            const aConv = getConversoes(merged);
+            const aSpend = Number(merged.spend || 0);
+            const aLeads = Number(merged.leads || 0);
+            const aMsgs = Number(merged.messages || 0);
             const aCpl = aLeads > 0 ? aSpend / aLeads : 0;
+            const aCpa = Number(merged.cpa || 0) || (aConv > 0 ? aSpend / aConv : 0);
             const aCtx: Record<string, string> = {
               ...cCtx,
-              nome_conjunto: a.name,
-              gasto_conjunto: formatBRL(a.spend),
-              impressoes_conjunto: formatInt(a.impressions),
-              cliques_conjunto: formatInt(a.clicks),
-              ctr_conjunto: formatPct(a.ctr),
-              cpa_conjunto: formatBRL(a.cpa),
+              nome_conjunto: merged.name,
+              gasto_conjunto: fmtBRL(aSpend),
+              impressoes_conjunto: fmtInt(merged.impressions),
+              cliques_conjunto: fmtInt(merged.clicks),
+              ctr_conjunto: fmtPct(merged.ctr),
+              cpa_conjunto: fmtBRL(aCpa),
               conversoes_conjunto: String(aConv),
-              mensagens_conjunto: formatInt(aMsgs),
-              leads_conjunto: formatInt(aLeads),
-              cpl_conjunto: formatBRL(aCpl),
-              alcance_conjunto: formatInt(a.reach),
+              mensagens_conjunto: fmtInt(aMsgs),
+              leads_conjunto: fmtInt(aLeads),
+              cpl_conjunto: fmtBRL(aCpl),
+              alcance_conjunto: fmtInt(merged.reach),
             };
             out.push(fillVars(adsetTpl.text, aCtx));
           }
         }
       }
+
+      // Totais gerais (rodapé)
+      if (mergedCampaigns.length > 1) {
+        out.push('\n———————————');
+        out.push(`📊 *Totais do período*`);
+        out.push(`💰 Investimento total: ${fmtBRL(totalSpend)}`);
+        out.push(`👁 Impressões: ${fmtInt(totalImpr)}`);
+        out.push(`🔗 Cliques: ${fmtInt(totalClicks)}`);
+        out.push(`✉️ Conversões: ${fmtInt(totalConv)}`);
+      }
+
       setGenerated(out.join('\n'));
     } finally {
       setGenerating(false);
     }
-  }
 
   async function copyToClipboard() {
     try {
