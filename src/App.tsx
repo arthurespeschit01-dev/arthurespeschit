@@ -27,6 +27,7 @@ const PlanilhaTeste = lazy(() => import("./pages/PlanilhaTeste"));
 const Tasks = lazy(() => import("./pages/Tasks"));
 const UTMGenerator = lazy(() => import("./pages/UTMGenerator"));
 const Estrategias = lazy(() => import("./pages/Estrategias"));
+const RelatoriosDiarios = lazy(() => import("./pages/RelatoriosDiarios"));
 const Bloqueado = lazy(() => import("./pages/Bloqueado"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -104,6 +105,7 @@ function ProtectedRoutes() {
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/clientes" element={<Clientes />} />
                 <Route path="/clientes/:id" element={<ClientDetail />} />
+                <Route path="/relatorios" element={<RelatoriosDiarios />} />
                 <Route path="/financeiro" element={<Financeiro />} />
                 <Route path="/calculadora" element={<Navigate to="/financeiro" replace />} />
                 <Route path="/processos" element={<Processos />} />

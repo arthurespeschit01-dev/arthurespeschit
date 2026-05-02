@@ -17,6 +17,7 @@ import logoCentralGestor from '@/assets/logo-central-gestor.png';
 const mainNavItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/clientes', label: 'Clientes', icon: Users },
+  { to: '/relatorios', label: 'Relatórios Diários', icon: FileText },
   { to: '/tasks', label: 'Tasks', icon: ListTodo },
   { to: '/financeiro', label: 'Financeiro', icon: DollarSign },
   // { to: '/planilha', label: 'Planilha', icon: BarChart3 },
