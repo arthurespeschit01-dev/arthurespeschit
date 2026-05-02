@@ -17,8 +17,9 @@ import {
 import { toast } from 'sonner';
 import {
   Plus, Edit2, Copy, Trash2, ArrowLeft, Send, ClipboardCopy, RefreshCw,
-  GripVertical, ChevronDown, ChevronUp, X, FileText, Sparkles, ArrowRight,
+  GripVertical, ChevronDown, ChevronUp, X, FileText, Sparkles, ArrowRight, Search,
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 // =====================================================================
 // Tipos
@@ -56,6 +57,9 @@ interface CampaignRow {
   purchases?: number;
   messages?: number;
   frequency?: number;
+  reach?: number;
+  link_clicks?: number;
+  video_views?: number;
   meta_campaign_id?: string | null;
 }
 interface AdSetRow {
@@ -72,68 +76,130 @@ interface AdSetRow {
   leads?: number;
   messages?: number;
   frequency?: number;
+  reach?: number;
 }
 
 // =====================================================================
 // Variáveis disponíveis
 // =====================================================================
-const VARIABLES: { group: string; vars: { key: string; label: string }[] }[] = [
+type VarDef = { key: string; label: string; desc?: string; isNew?: boolean };
+const VARIABLES: { group: string; vars: VarDef[] }[] = [
   {
     group: 'Cabeçalho',
     vars: [
-      { key: 'nome_cliente', label: 'Nome do cliente' },
-      { key: 'nome_campanha', label: 'Nome da campanha' },
-      { key: 'plataforma', label: 'Plataforma' },
-      { key: 'objetivo', label: 'Objetivo' },
-      { key: 'status_campanha', label: 'Status da campanha' },
+      { key: 'nome_cliente', label: 'Nome do cliente', desc: 'Nome do cliente selecionado' },
+      { key: 'nome_campanha', label: 'Nome da campanha', desc: 'Nome de cada campanha incluída' },
+      { key: 'plataforma', label: 'Plataforma', desc: 'Plataforma da campanha (Meta, Google...)' },
+      { key: 'objetivo', label: 'Objetivo', desc: 'Objetivo configurado da campanha' },
+      { key: 'status_campanha', label: 'Status da campanha', desc: 'Ativa, pausada ou concluída' },
     ],
   },
   {
     group: 'Datas',
     vars: [
-      { key: 'data_hoje', label: 'Data de hoje' },
-      { key: 'hora_envio', label: 'Hora do envio' },
-      { key: 'data_inicio', label: 'Data de início' },
-      { key: 'data_fim', label: 'Data de fim' },
-      { key: 'tipo_relatorio', label: 'Tipo de relatório' },
-      { key: 'periodo_dias', label: 'Período (dias)' },
-      { key: 'periodo_meses', label: 'Período (meses)' },
-      { key: 'inicio_do_periodo', label: 'Início do período' },
-      { key: 'fim_do_periodo', label: 'Fim do período' },
+      { key: 'data_hoje', label: 'Data de hoje', desc: 'Data atual no formato dd/mm/aaaa' },
+      { key: 'hora_envio', label: 'Hora do envio', desc: 'Hora atual hh:mm' },
+      { key: 'data_inicio', label: 'Data de início', desc: 'Início do período do relatório' },
+      { key: 'data_fim', label: 'Data de fim', desc: 'Fim do período do relatório' },
+      { key: 'tipo_relatorio', label: 'Tipo de relatório', desc: 'Hoje, Ontem, 7 dias...' },
+      { key: 'periodo_dias', label: 'Período (dias)', desc: 'Quantidade de dias do período' },
+      { key: 'periodo_meses', label: 'Período (meses)', desc: 'Quantidade aproximada de meses' },
+      { key: 'inicio_do_periodo', label: 'Início do período', desc: 'Atalho para data de início' },
+      { key: 'fim_do_periodo', label: 'Fim do período', desc: 'Atalho para data de fim' },
     ],
   },
   {
     group: 'Financeiro',
     vars: [
-      { key: 'valor_investimento', label: 'Investimento previsto' },
-      { key: 'saldo_da_conta', label: 'Saldo da conta' },
-      { key: 'gasto_periodo', label: 'Gasto no período' },
-      { key: 'gasto', label: 'Gasto da campanha' },
-      { key: 'cpc', label: 'CPC' },
-      { key: 'cpm', label: 'CPM' },
-      { key: 'cpa', label: 'CPA' },
+      { key: 'valor_investimento', label: 'Investimento previsto', desc: 'Verba mensal contratada' },
+      { key: 'saldo_da_conta', label: 'Saldo da conta', desc: 'Saldo atual na conta de anúncios' },
+      { key: 'gasto_periodo', label: 'Gasto no período', desc: 'Soma do gasto de todas as campanhas selecionadas' },
+      { key: 'gasto', label: 'Gasto da campanha', desc: 'Gasto da campanha individual' },
+      { key: 'cpc', label: 'CPC', desc: 'Custo por clique médio' },
+      { key: 'cpm', label: 'CPM', desc: 'Custo por mil impressões' },
+      { key: 'cpa', label: 'CPA', desc: 'Custo por aquisição/conversão' },
     ],
   },
   {
     group: 'Métricas (campanha)',
     vars: [
-      { key: 'impressoes', label: 'Impressões' },
-      { key: 'cliques', label: 'Cliques' },
-      { key: 'ctr', label: 'CTR' },
-      { key: 'conversoes', label: 'Conversões' },
-      { key: 'freq', label: 'Frequência' },
+      { key: 'impressoes', label: 'Impressões', desc: 'Total de impressões servidas' },
+      { key: 'cliques', label: 'Cliques', desc: 'Total de cliques' },
+      { key: 'ctr', label: 'CTR', desc: 'Taxa de cliques (%)' },
+      { key: 'conversoes', label: 'Conversões', desc: 'Total de conversões (leads + vendas + msgs)' },
+      { key: 'freq', label: 'Frequência', desc: 'Frequência média de exibição' },
     ],
   },
   {
     group: 'Métricas (conjunto)',
     vars: [
-      { key: 'nome_conjunto', label: 'Nome do conjunto' },
-      { key: 'gasto_conjunto', label: 'Gasto do conjunto' },
+      { key: 'nome_conjunto', label: 'Nome do conjunto', desc: 'Nome do ad set' },
+      { key: 'gasto_conjunto', label: 'Gasto do conjunto', desc: 'Gasto somente do ad set' },
       { key: 'impressoes_conjunto', label: 'Impressões do conjunto' },
       { key: 'cliques_conjunto', label: 'Cliques do conjunto' },
       { key: 'ctr_conjunto', label: 'CTR do conjunto' },
       { key: 'cpa_conjunto', label: 'CPA do conjunto' },
       { key: 'conversoes_conjunto', label: 'Conversões do conjunto' },
+    ],
+  },
+  {
+    group: 'Mensagens / WhatsApp',
+    vars: [
+      { key: 'mensagens', label: 'Mensagens', desc: 'Total de conversas iniciadas', isNew: true },
+      { key: 'custo_por_mensagem', label: 'Custo por mensagem', desc: 'Custo médio por mensagem', isNew: true },
+      { key: 'mensagens_conjunto', label: 'Mensagens (conjunto)', desc: 'Mensagens por conjunto', isNew: true },
+    ],
+  },
+  {
+    group: 'Leads',
+    vars: [
+      { key: 'leads', label: 'Leads', desc: 'Total de leads gerados', isNew: true },
+      { key: 'cpl', label: 'CPL', desc: 'Custo por lead', isNew: true },
+      { key: 'leads_conjunto', label: 'Leads (conjunto)', desc: 'Leads por conjunto', isNew: true },
+      { key: 'cpl_conjunto', label: 'CPL (conjunto)', desc: 'Custo por lead no conjunto', isNew: true },
+    ],
+  },
+  {
+    group: 'Alcance',
+    vars: [
+      { key: 'alcance', label: 'Alcance', desc: 'Pessoas únicas alcançadas', isNew: true },
+      { key: 'alcance_conjunto', label: 'Alcance (conjunto)', desc: 'Alcance por conjunto', isNew: true },
+      { key: 'frequencia', label: 'Frequência', desc: 'Frequência média (sinônimo de freq)', isNew: true },
+    ],
+  },
+  {
+    group: 'Vídeo',
+    vars: [
+      { key: 'visualizacoes_video', label: 'Visualizações de vídeo', desc: 'Total de views', isNew: true },
+      { key: 'custo_por_visualizacao', label: 'CPV', desc: 'Custo por visualização', isNew: true },
+      { key: 'reproducoes_3s', label: 'Reproduções 3s', desc: 'Reproduções de pelo menos 3 segundos', isNew: true },
+      { key: 'reproducoes_thruplay', label: 'ThruPlay', desc: 'Vídeo assistido até o fim ou 15s+', isNew: true },
+    ],
+  },
+  {
+    group: 'Engajamento',
+    vars: [
+      { key: 'curtidas', label: 'Curtidas', desc: 'Curtidas no post', isNew: true },
+      { key: 'comentarios', label: 'Comentários', desc: 'Total de comentários', isNew: true },
+      { key: 'compartilhamentos', label: 'Compartilhamentos', desc: 'Total de compartilhamentos', isNew: true },
+      { key: 'cliques_link', label: 'Cliques no link', desc: 'Cliques no link especificamente', isNew: true },
+      { key: 'custo_por_clique_link', label: 'CPC de link', desc: 'Custo por clique no link', isNew: true },
+    ],
+  },
+  {
+    group: 'Resultados gerais',
+    vars: [
+      { key: 'resultado', label: 'Resultado', desc: 'Resultado principal (depende do objetivo)', isNew: true },
+      { key: 'custo_por_resultado', label: 'Custo por resultado', desc: 'Custo do resultado principal', isNew: true },
+      { key: 'roas', label: 'ROAS', desc: 'Retorno sobre investimento (se aplicável)', isNew: true },
+    ],
+  },
+  {
+    group: 'Comparativo (período anterior)',
+    vars: [
+      { key: 'variacao_gasto', label: 'Variação do gasto', desc: 'Ex: +12% vs período anterior', isNew: true },
+      { key: 'variacao_resultado', label: 'Variação do resultado', desc: 'Variação do resultado principal', isNew: true },
+      { key: 'variacao_cpa', label: 'Variação do CPA', desc: 'Variação do CPA vs período anterior', isNew: true },
     ],
   },
 ];
@@ -518,34 +584,7 @@ function TemplateEditor({
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-primary" /> Variáveis disponíveis
-              </CardTitle>
-              <p className="text-[11px] text-muted-foreground">Clique para inserir no bloco selecionado.</p>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {VARIABLES.map(g => (
-                <div key={g.group}>
-                  <div className="text-[11px] font-medium text-muted-foreground mb-1">{g.group}</div>
-                  <div className="flex flex-wrap gap-1">
-                    {g.vars.map(v => (
-                      <button
-                        key={v.key}
-                        type="button"
-                        onClick={() => insertVar(v.key)}
-                        className="text-[11px] px-2 py-1 rounded bg-secondary hover:bg-secondary/80 border border-border/40"
-                        title={v.label}
-                      >
-                        {`{{${v.key}}}`}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+          <VariablesPanel onInsert={insertVar} />
         </div>
 
         {/* Preview (direita) */}
@@ -557,6 +596,93 @@ function TemplateEditor({
         </div>
       </div>
     </div>
+  );
+}
+
+function VariablesPanel({ onInsert }: { onInsert: (key: string) => void }) {
+  const [query, setQuery] = useState('');
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  function toggleGroup(g: string) {
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      if (next.has(g)) next.delete(g); else next.add(g);
+      return next;
+    });
+  }
+
+  const q = query.trim().toLowerCase();
+  const filtered = VARIABLES.map(g => ({
+    ...g,
+    vars: g.vars.filter(v =>
+      !q || v.key.toLowerCase().includes(q) || v.label.toLowerCase().includes(q) || (v.desc?.toLowerCase().includes(q))
+    ),
+  })).filter(g => g.vars.length > 0);
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-primary" /> Variáveis disponíveis
+        </CardTitle>
+        <p className="text-[11px] text-muted-foreground">Clique para inserir no bloco selecionado.</p>
+        <div className="relative mt-2">
+          <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Buscar variável..."
+            className="pl-7 h-8 text-xs"
+          />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-2 max-h-[420px] overflow-y-auto">
+        <TooltipProvider delayDuration={200}>
+          {filtered.map(g => {
+            const isCollapsed = collapsed.has(g.group) && !q;
+            return (
+              <div key={g.group} className="border border-border/30 rounded-md">
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(g.group)}
+                  className="w-full flex items-center justify-between px-2 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-secondary/40"
+                >
+                  <span>{g.group} <span className="opacity-60">({g.vars.length})</span></span>
+                  {isCollapsed ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
+                </button>
+                {!isCollapsed && (
+                  <div className="flex flex-wrap gap-1 p-2 pt-1">
+                    {g.vars.map(v => (
+                      <Tooltip key={v.key}>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() => onInsert(v.key)}
+                            className="text-[11px] px-2 py-1 rounded bg-secondary hover:bg-secondary/80 border border-border/40 inline-flex items-center gap-1"
+                          >
+                            {`{{${v.key}}}`}
+                            {v.isNew && (
+                              <span className="text-[9px] px-1 py-0 rounded bg-primary text-primary-foreground font-semibold">novo</span>
+                            )}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">
+                          <div className="text-xs font-medium">{v.label}</div>
+                          {v.desc && <div className="text-[11px] opacity-80">{v.desc}</div>}
+                        </TooltipContent>
+                      </Tooltip>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {filtered.length === 0 && (
+            <p className="text-[11px] text-muted-foreground text-center py-3">Nenhuma variável encontrada.</p>
+          )}
+        </TooltipProvider>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -712,6 +838,8 @@ function ReportGenerator({
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
   const [adsets, setAdsets] = useState<AdSetRow[]>([]);
   const [selectedCampaignIds, setSelectedCampaignIds] = useState<Set<string>>(new Set());
+  const [campaignSearch, setCampaignSearch] = useState('');
+  const [campaignStatusFilter, setCampaignStatusFilter] = useState<'all' | 'active' | 'paused' | 'archived'>('all');
   const [client, setClient] = useState<any>(null);
   const [accountBalance, setAccountBalance] = useState<string>('—');
   const [generated, setGenerated] = useState<string>('');
@@ -811,6 +939,23 @@ function ReportGenerator({
 
       for (const c of campaigns.filter(c => selectedCampaignIds.has(c.id))) {
         const conv = getConversoes(c);
+        const spend = Number(c.spend || 0);
+        const leadsN = Number(c.leads || 0);
+        const msgsN = Number(c.messages || 0);
+        const purchasesN = Number(c.purchases || 0);
+        const cpl = leadsN > 0 ? spend / leadsN : 0;
+        const cpMsg = msgsN > 0 ? spend / msgsN : 0;
+        const videoViews = Number(c.video_views || 0);
+        const cpv = videoViews > 0 ? spend / videoViews : 0;
+        const linkClicks = Number(c.link_clicks || 0);
+        const cpcLink = linkClicks > 0 ? spend / linkClicks : 0;
+        // Resultado principal: depende do objetivo
+        let resultado = conv;
+        if (purchasesN > 0) resultado = purchasesN;
+        else if (leadsN > 0) resultado = leadsN;
+        else if (msgsN > 0) resultado = msgsN;
+        const cpResult = resultado > 0 ? spend / resultado : 0;
+
         const cCtx: Record<string, string> = {
           ...headerCtx,
           nome_campanha: c.name,
@@ -826,6 +971,34 @@ function ReportGenerator({
           cpa: formatBRL(c.cpa),
           conversoes: String(conv),
           freq: (Number(c.frequency || 0)).toFixed(2).replace('.', ','),
+          // Mensagens
+          mensagens: formatInt(msgsN),
+          custo_por_mensagem: formatBRL(cpMsg),
+          // Leads
+          leads: formatInt(leadsN),
+          cpl: formatBRL(cpl),
+          // Alcance
+          alcance: formatInt(c.reach),
+          frequencia: (Number(c.frequency || 0)).toFixed(2).replace('.', ','),
+          // Vídeo
+          visualizacoes_video: formatInt(videoViews),
+          custo_por_visualizacao: formatBRL(cpv),
+          reproducoes_3s: formatInt(videoViews),
+          reproducoes_thruplay: '—',
+          // Engajamento
+          curtidas: '—',
+          comentarios: '—',
+          compartilhamentos: '—',
+          cliques_link: formatInt(linkClicks),
+          custo_por_clique_link: formatBRL(cpcLink),
+          // Resultados gerais
+          resultado: String(resultado),
+          custo_por_resultado: formatBRL(cpResult),
+          roas: (Number((c as any).roas || 0)).toFixed(2).replace('.', ','),
+          // Comparativo (sem dados ainda)
+          variacao_gasto: '—',
+          variacao_resultado: '—',
+          variacao_cpa: '—',
         };
         if (campaignTpl) out.push(fillVars(campaignTpl.text, cCtx));
 
@@ -833,6 +1006,10 @@ function ReportGenerator({
           const adsetsForCampaign = adsets.filter(a => a.campaign_id === c.id);
           for (const a of adsetsForCampaign) {
             const aConv = getConversoes(a);
+            const aSpend = Number(a.spend || 0);
+            const aLeads = Number(a.leads || 0);
+            const aMsgs = Number(a.messages || 0);
+            const aCpl = aLeads > 0 ? aSpend / aLeads : 0;
             const aCtx: Record<string, string> = {
               ...cCtx,
               nome_conjunto: a.name,
@@ -842,6 +1019,10 @@ function ReportGenerator({
               ctr_conjunto: formatPct(a.ctr),
               cpa_conjunto: formatBRL(a.cpa),
               conversoes_conjunto: String(aConv),
+              mensagens_conjunto: formatInt(aMsgs),
+              leads_conjunto: formatInt(aLeads),
+              cpl_conjunto: formatBRL(aCpl),
+              alcance_conjunto: formatInt(a.reach),
             };
             out.push(fillVars(adsetTpl.text, aCtx));
           }
@@ -935,33 +1116,103 @@ function ReportGenerator({
               <div>
                 <div className="flex items-center justify-between">
                   <Label className="text-xs">Campanhas a incluir</Label>
-                  {campaigns.length > 0 && (
-                    <div className="flex gap-1">
-                      <Button size="sm" variant="ghost" className="h-6 text-[11px]"
-                        onClick={() => setSelectedCampaignIds(new Set(campaigns.map(c => c.id)))}>
-                        Todas
-                      </Button>
-                      <Button size="sm" variant="ghost" className="h-6 text-[11px]"
-                        onClick={() => setSelectedCampaignIds(new Set())}>
-                        Nenhuma
-                      </Button>
-                    </div>
-                  )}
                 </div>
-                <div className="border border-border/40 rounded-md p-2 max-h-56 overflow-y-auto space-y-1 mt-1">
-                  {!clientId && <p className="text-[11px] text-muted-foreground">Selecione um cliente.</p>}
-                  {clientId && campaigns.length === 0 && <p className="text-[11px] text-muted-foreground">Nenhuma campanha encontrada.</p>}
-                  {campaigns.map(c => (
-                    <label key={c.id} className="flex items-center gap-2 text-xs cursor-pointer">
-                      <Checkbox
-                        checked={selectedCampaignIds.has(c.id)}
-                        onCheckedChange={() => toggleCampaign(c.id)}
-                      />
-                      <span className="flex-1 truncate">{c.name}</span>
-                      <span className="text-muted-foreground text-[10px]">{formatBRL(c.spend)}</span>
-                    </label>
+
+                {/* Filtros de status */}
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {([
+                    { v: 'all', l: 'Todas' },
+                    { v: 'active', l: 'Ativas' },
+                    { v: 'paused', l: 'Pausadas' },
+                    { v: 'archived', l: 'Concluídas' },
+                  ] as const).map(f => (
+                    <Button
+                      key={f.v}
+                      type="button"
+                      size="sm"
+                      variant={campaignStatusFilter === f.v ? 'default' : 'outline'}
+                      className="h-7 text-[11px]"
+                      onClick={() => setCampaignStatusFilter(f.v)}
+                    >
+                      {f.l}
+                    </Button>
                   ))}
                 </div>
+
+                {/* Busca */}
+                <div className="relative mt-2">
+                  <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={campaignSearch}
+                    onChange={e => setCampaignSearch(e.target.value)}
+                    placeholder="Buscar campanha pelo nome..."
+                    className="pl-7 h-8 text-xs"
+                  />
+                </div>
+
+                {(() => {
+                  const q = campaignSearch.trim().toLowerCase();
+                  const matchStatus = (s?: string) => {
+                    const v = (s || '').toLowerCase();
+                    if (campaignStatusFilter === 'all') return true;
+                    if (campaignStatusFilter === 'active') return v === 'ativa' || v === 'ativo' || v === 'active';
+                    if (campaignStatusFilter === 'paused') return v === 'pausada' || v === 'pausado' || v === 'paused';
+                    if (campaignStatusFilter === 'archived') return v === 'concluída' || v === 'concluida' || v === 'concluído' || v === 'archived' || v === 'finalizada' || v === 'encerrada';
+                    return true;
+                  };
+                  const visible = campaigns.filter(c =>
+                    matchStatus(c.status) && (!q || c.name.toLowerCase().includes(q))
+                  );
+                  const dotColor = (s?: string) => {
+                    const v = (s || '').toLowerCase();
+                    if (v === 'ativa' || v === 'ativo' || v === 'active') return 'bg-emerald-500';
+                    if (v === 'pausada' || v === 'pausado' || v === 'paused') return 'bg-amber-500';
+                    return 'bg-muted-foreground/50';
+                  };
+
+                  return (
+                    <>
+                      {visible.length > 0 && (
+                        <div className="flex gap-1 mt-2">
+                          <Button size="sm" variant="ghost" className="h-6 text-[11px]"
+                            onClick={() => setSelectedCampaignIds(prev => {
+                              const next = new Set(prev);
+                              visible.forEach(c => next.add(c.id));
+                              return next;
+                            })}>
+                            Selecionar todas
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-6 text-[11px]"
+                            onClick={() => setSelectedCampaignIds(prev => {
+                              const next = new Set(prev);
+                              visible.forEach(c => next.delete(c.id));
+                              return next;
+                            })}>
+                            Nenhuma
+                          </Button>
+                        </div>
+                      )}
+                      <div className="border border-border/40 rounded-md p-2 max-h-56 overflow-y-auto space-y-1 mt-1">
+                        {!clientId && <p className="text-[11px] text-muted-foreground">Selecione um cliente.</p>}
+                        {clientId && campaigns.length === 0 && <p className="text-[11px] text-muted-foreground">Nenhuma campanha encontrada.</p>}
+                        {clientId && campaigns.length > 0 && visible.length === 0 && (
+                          <p className="text-[11px] text-muted-foreground">Nenhuma campanha bate com o filtro.</p>
+                        )}
+                        {visible.map(c => (
+                          <label key={c.id} className="flex items-center gap-2 text-xs cursor-pointer">
+                            <Checkbox
+                              checked={selectedCampaignIds.has(c.id)}
+                              onCheckedChange={() => toggleCampaign(c.id)}
+                            />
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor(c.status)}`} title={c.status || ''} />
+                            <span className="flex-1 truncate">{c.name}</span>
+                            <span className="text-muted-foreground text-[10px]">{formatBRL(c.spend)}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
 
               <Button onClick={generate} disabled={generating || !templateId || !clientId} className="w-full">
