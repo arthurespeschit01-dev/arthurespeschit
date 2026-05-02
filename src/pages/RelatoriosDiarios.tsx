@@ -903,6 +903,15 @@ function ReportGenerator({
     return { start: fmt(start), end: fmt(end), label, days };
   }
 
+  // Mapeia o período do gerador para o MESMO DatePreset usado pela aba "Campanhas".
+  function getDateRange(): DateRangeValue {
+    if (period === 'today') return { preset: 'today' };
+    if (period === 'yesterday') return { preset: 'yesterday' };
+    if (period === '7d') return { preset: 'last_7d' };
+    if (period === 'month') return { preset: 'this_month' };
+    return { preset: 'custom', since: customStart, until: customEnd };
+  }
+
   async function generate() {
     const tpl = templates.find(t => t.id === templateId);
     if (!tpl) { toast.error('Selecione um template'); return; }
