@@ -1,44 +1,62 @@
-Vou corrigir o botão “Ir para Pagamentos” para replicar o link que funcionou e evitar o caminho que está gerando `ERR_BLOCKED_BY_RESPONSE`.
+## Objetivo
 
-O problema mais provável é este: para essa mesma conta, o link que funcionou tinha `business_id`, `payment_account_id_from_jsmodule`, `payment_account_id` e `entrypoint`. Agora o navegador caiu em `/latest/billing_hub/payment_settings/?asset_id=...`, que é o fallback sem `business_id`. Ou seja, em algumas contas o sistema não está recebendo/enviando o `business_id`, então ele monta um link incompleto.
+Reorganizar o gerador de Relatórios Diários para que a escolha do **tipo de campanha** e da **variação (Resumo Rápido / Detalhado / Executivo)** aconteça **dentro do card "Configurações"**, em frente ao "Cliente" — substituindo o dropdown "Template" atual. Sem passos prévios em tela cheia.
 
-Plano de correção:
-
-1. Ajustar a busca dos saldos/contas
-   - Na função que carrega as contas Meta, também buscar `account_ids` do cliente.
-   - Usar como `business_id` principal o retorno da Meta (`business.id`).
-   - Se a Meta não retornar `business.id`, usar o campo “BM (Business Manager)” salvo no cadastro do cliente (`account_ids.bm`) como fallback.
-   - Sanitizar o ID para remover caracteres que não sejam números.
-
-2. Replicar exatamente o formato do link que funcionou
-   - Para contas com `business_id`, montar:
+## Layout final do card "Configurações"
 
 ```text
-https://business.facebook.com/billing_hub/accounts/details/?placement=ads_manager&asset_id=CONTA&business_id=BM&payment_account_id_from_jsmodule=CONTA&payment_account_id=CONTA&entrypoint=ads_ecosystem_navigation_ads_billing_tool_plugin
+┌─ Configurações ──────────────────────────────────────────────┐
+│  Modelo do relatório                                         │
+│  ┌──────────────────────────────────────────────────────┐    │
+│  │ Tipo de campanha                                     │    │
+│  │ [💬 Mensagens] [🛒 Vendas] [🖱 Tráfego] [📢 Alcance] │    │
+│  │ [❤️ Engajamento] [📋 Leads] [🎥 Vídeo] [⚙️ Person.] │    │
+│  │                                                      │    │
+│  │ Modelo (após escolher tipo)                          │    │
+│  │ ┌──────────┐ ┌──────────┐ ┌──────────┐               │    │
+│  │ │ Resumo   │ │Detalhado │ │Executivo │               │    │
+│  │ │ Rápido ✓ │ │          │ │          │               │    │
+│  │ └──────────┘ └──────────┘ └──────────┘               │    │
+│  │                          ✏ Personalizar este template│    │
+│  │ ─────────────────────────────────────────────────    │    │
+│  │ Ou usar um template salvo  [ Selecionar... ▾ ]       │    │
+│  └──────────────────────────────────────────────────────┘    │
+│                                                              │
+│  Cliente   [ Selecionar... ▾ ]                               │
+│  Período   [Hoje][Ontem][7d][Mês][Personalizado]             │
+│  Campanhas a incluir ...                                     │
+│  [ Gerar relatório ]                                         │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-   - Manter `asset_id`, `payment_account_id_from_jsmodule` e `payment_account_id` sempre com o ID da conta sem `act_`.
+## Mudanças de comportamento
 
-3. Remover o fallback problemático
-   - Não usar mais diretamente:
+- **Remover** as duas telas em passos (`step === 'kind'` e `step === 'variant'`). Não há mais navegação por passos antes de chegar nas configurações.
+- **Tipo de campanha** vira uma fileira de chips com emoji + nome. Clicar destaca em roxo.
+  - Ao escolher um tipo, a variação atual (`short` por padrão) é auto-selecionada.
+  - Clicar em "⚙️ Personalizado" abre direto o editor com um template em branco.
+- **Variação** aparece logo abaixo, em 3 cards compactos (Resumo Rápido / Detalhado / Executivo). Card ativo destacado em roxo, com badge "PRÉ-PRONTO".
+- **Personalizar este template**: link discreto à direita dos cards de variação que abre o editor com o conteúdo do preset selecionado pré-carregado.
+- **Atalho para template salvo**: dropdown "Ou usar um template salvo" mantido dentro do mesmo bloco, separado por uma linha. Selecionar um template salvo limpa a seleção de tipo/variação.
+- **Botão "Gerar relatório"**: continua habilitado quando há (preset OU template salvo) + cliente + ≥1 campanha selecionada.
 
-```text
-business.facebook.com/billing_hub/payment_settings?asset_id=...
-```
+## Mudanças técnicas
 
-   - Esse é o caminho que aparece no print com erro.
-   - Quando não houver BM disponível, o fallback será o Gerenciador de Anúncios na área de cobrança:
+Arquivo: `src/pages/RelatoriosDiarios.tsx`, função `ReportGenerator`.
 
-```text
-https://adsmanager.facebook.com/adsmanager/manage/billing?act=CONTA
-```
+1. Remover o estado `step` e o `if (step === 'kind') return ...` / `if (step === 'variant') return ...`.
+2. Manter os estados `selectedKind` e `selectedPreset`.
+3. Manter o estado `templateId` (continua suportando entrada via lista de templates salvos).
+4. Substituir o dropdown "Template" atual por um sub-bloco "Modelo do relatório" dentro do `Card` de Configurações, contendo:
+   - Linha de chips com `REPORT_KINDS`.
+   - Grid de 3 botões com as variações `getPresetsByKind(selectedKind)`.
+   - Link "Personalizar este template" → `onCustomize(...)`.
+   - `<Select>` opcional de templates salvos.
+5. Lógica de seleção mutuamente exclusiva: escolher preset limpa `templateId`; escolher template salvo limpa `selectedKind`/`selectedPreset`.
+6. Banner roxo de "selecionado" no topo (introduzido na iteração anterior) é removido — a própria área de modelo já mostra a seleção ativa.
+7. `generate()` continua usando `selectedPreset?.blocks` quando presente, senão `templates.find(t => t.id === templateId)?.blocks`.
 
-4. Melhorar a segurança contra dados incompletos
-   - Se a conta não tiver `business_id`, ainda abrir uma tela útil de cobrança pelo Ads Manager, em vez de abrir uma página bloqueada.
-   - Isso garante que todos os clientes tenham comportamento consistente: abrir cobrança/pagamentos da conta correta quando houver BM e abrir cobrança no Gerenciador quando não houver.
+## Fora de escopo
 
-Arquivos a alterar:
-
-- `supabase/functions/meta-account-balances/index.ts`
-- `src/components/AccountBalanceActionDialog.tsx`
-- Se necessário, apenas ajuste de tipo em `src/components/AccountBalancesPanel.tsx` já que `business_id` já existe na interface.
+- Lista de templates salvos (`TemplatesList`), editor (`TemplateEditor`), variáveis e geração de mensagem permanecem inalterados.
+- Sem mudança de banco de dados.
