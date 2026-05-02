@@ -1219,37 +1219,6 @@ function ReportGenerator({
                   </div>
                 </div>
 
-                {/* Linha 2: variação (após escolher tipo) */}
-                {selectedKind && selectedKind !== 'custom' && (
-                  <div className="animate-fade-in">
-                    <p className="text-[11px] text-muted-foreground mb-1">Modelo</p>
-                    <div className="grid grid-cols-3 gap-1">
-                      {(['short', 'detailed', 'executive'] as ReportVariant[]).map(v => {
-                        const preset = presetsForKind.find(p => p.variant === v);
-                        if (!preset) return null;
-                        const active = selectedPreset?.variant === v && selectedPreset?.kind === selectedKind;
-                        return (
-                          <button
-                            key={v}
-                            type="button"
-                            onClick={() => { setSelectedPreset(preset); setTemplateId(''); }}
-                            className={`text-left rounded-md border p-2 transition-all ${
-                              active
-                                ? 'border-primary bg-primary/15'
-                                : 'border-border/40 bg-card hover:border-primary/50'
-                            }`}
-                          >
-                            <div className="text-[12px] font-semibold flex items-center gap-1 flex-wrap">
-                              {VARIANT_LABEL[v]}
-                              {active && <Badge variant="secondary" className="text-[9px] py-0 px-1">PRÉ-PRONTO</Badge>}
-                            </div>
-                            <div className="text-[10px] text-muted-foreground line-clamp-2 mt-0.5">{VARIANT_DESC[v]}</div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
 
               </div>
 
