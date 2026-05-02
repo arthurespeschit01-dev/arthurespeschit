@@ -1210,14 +1210,8 @@ function ReportGenerator({
 
                 {(() => {
                   const q = campaignSearch.trim().toLowerCase();
-                  const matchStatus = (s?: string) => {
-                    const v = (s || '').toLowerCase();
-                    if (campaignStatusFilter === 'all') return true;
-                    if (campaignStatusFilter === 'active') return v === 'ativa' || v === 'ativo' || v === 'active';
-                    if (campaignStatusFilter === 'paused') return v === 'pausada' || v === 'pausado' || v === 'paused';
-                    if (campaignStatusFilter === 'archived') return v === 'concluída' || v === 'concluida' || v === 'concluído' || v === 'archived' || v === 'finalizada' || v === 'encerrada';
-                    return true;
-                  };
+                  const matchStatus = (s?: string) =>
+                    matchStatusShared(s, campaignStatusFilter as any);
                   const visible = campaigns.filter(c =>
                     matchStatus(c.status) && (!q || c.name.toLowerCase().includes(q))
                   );
