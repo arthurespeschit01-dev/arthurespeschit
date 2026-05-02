@@ -20,6 +20,11 @@ import {
   GripVertical, ChevronDown, ChevronUp, X, FileText, Sparkles, ArrowRight, Search,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  getCampaignInsights, getAdsetInsights, matchStatus as matchStatusShared,
+  formatBRL as fmtBRL, formatInt as fmtInt, formatPct as fmtPct, formatDec as fmtDec,
+  type DateRangeValue, type DatePreset,
+} from '@/services/metaMetrics';
 
 // =====================================================================
 // Tipos
@@ -226,22 +231,22 @@ const DEFAULT_TEMPLATES: Omit<Template, 'id' | 'created_at'>[] = [
   },
   {
     name: 'Detalhado',
-    description: 'Todas as métricas + comparativos por conjunto.',
+    description: 'Todas as métricas, uma por linha — pronto para WhatsApp.',
     blocks: [
       {
         id: 'h1',
         kind: 'header',
-        text: '📊 Relatório {{tipo_relatorio}} — {{nome_cliente}}\n📅 {{data_hoje}} — {{hora_envio}}\n💼 Investimento previsto: {{valor_investimento}}\n💳 Saldo da conta: {{saldo_da_conta}}',
+        text: '📊 *Relatório {{tipo_relatorio}} — {{nome_cliente}}*\n📅 {{data_hoje}} — {{hora_envio}}\n📆 Período: {{inicio_do_periodo}} a {{fim_do_periodo}}\n💼 Investimento previsto: {{valor_investimento}}\n💳 Saldo da conta: {{saldo_da_conta}}\n———————————',
       },
       {
         id: 'c1',
         kind: 'campaign',
-        text: '\n━━━━━━━━━━━━━━\n✅ {{nome_campanha}} ({{status_campanha}})\n🎯 {{objetivo}} · {{plataforma}}\n💰 Gasto: {{gasto}} · CPM: {{cpm}} · CPC: {{cpc}}\n👁 {{impressoes}} impressões · 🖱 {{cliques}} cliques · CTR {{ctr}}\n📈 {{conversoes}} conversões · CPA {{cpa}} · Freq {{freq}}',
+        text: '\n✅ *{{nome_campanha}}* ({{status_campanha}})\n🎯 {{objetivo}} · {{plataforma}}\n\n💰 Investimento: {{gasto}}\n📊 CPM: {{cpm}}\n🖱 CPC: {{cpc}}\n👁 Impressões: {{impressoes}}\n🔗 Cliques: {{cliques}}\n📈 CTR: {{ctr}}\n🔄 Frequência: {{freq}}\n✉️ Conversões: {{conversoes}}\n💵 CPA: {{cpa}}',
       },
       {
         id: 'a1',
         kind: 'adset',
-        text: '   • {{nome_conjunto}}\n     👁 {{impressoes_conjunto}} · 💰 {{gasto_conjunto}}\n     {{conversoes_conjunto}} conv. · CPA {{cpa_conjunto}} · CTR {{ctr_conjunto}}',
+        text: '\n📦 *{{nome_conjunto}}*\n👁 Impressões: {{impressoes_conjunto}}\n💰 Gasto: {{gasto_conjunto}}\n✉️ Conversões: {{conversoes_conjunto}}\n💵 CPA: {{cpa_conjunto}}\n📈 CTR: {{ctr_conjunto}}',
       },
     ],
   },
@@ -844,6 +849,8 @@ function ReportGenerator({
   const [accountBalance, setAccountBalance] = useState<string>('—');
   const [generated, setGenerated] = useState<string>('');
   const [generating, setGenerating] = useState(false);
+  const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
+  const [syncedRange, setSyncedRange] = useState<{ start: string; end: string } | null>(null);
 
   // Load templates + clients
   useEffect(() => {
@@ -896,13 +903,22 @@ function ReportGenerator({
     return { start: fmt(start), end: fmt(end), label, days };
   }
 
+  // Mapeia o período do gerador para o MESMO DatePreset usado pela aba "Campanhas".
+  function getDateRange(): DateRangeValue {
+    if (period === 'today') return { preset: 'today' };
+    if (period === 'yesterday') return { preset: 'yesterday' };
+    if (period === '7d') return { preset: 'last_7d' };
+    if (period === 'month') return { preset: 'this_month' };
+    return { preset: 'custom', since: customStart, until: customEnd };
+  }
+
   async function generate() {
     const tpl = templates.find(t => t.id === templateId);
     if (!tpl) { toast.error('Selecione um template'); return; }
     if (!clientId) { toast.error('Selecione um cliente'); return; }
     setGenerating(true);
     try {
-      // Tenta puxar saldo da conta (best-effort)
+      // Saldo da conta (best-effort)
       try {
         const { data } = await supabase.functions.invoke('meta-account-balances', {
           body: { client_id: clientId },
@@ -911,7 +927,43 @@ function ReportGenerator({
         if (bal != null) setAccountBalance(formatBRL(Number(bal)));
       } catch { /* ignore */ }
 
+      const range = getDateRange();
       const { start, end, label, days } = getPeriodLabels();
+
+      // ====== MESMA FONTE DA ABA CAMPANHAS ======
+      // Busca insights via edge functions, idêntico ao que ClientDetail usa.
+      const selectedCampaigns = campaigns.filter(c => selectedCampaignIds.has(c.id));
+      const metaCampaigns = selectedCampaigns.filter(c => c.meta_campaign_id);
+
+      let campaignInsights: Record<string, any> = {};
+      let adsetInsights: Record<string, any> = {};
+      try {
+        if (metaCampaigns.length > 0) {
+          campaignInsights = await getCampaignInsights({
+            client_id: clientId,
+            meta_campaign_ids: metaCampaigns.map(c => c.meta_campaign_id!) as string[],
+            range,
+          });
+          adsetInsights = await getAdsetInsights({ client_id: clientId, range });
+        }
+      } catch (e) {
+        console.warn('[relatorios] insights live falhou, usando fallback do banco:', e);
+      }
+      setLastSyncAt(new Date());
+      setSyncedRange({ start, end });
+
+      // Mescla métrica live com a row do banco (live tem prioridade)
+      const mergedCampaigns = selectedCampaigns.map(c => {
+        const live = c.meta_campaign_id ? campaignInsights[c.meta_campaign_id] : null;
+        if (!live) return c;
+        return { ...c, ...live };
+      });
+
+      const totalSpend = mergedCampaigns.reduce((s, c: any) => s + Number(c.spend || 0), 0);
+      const totalImpr = mergedCampaigns.reduce((s, c: any) => s + Number(c.impressions || 0), 0);
+      const totalClicks = mergedCampaigns.reduce((s, c: any) => s + Number(c.clicks || 0), 0);
+      const totalConv = mergedCampaigns.reduce((s, c: any) => s + getConversoes(c), 0);
+
       const headerCtx: Record<string, string> = {
         nome_cliente: client?.name || '—',
         tipo_relatorio: label,
@@ -923,11 +975,9 @@ function ReportGenerator({
         fim_do_periodo: end,
         periodo_dias: days,
         periodo_meses: '0',
-        valor_investimento: formatBRL(client?.verba_mensal || 0),
+        valor_investimento: fmtBRL(client?.verba_mensal || 0),
         saldo_da_conta: accountBalance,
-        gasto_periodo: formatBRL(
-          campaigns.filter(c => selectedCampaignIds.has(c.id)).reduce((s, c) => s + Number(c.spend || 0), 0)
-        ),
+        gasto_periodo: fmtBRL(totalSpend),
       };
 
       const headers = tpl.blocks.filter(b => b.kind === 'header');
@@ -937,7 +987,7 @@ function ReportGenerator({
       const out: string[] = [];
       for (const h of headers) out.push(fillVars(h.text, headerCtx));
 
-      for (const c of campaigns.filter(c => selectedCampaignIds.has(c.id))) {
+      for (const c of mergedCampaigns as any[]) {
         const conv = getConversoes(c);
         const spend = Number(c.spend || 0);
         const leadsN = Number(c.leads || 0);
@@ -949,7 +999,7 @@ function ReportGenerator({
         const cpv = videoViews > 0 ? spend / videoViews : 0;
         const linkClicks = Number(c.link_clicks || 0);
         const cpcLink = linkClicks > 0 ? spend / linkClicks : 0;
-        // Resultado principal: depende do objetivo
+        const cpaCalc = Number(c.cpa || 0) || (conv > 0 ? spend / conv : 0);
         let resultado = conv;
         if (purchasesN > 0) resultado = purchasesN;
         else if (leadsN > 0) resultado = leadsN;
@@ -959,43 +1009,36 @@ function ReportGenerator({
         const cCtx: Record<string, string> = {
           ...headerCtx,
           nome_campanha: c.name,
-          plataforma: c.platform || 'Meta',
+          plataforma: c.platform || 'Meta Ads',
           objetivo: c.objective || '—',
           status_campanha: c.status || '—',
-          gasto: formatBRL(c.spend),
-          impressoes: formatInt(c.impressions),
-          cliques: formatInt(c.clicks),
-          ctr: formatPct(c.ctr),
-          cpc: formatBRL(c.cpc),
-          cpm: formatBRL(c.cpm),
-          cpa: formatBRL(c.cpa),
+          gasto: fmtBRL(spend),
+          impressoes: fmtInt(c.impressions),
+          cliques: fmtInt(c.clicks),
+          ctr: fmtPct(c.ctr),
+          cpc: fmtBRL(c.cpc),
+          cpm: fmtBRL(c.cpm),
+          cpa: fmtBRL(cpaCalc),
           conversoes: String(conv),
-          freq: (Number(c.frequency || 0)).toFixed(2).replace('.', ','),
-          // Mensagens
-          mensagens: formatInt(msgsN),
-          custo_por_mensagem: formatBRL(cpMsg),
-          // Leads
-          leads: formatInt(leadsN),
-          cpl: formatBRL(cpl),
-          // Alcance
-          alcance: formatInt(c.reach),
-          frequencia: (Number(c.frequency || 0)).toFixed(2).replace('.', ','),
-          // Vídeo
-          visualizacoes_video: formatInt(videoViews),
-          custo_por_visualizacao: formatBRL(cpv),
-          reproducoes_3s: formatInt(videoViews),
+          freq: fmtDec(c.frequency),
+          mensagens: fmtInt(msgsN),
+          custo_por_mensagem: fmtBRL(cpMsg),
+          leads: fmtInt(leadsN),
+          cpl: fmtBRL(cpl),
+          alcance: fmtInt(c.reach),
+          frequencia: fmtDec(c.frequency),
+          visualizacoes_video: fmtInt(videoViews),
+          custo_por_visualizacao: fmtBRL(cpv),
+          reproducoes_3s: fmtInt(videoViews),
           reproducoes_thruplay: '—',
-          // Engajamento
           curtidas: '—',
           comentarios: '—',
           compartilhamentos: '—',
-          cliques_link: formatInt(linkClicks),
-          custo_por_clique_link: formatBRL(cpcLink),
-          // Resultados gerais
+          cliques_link: fmtInt(linkClicks),
+          custo_por_clique_link: fmtBRL(cpcLink),
           resultado: String(resultado),
-          custo_por_resultado: formatBRL(cpResult),
-          roas: (Number((c as any).roas || 0)).toFixed(2).replace('.', ','),
-          // Comparativo (sem dados ainda)
+          custo_por_resultado: fmtBRL(cpResult),
+          roas: fmtDec(c.roas),
           variacao_gasto: '—',
           variacao_resultado: '—',
           variacao_cpa: '—',
@@ -1004,35 +1047,50 @@ function ReportGenerator({
 
         if (adsetTpl) {
           const adsetsForCampaign = adsets.filter(a => a.campaign_id === c.id);
-          for (const a of adsetsForCampaign) {
-            const aConv = getConversoes(a);
-            const aSpend = Number(a.spend || 0);
-            const aLeads = Number(a.leads || 0);
-            const aMsgs = Number(a.messages || 0);
+          for (const a of adsetsForCampaign as any[]) {
+            const live = a.meta_adset_id ? adsetInsights[a.meta_adset_id] : null;
+            const merged = live ? { ...a, ...live } : a;
+            const aConv = getConversoes(merged);
+            const aSpend = Number(merged.spend || 0);
+            const aLeads = Number(merged.leads || 0);
+            const aMsgs = Number(merged.messages || 0);
             const aCpl = aLeads > 0 ? aSpend / aLeads : 0;
+            const aCpa = Number(merged.cpa || 0) || (aConv > 0 ? aSpend / aConv : 0);
             const aCtx: Record<string, string> = {
               ...cCtx,
-              nome_conjunto: a.name,
-              gasto_conjunto: formatBRL(a.spend),
-              impressoes_conjunto: formatInt(a.impressions),
-              cliques_conjunto: formatInt(a.clicks),
-              ctr_conjunto: formatPct(a.ctr),
-              cpa_conjunto: formatBRL(a.cpa),
+              nome_conjunto: merged.name,
+              gasto_conjunto: fmtBRL(aSpend),
+              impressoes_conjunto: fmtInt(merged.impressions),
+              cliques_conjunto: fmtInt(merged.clicks),
+              ctr_conjunto: fmtPct(merged.ctr),
+              cpa_conjunto: fmtBRL(aCpa),
               conversoes_conjunto: String(aConv),
-              mensagens_conjunto: formatInt(aMsgs),
-              leads_conjunto: formatInt(aLeads),
-              cpl_conjunto: formatBRL(aCpl),
-              alcance_conjunto: formatInt(a.reach),
+              mensagens_conjunto: fmtInt(aMsgs),
+              leads_conjunto: fmtInt(aLeads),
+              cpl_conjunto: fmtBRL(aCpl),
+              alcance_conjunto: fmtInt(merged.reach),
             };
             out.push(fillVars(adsetTpl.text, aCtx));
           }
         }
       }
+
+      // Totais gerais (rodapé)
+      if (mergedCampaigns.length > 1) {
+        out.push('\n———————————');
+        out.push(`📊 *Totais do período*`);
+        out.push(`💰 Investimento total: ${fmtBRL(totalSpend)}`);
+        out.push(`👁 Impressões: ${fmtInt(totalImpr)}`);
+        out.push(`🔗 Cliques: ${fmtInt(totalClicks)}`);
+        out.push(`✉️ Conversões: ${fmtInt(totalConv)}`);
+      }
+
       setGenerated(out.join('\n'));
     } finally {
       setGenerating(false);
     }
   }
+
 
   async function copyToClipboard() {
     try {
@@ -1152,14 +1210,8 @@ function ReportGenerator({
 
                 {(() => {
                   const q = campaignSearch.trim().toLowerCase();
-                  const matchStatus = (s?: string) => {
-                    const v = (s || '').toLowerCase();
-                    if (campaignStatusFilter === 'all') return true;
-                    if (campaignStatusFilter === 'active') return v === 'ativa' || v === 'ativo' || v === 'active';
-                    if (campaignStatusFilter === 'paused') return v === 'pausada' || v === 'pausado' || v === 'paused';
-                    if (campaignStatusFilter === 'archived') return v === 'concluída' || v === 'concluida' || v === 'concluído' || v === 'archived' || v === 'finalizada' || v === 'encerrada';
-                    return true;
-                  };
+                  const matchStatus = (s?: string) =>
+                    matchStatusShared(s, campaignStatusFilter as any);
                   const visible = campaigns.filter(c =>
                     matchStatus(c.status) && (!q || c.name.toLowerCase().includes(q))
                   );
@@ -1237,6 +1289,20 @@ function ReportGenerator({
             <CardContent className="space-y-3">
               {generated ? (
                 <>
+                  {lastSyncAt && syncedRange && (
+                    <div className="text-[11px] text-muted-foreground bg-secondary/40 border border-border/40 rounded-md px-2 py-1.5 flex items-start gap-2">
+                      <RefreshCw className="w-3 h-3 mt-0.5 text-primary shrink-0" />
+                      <span>
+                        Dados sincronizados em{' '}
+                        <strong className="text-foreground">
+                          {lastSyncAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </strong>{' '}
+                        — período: <strong className="text-foreground">{syncedRange.start}</strong> a{' '}
+                        <strong className="text-foreground">{syncedRange.end}</strong>.
+                        <span className="block opacity-70">Esta nota não é copiada para a mensagem.</span>
+                      </span>
+                    </div>
+                  )}
                   <WhatsAppPreview text={generated} />
                   <Button onClick={copyToClipboard} className="w-full" size="lg">
                     <ClipboardCopy className="w-4 h-4 mr-2" /> Copiar Mensagem
