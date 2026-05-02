@@ -82,63 +82,124 @@ interface AdSetRow {
 // =====================================================================
 // Variáveis disponíveis
 // =====================================================================
-const VARIABLES: { group: string; vars: { key: string; label: string }[] }[] = [
+type VarDef = { key: string; label: string; desc?: string; isNew?: boolean };
+const VARIABLES: { group: string; vars: VarDef[] }[] = [
   {
     group: 'Cabeçalho',
     vars: [
-      { key: 'nome_cliente', label: 'Nome do cliente' },
-      { key: 'nome_campanha', label: 'Nome da campanha' },
-      { key: 'plataforma', label: 'Plataforma' },
-      { key: 'objetivo', label: 'Objetivo' },
-      { key: 'status_campanha', label: 'Status da campanha' },
+      { key: 'nome_cliente', label: 'Nome do cliente', desc: 'Nome do cliente selecionado' },
+      { key: 'nome_campanha', label: 'Nome da campanha', desc: 'Nome de cada campanha incluída' },
+      { key: 'plataforma', label: 'Plataforma', desc: 'Plataforma da campanha (Meta, Google...)' },
+      { key: 'objetivo', label: 'Objetivo', desc: 'Objetivo configurado da campanha' },
+      { key: 'status_campanha', label: 'Status da campanha', desc: 'Ativa, pausada ou concluída' },
     ],
   },
   {
     group: 'Datas',
     vars: [
-      { key: 'data_hoje', label: 'Data de hoje' },
-      { key: 'hora_envio', label: 'Hora do envio' },
-      { key: 'data_inicio', label: 'Data de início' },
-      { key: 'data_fim', label: 'Data de fim' },
-      { key: 'tipo_relatorio', label: 'Tipo de relatório' },
-      { key: 'periodo_dias', label: 'Período (dias)' },
-      { key: 'periodo_meses', label: 'Período (meses)' },
-      { key: 'inicio_do_periodo', label: 'Início do período' },
-      { key: 'fim_do_periodo', label: 'Fim do período' },
+      { key: 'data_hoje', label: 'Data de hoje', desc: 'Data atual no formato dd/mm/aaaa' },
+      { key: 'hora_envio', label: 'Hora do envio', desc: 'Hora atual hh:mm' },
+      { key: 'data_inicio', label: 'Data de início', desc: 'Início do período do relatório' },
+      { key: 'data_fim', label: 'Data de fim', desc: 'Fim do período do relatório' },
+      { key: 'tipo_relatorio', label: 'Tipo de relatório', desc: 'Hoje, Ontem, 7 dias...' },
+      { key: 'periodo_dias', label: 'Período (dias)', desc: 'Quantidade de dias do período' },
+      { key: 'periodo_meses', label: 'Período (meses)', desc: 'Quantidade aproximada de meses' },
+      { key: 'inicio_do_periodo', label: 'Início do período', desc: 'Atalho para data de início' },
+      { key: 'fim_do_periodo', label: 'Fim do período', desc: 'Atalho para data de fim' },
     ],
   },
   {
     group: 'Financeiro',
     vars: [
-      { key: 'valor_investimento', label: 'Investimento previsto' },
-      { key: 'saldo_da_conta', label: 'Saldo da conta' },
-      { key: 'gasto_periodo', label: 'Gasto no período' },
-      { key: 'gasto', label: 'Gasto da campanha' },
-      { key: 'cpc', label: 'CPC' },
-      { key: 'cpm', label: 'CPM' },
-      { key: 'cpa', label: 'CPA' },
+      { key: 'valor_investimento', label: 'Investimento previsto', desc: 'Verba mensal contratada' },
+      { key: 'saldo_da_conta', label: 'Saldo da conta', desc: 'Saldo atual na conta de anúncios' },
+      { key: 'gasto_periodo', label: 'Gasto no período', desc: 'Soma do gasto de todas as campanhas selecionadas' },
+      { key: 'gasto', label: 'Gasto da campanha', desc: 'Gasto da campanha individual' },
+      { key: 'cpc', label: 'CPC', desc: 'Custo por clique médio' },
+      { key: 'cpm', label: 'CPM', desc: 'Custo por mil impressões' },
+      { key: 'cpa', label: 'CPA', desc: 'Custo por aquisição/conversão' },
     ],
   },
   {
     group: 'Métricas (campanha)',
     vars: [
-      { key: 'impressoes', label: 'Impressões' },
-      { key: 'cliques', label: 'Cliques' },
-      { key: 'ctr', label: 'CTR' },
-      { key: 'conversoes', label: 'Conversões' },
-      { key: 'freq', label: 'Frequência' },
+      { key: 'impressoes', label: 'Impressões', desc: 'Total de impressões servidas' },
+      { key: 'cliques', label: 'Cliques', desc: 'Total de cliques' },
+      { key: 'ctr', label: 'CTR', desc: 'Taxa de cliques (%)' },
+      { key: 'conversoes', label: 'Conversões', desc: 'Total de conversões (leads + vendas + msgs)' },
+      { key: 'freq', label: 'Frequência', desc: 'Frequência média de exibição' },
     ],
   },
   {
     group: 'Métricas (conjunto)',
     vars: [
-      { key: 'nome_conjunto', label: 'Nome do conjunto' },
-      { key: 'gasto_conjunto', label: 'Gasto do conjunto' },
+      { key: 'nome_conjunto', label: 'Nome do conjunto', desc: 'Nome do ad set' },
+      { key: 'gasto_conjunto', label: 'Gasto do conjunto', desc: 'Gasto somente do ad set' },
       { key: 'impressoes_conjunto', label: 'Impressões do conjunto' },
       { key: 'cliques_conjunto', label: 'Cliques do conjunto' },
       { key: 'ctr_conjunto', label: 'CTR do conjunto' },
       { key: 'cpa_conjunto', label: 'CPA do conjunto' },
       { key: 'conversoes_conjunto', label: 'Conversões do conjunto' },
+    ],
+  },
+  {
+    group: 'Mensagens / WhatsApp',
+    vars: [
+      { key: 'mensagens', label: 'Mensagens', desc: 'Total de conversas iniciadas', isNew: true },
+      { key: 'custo_por_mensagem', label: 'Custo por mensagem', desc: 'Custo médio por mensagem', isNew: true },
+      { key: 'mensagens_conjunto', label: 'Mensagens (conjunto)', desc: 'Mensagens por conjunto', isNew: true },
+    ],
+  },
+  {
+    group: 'Leads',
+    vars: [
+      { key: 'leads', label: 'Leads', desc: 'Total de leads gerados', isNew: true },
+      { key: 'cpl', label: 'CPL', desc: 'Custo por lead', isNew: true },
+      { key: 'leads_conjunto', label: 'Leads (conjunto)', desc: 'Leads por conjunto', isNew: true },
+      { key: 'cpl_conjunto', label: 'CPL (conjunto)', desc: 'Custo por lead no conjunto', isNew: true },
+    ],
+  },
+  {
+    group: 'Alcance',
+    vars: [
+      { key: 'alcance', label: 'Alcance', desc: 'Pessoas únicas alcançadas', isNew: true },
+      { key: 'alcance_conjunto', label: 'Alcance (conjunto)', desc: 'Alcance por conjunto', isNew: true },
+      { key: 'frequencia', label: 'Frequência', desc: 'Frequência média (sinônimo de freq)', isNew: true },
+    ],
+  },
+  {
+    group: 'Vídeo',
+    vars: [
+      { key: 'visualizacoes_video', label: 'Visualizações de vídeo', desc: 'Total de views', isNew: true },
+      { key: 'custo_por_visualizacao', label: 'CPV', desc: 'Custo por visualização', isNew: true },
+      { key: 'reproducoes_3s', label: 'Reproduções 3s', desc: 'Reproduções de pelo menos 3 segundos', isNew: true },
+      { key: 'reproducoes_thruplay', label: 'ThruPlay', desc: 'Vídeo assistido até o fim ou 15s+', isNew: true },
+    ],
+  },
+  {
+    group: 'Engajamento',
+    vars: [
+      { key: 'curtidas', label: 'Curtidas', desc: 'Curtidas no post', isNew: true },
+      { key: 'comentarios', label: 'Comentários', desc: 'Total de comentários', isNew: true },
+      { key: 'compartilhamentos', label: 'Compartilhamentos', desc: 'Total de compartilhamentos', isNew: true },
+      { key: 'cliques_link', label: 'Cliques no link', desc: 'Cliques no link especificamente', isNew: true },
+      { key: 'custo_por_clique_link', label: 'CPC de link', desc: 'Custo por clique no link', isNew: true },
+    ],
+  },
+  {
+    group: 'Resultados gerais',
+    vars: [
+      { key: 'resultado', label: 'Resultado', desc: 'Resultado principal (depende do objetivo)', isNew: true },
+      { key: 'custo_por_resultado', label: 'Custo por resultado', desc: 'Custo do resultado principal', isNew: true },
+      { key: 'roas', label: 'ROAS', desc: 'Retorno sobre investimento (se aplicável)', isNew: true },
+    ],
+  },
+  {
+    group: 'Comparativo (período anterior)',
+    vars: [
+      { key: 'variacao_gasto', label: 'Variação do gasto', desc: 'Ex: +12% vs período anterior', isNew: true },
+      { key: 'variacao_resultado', label: 'Variação do resultado', desc: 'Variação do resultado principal', isNew: true },
+      { key: 'variacao_cpa', label: 'Variação do CPA', desc: 'Variação do CPA vs período anterior', isNew: true },
     ],
   },
 ];
