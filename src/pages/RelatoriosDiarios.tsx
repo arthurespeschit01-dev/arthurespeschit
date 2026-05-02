@@ -25,6 +25,10 @@ import {
   formatBRL as fmtBRL, formatInt as fmtInt, formatPct as fmtPct, formatDec as fmtDec,
   type DateRangeValue, type DatePreset,
 } from '@/services/metaMetrics';
+import {
+  REPORT_KINDS, getPresetsByKind, VARIANT_LABEL, VARIANT_DESC,
+  type ReportKind, type ReportVariant, type PresetTemplate,
+} from '@/lib/reportPresets';
 
 // =====================================================================
 // Tipos
