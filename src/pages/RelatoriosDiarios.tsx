@@ -17,8 +17,9 @@ import {
 import { toast } from 'sonner';
 import {
   Plus, Edit2, Copy, Trash2, ArrowLeft, Send, ClipboardCopy, RefreshCw,
-  GripVertical, ChevronDown, ChevronUp, X, FileText, Sparkles, ArrowRight,
+  GripVertical, ChevronDown, ChevronUp, X, FileText, Sparkles, ArrowRight, Search,
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 // =====================================================================
 // Tipos
