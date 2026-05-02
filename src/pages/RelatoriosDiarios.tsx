@@ -318,7 +318,7 @@ function TemplatesList({
       name: `${t.name} (cópia)`,
       description: t.description,
       blocks: t.blocks,
-    });
+    } as any);
     if (error) { toast.error('Falha ao duplicar', { description: error.message }); return; }
     toast.success('Template duplicado');
     load();
