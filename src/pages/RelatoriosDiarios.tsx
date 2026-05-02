@@ -599,6 +599,93 @@ function TemplateEditor({
   );
 }
 
+function VariablesPanel({ onInsert }: { onInsert: (key: string) => void }) {
+  const [query, setQuery] = useState('');
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  function toggleGroup(g: string) {
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      if (next.has(g)) next.delete(g); else next.add(g);
+      return next;
+    });
+  }
+
+  const q = query.trim().toLowerCase();
+  const filtered = VARIABLES.map(g => ({
+    ...g,
+    vars: g.vars.filter(v =>
+      !q || v.key.toLowerCase().includes(q) || v.label.toLowerCase().includes(q) || (v.desc?.toLowerCase().includes(q))
+    ),
+  })).filter(g => g.vars.length > 0);
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-primary" /> Variáveis disponíveis
+        </CardTitle>
+        <p className="text-[11px] text-muted-foreground">Clique para inserir no bloco selecionado.</p>
+        <div className="relative mt-2">
+          <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Buscar variável..."
+            className="pl-7 h-8 text-xs"
+          />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-2 max-h-[420px] overflow-y-auto">
+        <TooltipProvider delayDuration={200}>
+          {filtered.map(g => {
+            const isCollapsed = collapsed.has(g.group) && !q;
+            return (
+              <div key={g.group} className="border border-border/30 rounded-md">
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(g.group)}
+                  className="w-full flex items-center justify-between px-2 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-secondary/40"
+                >
+                  <span>{g.group} <span className="opacity-60">({g.vars.length})</span></span>
+                  {isCollapsed ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
+                </button>
+                {!isCollapsed && (
+                  <div className="flex flex-wrap gap-1 p-2 pt-1">
+                    {g.vars.map(v => (
+                      <Tooltip key={v.key}>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() => onInsert(v.key)}
+                            className="text-[11px] px-2 py-1 rounded bg-secondary hover:bg-secondary/80 border border-border/40 inline-flex items-center gap-1"
+                          >
+                            {`{{${v.key}}}`}
+                            {v.isNew && (
+                              <span className="text-[9px] px-1 py-0 rounded bg-primary text-primary-foreground font-semibold">novo</span>
+                            )}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">
+                          <div className="text-xs font-medium">{v.label}</div>
+                          {v.desc && <div className="text-[11px] opacity-80">{v.desc}</div>}
+                        </TooltipContent>
+                      </Tooltip>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {filtered.length === 0 && (
+            <p className="text-[11px] text-muted-foreground text-center py-3">Nenhuma variável encontrada.</p>
+          )}
+        </TooltipProvider>
+      </CardContent>
+    </Card>
+  );
+}
+
 function BlockEditor({
   block, active, onActivate, onChange, onUp, onDown, onRemove, canUp, canDown,
 }: {
