@@ -606,24 +606,6 @@ export default function QuickEditDialog({
               </>
             )}
           </TabsContent>
-
-          {/* COLUMNS */}
-          <TabsContent value="columns" className="space-y-3 pt-4">
-            <p className="text-xs text-muted-foreground">Escolha quais métricas aparecem na tabela.</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {metricColumns.map(c => (
-                <label key={c.key} className="flex items-center gap-2 text-xs p-2 rounded border border-border/40 hover:bg-secondary/40">
-                  <Checkbox checked={visibleColumnKeys.includes(c.key)} onCheckedChange={() => toggleColumn(c.key)} />
-                  {c.label}
-                </label>
-              ))}
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => onColumnsChange(metricColumns.map(c => c.key))}>Marcar todas</Button>
-              <Button variant="outline" onClick={() => onColumnsChange([])}>Limpar</Button>
-              <Button onClick={onClose}>Concluir</Button>
-            </div>
-          </TabsContent>
         </Tabs>
       </DialogContent>
     </Dialog>
