@@ -691,6 +691,42 @@ export type Database = {
           },
         ]
       }
+      message_templates: {
+        Row: {
+          channel: string
+          client_id: string | null
+          created_at: string
+          greeting: string
+          id: string
+          name: string
+          prefilled_message: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          channel?: string
+          client_id?: string | null
+          created_at?: string
+          greeting?: string
+          id?: string
+          name: string
+          prefilled_message?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          channel?: string
+          client_id?: string | null
+          created_at?: string
+          greeting?: string
+          id?: string
+          name?: string
+          prefilled_message?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       meta_connections: {
         Row: {
           access_token: string

@@ -13,10 +13,13 @@ const GRAPH = 'https://graph.facebook.com/v21.0';
 const FIELDS = [
   'id', 'name', 'status', 'effective_status',
   'daily_budget', 'lifetime_budget',
-  'optimization_goal', 'billing_event', 'bid_strategy',
+  'optimization_goal', 'billing_event', 'bid_strategy', 'bid_amount',
   'start_time', 'end_time',
   'targeting',
   'promoted_object',
+  'destination_type',
+  'pacing_type',
+  'adset_schedule',
 ].join(',');
 
 Deno.serve(async (req) => {
