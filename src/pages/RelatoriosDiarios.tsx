@@ -380,6 +380,9 @@ function TemplatesList({
       return;
     }
     let list = (data || []).map((d: any) => ({ ...d, blocks: d.blocks || [] })) as Template[];
+    // Dedupe defensivamente por nome (mantém o mais antigo)
+    const seen = new Set<string>();
+    list = list.filter(t => { if (seen.has(t.name)) return false; seen.add(t.name); return true; });
     // Seed defaults na primeira vez
     if (list.length === 0) {
       const { data: { user } } = await supabase.auth.getUser();
@@ -1260,23 +1263,6 @@ function ReportGenerator({
                   </div>
                 )}
 
-                {/* Atalho para template salvo do usuário */}
-                {templates.length > 0 && (
-                  <div className="pt-2 border-t border-border/30">
-                    <p className="text-[11px] text-muted-foreground mb-1">Ou usar um template salvo</p>
-                    <Select
-                      value={templateId}
-                      onValueChange={(v) => { setTemplateId(v); setSelectedPreset(null); setSelectedKind(null); }}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="Selecionar template salvo..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {templates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
               </div>
 
               {/* ===== Cliente ===== */}
