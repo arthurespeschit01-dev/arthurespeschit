@@ -309,7 +309,7 @@ export default function RelatoriosDiarios() {
       <div className="flex items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
-            <FileText className="w-5 h-5 text-primary" /> Relatórios Diários
+            <FileText className="w-5 h-5 text-primary" /> Relatórios
           </h1>
           <p className="text-sm text-muted-foreground">
             Gere mensagens prontas com métricas Meta Ads para enviar no WhatsApp.
@@ -835,7 +835,7 @@ function WhatsAppPreview({ text }: { text: string }) {
       <div className="bg-[#075E54] text-white px-3 py-2 flex items-center gap-2">
         <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-sm font-bold">R</div>
         <div>
-          <div className="text-xs font-medium">Relatórios Diários</div>
+          <div className="text-xs font-medium">Relatórios </div>
           <div className="text-[10px] text-white/70">online</div>
         </div>
       </div>
