@@ -250,10 +250,10 @@ export default function Tasks() {
     };
     if (editing) {
       await supabase.from('operational_tasks').update(payload).eq('id', editing.id);
-      toast.success('Task atualizada!');
+      toast.success('Tarefa atualizada!');
     } else {
       await supabase.from('operational_tasks').insert({ ...payload, user_id: user.id });
-      toast.success('Task criada!');
+      toast.success('Tarefa criada!');
     }
     setOpen(false);
     load();
@@ -261,7 +261,7 @@ export default function Tasks() {
 
   const remove = async (id: string) => {
     await supabase.from('operational_tasks').delete().eq('id', id);
-    toast.success('Task removida!');
+    toast.success('Tarefa removida!');
     load();
   };
 
@@ -814,7 +814,7 @@ export default function Tasks() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="bg-card border-border max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Editar Task' : 'Nova Task'}</DialogTitle>
+            <DialogTitle>{editing ? 'Editar Tarefa' : 'Nova Tarefa'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
