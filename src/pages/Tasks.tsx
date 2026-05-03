@@ -428,10 +428,10 @@ export default function Tasks() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Tasks Operacionais</h1>
+          <h1 className="text-2xl font-bold text-foreground">Tarefas Operacionais</h1>
           <p className="text-muted-foreground text-sm mt-1">Organize suas tarefas e acompanhe o progresso</p>
         </div>
-        <Button onClick={openNew} className="neon-glow gap-2 w-full sm:w-auto"><Plus className="w-4 h-4" /> Nova Task</Button>
+        <Button onClick={openNew} className="neon-glow gap-2 w-full sm:w-auto"><Plus className="w-4 h-4" /> Nova Tarefa</Button>
       </div>
 
       {/* Stats */}
@@ -456,7 +456,7 @@ export default function Tasks() {
       <div className="flex gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="Buscar tasks..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 bg-secondary/50 border-border/50" />
+          <Input placeholder="Buscar tarefas..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 bg-secondary/50 border-border/50" />
         </div>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
           <SelectTrigger className="w-44 bg-secondary/50 border-border/50">
@@ -523,8 +523,8 @@ export default function Tasks() {
       {filtered.length === 0 ? (
         <div className="text-center py-16">
           <CheckCircle2 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-muted-foreground">Nenhuma task encontrada.</p>
-          <Button onClick={openNew} variant="outline" className="mt-4 gap-2"><Plus className="w-4 h-4" /> Criar primeira task</Button>
+          <p className="text-muted-foreground">Nenhuma tarefa encontrada.</p>
+          <Button onClick={openNew} variant="outline" className="mt-4 gap-2"><Plus className="w-4 h-4" /> Criar primeira tarefa</Button>
         </div>
       ) : (
         <div className="overflow-x-auto pb-2 -mx-4 lg:-mx-6 px-4 lg:px-6">
@@ -629,8 +629,8 @@ export default function Tasks() {
                                     </AlertDialogTrigger>
                                     <AlertDialogContent>
                                       <AlertDialogHeader>
-                                        <AlertDialogTitle>Excluir task?</AlertDialogTitle>
-                                        <AlertDialogDescription>Essa ação não pode ser desfeita. A task "{t.title}" será removida permanentemente.</AlertDialogDescription>
+                                        <AlertDialogTitle>Excluir tarefa?</AlertDialogTitle>
+                                        <AlertDialogDescription>Essa ação não pode ser desfeita. A tarefa "{t.title}" será removida permanentemente.</AlertDialogDescription>
                                       </AlertDialogHeader>
                                       <AlertDialogFooter>
                                         <AlertDialogCancel>Cancelar</AlertDialogCancel>

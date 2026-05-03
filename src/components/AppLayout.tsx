@@ -18,7 +18,7 @@ const mainNavItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/clientes', label: 'Clientes', icon: Users },
   { to: '/relatorios', label: 'Relatórios ', icon: FileText },
-  { to: '/tasks', label: 'Tasks', icon: ListTodo },
+  { to: '/tasks', label: 'Tarefas', icon: ListTodo },
   { to: '/financeiro', label: 'Financeiro', icon: DollarSign },
   // { to: '/planilha', label: 'Planilha', icon: BarChart3 },
   { to: '/planilha-teste', label: 'Planilha acompanhamento', icon: BarChart3 },
