@@ -162,16 +162,16 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
   return (
     <div className="glass-surface rounded-xl border border-border/50 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 p-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4">
         <button
           type="button"
           onClick={() => setOpen(o => !o)}
-          className="flex items-center gap-3 flex-1 min-w-0 text-left"
+          className="flex items-start gap-3 flex-1 min-w-0 text-left"
         >
           <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
             <Wallet className="w-4 h-4 text-primary" />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2 flex-wrap">
               <span>Saldos das Contas</span>
               {problemCount > 0 && (
@@ -205,7 +205,7 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
             </p>
           </div>
         </button>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
           {open && (
             <Button onClick={load} variant="outline" size="sm" disabled={loading} className="gap-2">
               {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
