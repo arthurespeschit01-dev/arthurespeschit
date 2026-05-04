@@ -152,36 +152,6 @@ export default function Clientes() {
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             Clientes
-            {problemCount > 0 && (
-              <TooltipProvider delayDuration={150}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const el = document.getElementById('account-balances-panel');
-                        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                      }}
-                      className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500/25 transition-colors cursor-pointer whitespace-nowrap"
-                    >
-                      <AlertTriangle className="w-3 h-3" />
-                      {problemCount === 1 ? '1 conta com problema' : `${problemCount} contas com problema`}
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" align="start" className="max-w-sm">
-                    <div className="space-y-1.5">
-                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Contas com problema</p>
-                      {problemAccounts.map(a => (
-                        <div key={a.account_id} className="text-xs">
-                          <span className="font-semibold">{a.account_name || a.client_name || 'Sem nome'}</span>
-                          <span className="text-muted-foreground"> — {reasonOf(a)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
           </h1>
           <p className="text-muted-foreground text-sm mt-1">Gerencie seus clientes</p>
         </div>
