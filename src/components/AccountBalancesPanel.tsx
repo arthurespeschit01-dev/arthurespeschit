@@ -172,14 +172,14 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
             <Wallet className="w-4 h-4 text-primary" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              Saldos das Contas
+            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2 flex-wrap">
+              <span>Saldos das Contas</span>
               {problemCount > 0 && (
                 <TooltipProvider delayDuration={150}>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span
-                        className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/30 cursor-help"
+                        className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/30 cursor-help whitespace-nowrap"
                         onClick={(e) => { e.stopPropagation(); setOpen(true); }}
                       >
                         {problemCount} com problema
