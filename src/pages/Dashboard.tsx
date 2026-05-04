@@ -10,6 +10,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { useNavigate } from 'react-router-dom';
 import CobrancaDialog from '@/components/CobrancaDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAccountBalancesCount, getBalanceStatus } from '@/components/AccountBalancesPanel';
 
 const CUSTOS_DIRETOS = new Set(['Tráfego', 'Anúncios', 'Ferramentas Cliente', 'Freelancer Cliente']);
 
