@@ -162,7 +162,7 @@ export default function Clientes() {
                         const el = document.getElementById('account-balances-panel');
                         el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                       }}
-                      className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500/25 transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500/25 transition-colors cursor-pointer whitespace-nowrap"
                     >
                       <AlertTriangle className="w-3 h-3" />
                       {problemCount === 1 ? '1 conta com problema' : `${problemCount} contas com problema`}
