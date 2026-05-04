@@ -10,6 +10,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { useNavigate } from 'react-router-dom';
 import CobrancaDialog from '@/components/CobrancaDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAccountBalancesCount, getBalanceStatus } from '@/components/AccountBalancesPanel';
 
 const CUSTOS_DIRETOS = new Set(['Tráfego', 'Anúncios', 'Ferramentas Cliente', 'Freelancer Cliente']);
 
@@ -170,6 +171,11 @@ export default function Dashboard() {
   const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const fmtDate = (d: string) => new Date(d + 'T00:00').toLocaleDateString('pt-BR');
 
+  const { accounts: balanceAccounts } = useAccountBalancesCount();
+  const contasSemSaldo = useMemo(() => balanceAccounts.filter(a => getBalanceStatus(a) === 'empty'), [balanceAccounts]);
+  const contasBaixoSaldo = useMemo(() => balanceAccounts.filter(a => getBalanceStatus(a) === 'low'), [balanceAccounts]);
+  const contasComErro = useMemo(() => balanceAccounts.filter(a => getBalanceStatus(a) === 'error'), [balanceAccounts]);
+
   const [cobrancaOpen, setCobrancaOpen] = useState(false);
   const [cobrancaData, setCobrancaData] = useState<{ name: string; valor: number; vencimento: string }>({ name: '', valor: 0, vencimento: '' });
   const abrirCobranca = (clienteName: string, valor: number, vencimento: string) => {
@@ -239,7 +245,65 @@ export default function Dashboard() {
         <KpiCard icon={AlertTriangle} label="Margem baixa (<20%)" value={String(baixaMargem.length)} accent={baixaMargem.length > 0 ? 'text-red-400' : 'text-emerald-400'} />
       </div>
 
-      {/* Gráfico de evolução */}
+      {/* Saldos das contas de anúncio */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard
+          icon={XCircle}
+          label="Contas sem saldo"
+          value={String(contasSemSaldo.length)}
+          accent={contasSemSaldo.length > 0 ? 'text-red-400' : 'text-emerald-400'}
+          onClick={() => navigate('/clientes')}
+        />
+        <KpiCard
+          icon={AlertTriangle}
+          label="Saldo baixo"
+          value={String(contasBaixoSaldo.length)}
+          accent={contasBaixoSaldo.length > 0 ? 'text-amber-400' : 'text-emerald-400'}
+          onClick={() => navigate('/clientes')}
+        />
+        <KpiCard
+          icon={AlertCircle}
+          label="Contas com erro"
+          value={String(contasComErro.length)}
+          accent={contasComErro.length > 0 ? 'text-red-400' : 'text-emerald-400'}
+          onClick={() => navigate('/clientes')}
+        />
+        <KpiCard
+          icon={Wallet}
+          label="Total de contas Meta"
+          value={String(balanceAccounts.length)}
+          accent="text-[hsl(var(--neon-blue))]"
+          onClick={() => navigate('/clientes')}
+        />
+      </div>
+
+      {(contasSemSaldo.length > 0 || contasBaixoSaldo.length > 0 || contasComErro.length > 0) && (
+        <div className="glass-surface rounded-xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-400" /> Contas com problema de saldo
+            </h2>
+            <button onClick={() => navigate('/clientes')} className="text-xs text-primary hover:underline">Ver detalhes</button>
+          </div>
+          <div className="space-y-2">
+            {[...contasSemSaldo, ...contasComErro, ...contasBaixoSaldo].slice(0, 6).map(a => {
+              const st = getBalanceStatus(a);
+              const cor = st === 'empty' || st === 'error' ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-amber-500/10 border-amber-500/30 text-amber-400';
+              const label = st === 'empty' ? 'Sem saldo' : st === 'error' ? (a.account_status_label || 'Erro') : 'Saldo baixo';
+              return (
+                <div key={a.account_id} className={`flex items-center justify-between gap-3 p-3 rounded-lg border ${cor}`}>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-foreground truncate">{a.account_name || 'Sem nome'}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">{a.client_name}</p>
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider whitespace-nowrap">{label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="glass-surface rounded-xl p-6">
         <h2 className="text-lg font-semibold text-foreground mb-4">Evolução da receita (últimos 6 meses)</h2>
         <div className="h-64">
