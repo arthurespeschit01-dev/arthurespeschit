@@ -171,6 +171,11 @@ export default function Dashboard() {
   const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const fmtDate = (d: string) => new Date(d + 'T00:00').toLocaleDateString('pt-BR');
 
+  const { accounts: balanceAccounts } = useAccountBalancesCount();
+  const contasSemSaldo = useMemo(() => balanceAccounts.filter(a => getBalanceStatus(a) === 'empty'), [balanceAccounts]);
+  const contasBaixoSaldo = useMemo(() => balanceAccounts.filter(a => getBalanceStatus(a) === 'low'), [balanceAccounts]);
+  const contasComErro = useMemo(() => balanceAccounts.filter(a => getBalanceStatus(a) === 'error'), [balanceAccounts]);
+
   const [cobrancaOpen, setCobrancaOpen] = useState(false);
   const [cobrancaData, setCobrancaData] = useState<{ name: string; valor: number; vencimento: string }>({ name: '', valor: 0, vencimento: '' });
   const abrirCobranca = (clienteName: string, valor: number, vencimento: string) => {
