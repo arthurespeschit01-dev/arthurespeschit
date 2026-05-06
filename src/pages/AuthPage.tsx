@@ -35,7 +35,7 @@ export default function AuthPage() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md animate-fade-in">
         <div className="text-center mb-8">
-          <img src={logoCentralGestor} alt="Central do Gestor" className="h-28 w-auto mx-auto mb-4 object-contain" />
+          <img src={logoCentralGestor} alt="Central do Gestor" className="h-40 w-auto mx-auto mb-4 object-contain" />
           <p className="text-muted-foreground text-sm">Gerencie seus clientes e campanhas de marketing digital</p>
         </div>
 
