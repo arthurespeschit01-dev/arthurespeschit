@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Bell, X, AlertTriangle, Clock, FileText, ChevronUp, CheckCheck, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { Bell, X, AlertTriangle, Clock, FileText, ChevronUp, CheckCheck, Eye, EyeOff, Trash2, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
