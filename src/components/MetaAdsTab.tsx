@@ -184,8 +184,12 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
   };
 
   const clearMetaData = async () => {
-    await supabase.from('creatives').delete().eq('client_id', clientId).eq('source', 'meta');
-    await supabase.from('ad_sets').delete().eq('client_id', clientId);
+    const { data: camps } = await supabase.from('campaigns').select('id').eq('client_id', clientId).eq('source', 'meta');
+    const campIds = (camps || []).map((c: any) => c.id);
+    if (campIds.length) {
+      await supabase.from('creatives').delete().in('campaign_id', campIds);
+      await supabase.from('ad_sets').delete().in('campaign_id', campIds);
+    }
     await supabase.from('campaigns').delete().eq('client_id', clientId).eq('source', 'meta');
   };
 
