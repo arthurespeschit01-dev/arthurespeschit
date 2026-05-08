@@ -226,8 +226,33 @@ export default function Clientes() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="bg-card border-border max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
+            <DialogTitle>
+              {editing ? 'Editar Cliente' : step === 'meta' ? 'Conectar Meta Ads' : 'Novo Cliente — dados'}
+            </DialogTitle>
           </DialogHeader>
+
+          {!editing && step === 'meta' ? (
+            <div className="space-y-5 py-2">
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-5 text-center space-y-3">
+                <div className="mx-auto w-12 h-12 rounded-full bg-primary/15 flex items-center justify-center">
+                  <Link2 className="w-6 h-6 text-primary" />
+                </div>
+                <h3 className="text-foreground font-semibold">Conecte sua conta do Meta Ads</h3>
+                <p className="text-sm text-muted-foreground">
+                  Antes de cadastrar os dados do cliente, conecte uma conta do Meta para puxar métricas e relatórios automaticamente. Você pode pular essa etapa e conectar depois.
+                </p>
+                <Button onClick={startMetaConnection} className="neon-glow gap-2 w-full sm:w-auto">
+                  <Link2 className="w-4 h-4" /> Conectar Meta Ads
+                </Button>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+                <Button variant="outline" onClick={() => setStep('form')} className="gap-2">
+                  Pular e continuar <ArrowRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          ) : (
           <div className="space-y-4">
             <div><Label className="text-muted-foreground text-sm">Nome do cliente *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" /></div>
             <div className="grid grid-cols-2 gap-4">
