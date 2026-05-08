@@ -21,6 +21,7 @@ Deno.serve(async (req) => {
     }
     const url = new URL(req.url);
     const clientId = url.searchParams.get('client_id');
+    const origin = url.searchParams.get('origin') || '';
     if (!clientId) {
       return new Response(JSON.stringify({ error: 'client_id required' }), { status: 400, headers: corsHeaders });
     }
@@ -33,7 +34,9 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
     }
 
-    const state = crypto.randomUUID();
+    // state = uuid~base64(origin) — origem usada no redirect final do callback
+    const stateId = crypto.randomUUID();
+    const state = origin ? `${stateId}~${btoa(origin)}` : stateId;
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     await admin.from('google_ads_oauth_states').insert({ state, user_id: userData.user.id, client_id: clientId });
 
