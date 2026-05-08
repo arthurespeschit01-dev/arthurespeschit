@@ -40,6 +40,7 @@ export default function Clientes() {
   const navigate = useNavigate();
   const [clients, setClients] = useState<Client[]>([]);
   const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<'meta' | 'form'>('meta');
   const [balanceAccounts, setBalanceAccounts] = useState<AccountBalance[]>([]);
   const [editing, setEditing] = useState<Client | null>(null);
   const { accounts: preloadedBalanceAccounts } = useAccountBalancesCount();
