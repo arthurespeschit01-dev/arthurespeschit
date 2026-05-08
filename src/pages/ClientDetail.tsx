@@ -694,50 +694,7 @@ export default function ClientDetail() {
         </div>
       )}
 
-      {/* Campanhas Tab - hierarquia Meta (Campanhas > Conjuntos > Anúncios) */}
-      {tab === 'campanhas' && id && (
-        <MetaHierarchyTabs
-          clientId={id}
-          campaigns={campaigns as any}
-          insightsByCamp={insightsByCamp}
-          loadingInsights={loadingInsights}
-          dateRange={dateRange}
-          onDateRangeChange={setDateRange}
-          onReloadCampaigns={loadCampaigns}
-          onOpenNewCampaign={openNewCampaign}
-          onOpenEditCampaign={(c) => openEditCampaign(c as any)}
-          onDeleteCampaign={(cid, e) => deleteCampaign(cid, e)}
-          onOpenNewCreative={() => openNewCreative()}
-          onOpenEditCreative={(cr) => openEditCreative(cr as any)}
-          onDeleteCreative={(crId) => deleteCreative(crId)}
-          onPreviewCreative={(cr) => setPreviewCreative(cr as any)}
-          buildPeriodBody={buildPeriodBody}
-          importingMeta={importingMeta}
-          onImportFromMeta={async () => {
-            setImportingMeta(true);
-            const { data, error } = await supabase.functions.invoke('meta-import-campaigns', {
-              body: { client_id: id, ...buildPeriodBody() },
-            });
-            setImportingMeta(false);
-            if (error || data?.error) {
-              const msg = (data?.error || error?.message || '').toString();
-              if (msg.includes('no_connection')) toast.error('Conecte a Meta Ads na aba "Meta Ads" primeiro');
-              else if (msg.includes('no_selected_account')) toast.error('Selecione uma conta de anúncio na aba "Meta Ads"');
-              else toast.error('Falha ao importar: ' + msg);
-              return;
-            }
-            toast.success(`${data.imported} campanhas importadas da Meta`);
-            loadCampaigns();
-          }}
-          onExportPDF={() => {
-            if (campaigns.length === 0) { toast.error('Nenhuma campanha para exportar'); return; }
-            setExportStatusFilter('todas');
-            setExportObjectives([]);
-            setExportSelectedIds(Object.fromEntries(campaigns.map(c => [c.id, true])));
-            setExportOpen(true);
-          }}
-        />
-      )}
+      {/* (Aba Campanhas removida — conteúdo agora dentro da aba Meta Ads) */}
 
       {/* Anexos Tab */}
       {tab === 'anexos' && (
