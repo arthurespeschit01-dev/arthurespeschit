@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import NotificationBar from '@/components/NotificationBar';
 import SupportFAB from '@/components/SupportFAB';
 import ThemeToggle from '@/components/ThemeToggle';
+import OnboardingTour from '@/components/OnboardingTour';
 
 import { NavLink } from 'react-router-dom';
 import {
@@ -59,6 +60,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <TooltipProvider delayDuration={0}>
+      <OnboardingTour />
       <div className="min-h-screen flex bg-background">
         {sidebarOpen && (
           <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />

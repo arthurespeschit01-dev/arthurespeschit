@@ -966,6 +966,7 @@ export type Database = {
           notif_config: Json
           notif_email: boolean
           notif_email_destino: string | null
+          onboarding_completed: boolean
           updated_at: string
           user_id: string
         }
@@ -975,6 +976,7 @@ export type Database = {
           notif_config?: Json
           notif_email?: boolean
           notif_email_destino?: string | null
+          onboarding_completed?: boolean
           updated_at?: string
           user_id: string
         }
@@ -984,6 +986,7 @@ export type Database = {
           notif_config?: Json
           notif_email?: boolean
           notif_email_destino?: string | null
+          onboarding_completed?: boolean
           updated_at?: string
           user_id?: string
         }
