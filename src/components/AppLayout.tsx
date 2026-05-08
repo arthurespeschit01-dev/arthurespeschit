@@ -25,6 +25,7 @@ const mainNavItems = [
   { to: '/contratos', label: 'Contratos', icon: FileText },
   { to: '/estrategias', label: 'Geração de Estratégia', icon: Sparkles },
   { to: '/utm', label: 'Gerador de UTMs', icon: Link2 },
+  { to: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
 
 const processosSubItems = [
