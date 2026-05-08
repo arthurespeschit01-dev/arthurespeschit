@@ -183,25 +183,39 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
     onCampaignsImported?.();
   };
 
+  const clearMetaData = async () => {
+    const { data: camps } = await supabase.from('campaigns').select('id').eq('client_id', clientId).eq('source', 'meta');
+    const campIds = (camps || []).map((c: any) => c.id);
+    if (campIds.length) {
+      await supabase.from('creatives').delete().in('campaign_id', campIds);
+      await supabase.from('ad_sets').delete().in('campaign_id', campIds);
+    }
+    await supabase.from('campaigns').delete().eq('client_id', clientId).eq('source', 'meta');
+  };
+
   const disconnectAccount = async () => {
-    if (!confirm('Desconectar esta conta? Você poderá selecionar outra conta Meta em seguida.')) return;
+    if (!confirm('Desconectar esta conta? Os dados importados (campanhas, conjuntos e criativos) serão removidos.')) return;
     const { error } = await supabase.from('meta_connections')
       .update({ selected_ad_account_id: null, selected_ad_account_name: null })
       .eq('client_id', clientId);
     if (error) { toast.error('Falha ao desconectar conta'); return; }
-    toast.success('Conta desconectada — selecione outra abaixo');
+    await clearMetaData();
+    toast.success('Conta desconectada e dados removidos');
     await loadConnection();
+    onCampaignsImported?.();
   };
 
   const disconnectMetaFully = async () => {
-    if (!confirm('Desconectar Meta totalmente? O token será removido e você precisará refazer a autenticação para reconectar.')) return;
+    if (!confirm('Desconectar Meta totalmente? Token e todos os dados importados serão removidos.')) return;
     const { error } = await supabase.from('meta_connections')
       .delete()
       .eq('client_id', clientId);
     if (error) { toast.error('Falha ao desconectar Meta'); return; }
-    toast.success('Meta desconectada totalmente');
+    await clearMetaData();
+    toast.success('Meta desconectada e dados removidos');
     setAccounts([]);
     setConnection(null);
+    onCampaignsImported?.();
   };
 
   if (loading) return <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>;
