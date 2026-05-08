@@ -194,6 +194,50 @@ export default function NotificationBar() {
       }
     });
 
+    // Meta token expirando / expirado
+    (async () => {
+      const { data: conns } = await supabase
+        .from('meta_connections')
+        .select('client_id, token_expires_at')
+        .eq('user_id', user.id);
+      if (!conns) return;
+      const extras: Notification[] = [];
+      for (const c of conns) {
+        if (!c.token_expires_at) continue;
+        const exp = new Date(c.token_expires_at).getTime();
+        const days = (exp - Date.now()) / 86400000;
+        const cli = clients.find(cl => cl.id === c.client_id);
+        const nome = cli?.name || 'cliente';
+        if (days <= 0) {
+          extras.push({
+            id: `meta-token-expired-${c.client_id}`,
+            type: 'meta_token_expired',
+            title: `Meta Ads desconectado — ${nome}`,
+            description: 'O token da Meta expirou. Clique para reconectar.',
+            route: `/clientes/${c.client_id}`,
+            priority: 0,
+          });
+        } else if (days < 7) {
+          extras.push({
+            id: `meta-token-expiring-${c.client_id}`,
+            type: 'meta_token_expiring',
+            title: `Meta Ads expira em ${Math.max(1, Math.ceil(days))} dia(s) — ${nome}`,
+            description: 'A conexão será renovada automaticamente, mas você pode reconectar agora se preferir.',
+            route: `/clientes/${c.client_id}`,
+            priority: 2,
+          });
+        }
+      }
+      if (extras.length) {
+        setNotifications(prev => {
+          const ids = new Set(prev.map(n => n.id));
+          const merged = [...prev, ...extras.filter(e => !ids.has(e.id))];
+          merged.sort((a, b) => a.priority - b.priority);
+          return merged;
+        });
+      }
+    })();
+
     notifs.sort((a, b) => a.priority - b.priority);
     setNotifications(notifs);
 
