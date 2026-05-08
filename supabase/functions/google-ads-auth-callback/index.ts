@@ -10,10 +10,13 @@ const REDIRECT_URI = `${SUPABASE_URL}/functions/v1/google-ads-auth-callback`;
 function htmlClose(message: string, ok: boolean) {
   return `<!doctype html><html><head><meta charset="utf-8"><title>Google Ads</title>
 <style>body{font-family:system-ui;background:#0a0a0a;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:20px}
-.box{max-width:400px}.ok{color:#a78bfa}.err{color:#f87171}</style></head>
+.box{max-width:420px}.ok{color:#a78bfa}.err{color:#f87171}button{margin-top:16px;padding:10px 20px;background:#7c3aed;color:#fff;border:0;border-radius:8px;cursor:pointer;font-size:14px}</style></head>
 <body><div class="box"><h2 class="${ok ? 'ok' : 'err'}">${ok ? '✓ Google Ads conectado!' : '✗ Erro na conexão'}</h2>
-<p>${message}</p><p style="opacity:.6;font-size:14px">Esta janela será fechada automaticamente...</p></div>
-<script>setTimeout(()=>{if(window.opener){window.opener.postMessage({type:'google-ads-oauth',ok:${ok}},'*');}window.close();},1500);</script>
+<p>${message}</p>
+<p style="opacity:.6;font-size:14px;margin-top:20px">Você já pode fechar esta aba e voltar ao sistema.</p>
+<button onclick="try{window.opener&&window.opener.postMessage({type:'google-ads-oauth',ok:${ok}},'*');}catch(e){};window.close();">Fechar</button>
+</div>
+<script>try{if(window.opener){window.opener.postMessage({type:'google-ads-oauth',ok:${ok}},'*');}}catch(e){}</script>
 </body></html>`;
 }
 
