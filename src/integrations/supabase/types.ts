@@ -647,6 +647,69 @@ export type Database = {
           },
         ]
       }
+      google_ads_connections: {
+        Row: {
+          access_token: string | null
+          client_id: string
+          created_at: string
+          id: string
+          login_customer_id: string | null
+          refresh_token: string | null
+          selected_customer_id: string | null
+          selected_customer_name: string | null
+          token_expires_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          login_customer_id?: string | null
+          refresh_token?: string | null
+          selected_customer_id?: string | null
+          selected_customer_name?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          login_customer_id?: string | null
+          refresh_token?: string | null
+          selected_customer_id?: string | null
+          selected_customer_name?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      google_ads_oauth_states: {
+        Row: {
+          client_id: string
+          created_at: string
+          state: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          state: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          state?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       mensalidades: {
         Row: {
           cliente_id: string
