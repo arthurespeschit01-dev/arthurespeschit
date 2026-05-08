@@ -118,6 +118,7 @@ export default function Clientes() {
       verba_mensal: c.verba_mensal || 0, niche: c.niche || '', phone: c.phone || '',
       account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '', ...c.account_ids },
     });
+    setStep('form');
     setOpen(true);
   };
 
