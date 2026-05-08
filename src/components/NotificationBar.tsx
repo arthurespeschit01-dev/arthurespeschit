@@ -28,6 +28,27 @@ export default function NotificationBar() {
   const toastShownRef = useRef(false);
   const statesLoadedRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const prevUnreadCountRef = useRef<number | null>(null);
+  const [bellShake, setBellShake] = useState(false);
+
+  const playNotificationSound = useCallback(() => {
+    try {
+      const Ctx = (window.AudioContext || (window as any).webkitAudioContext);
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      oscillator.frequency.setValueAtTime(880, ctx.currentTime);
+      oscillator.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
+      gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      oscillator.start(ctx.currentTime);
+      oscillator.stop(ctx.currentTime + 0.4);
+      setTimeout(() => ctx.close().catch(() => {}), 600);
+    } catch { /* ignore */ }
+  }, []);
 
   // Close on outside click
   useEffect(() => {
