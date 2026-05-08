@@ -30,8 +30,17 @@ export default function NotificationBar() {
   const containerRef = useRef<HTMLDivElement>(null);
   const prevUnreadCountRef = useRef<number | null>(null);
   const [bellShake, setBellShake] = useState(false);
+  const [soundMuted, setSoundMuted] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('notif_sound_muted') === '1';
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem('notif_sound_muted', soundMuted ? '1' : '0'); } catch { /* ignore */ }
+  }, [soundMuted]);
 
   const playNotificationSound = useCallback(() => {
+    if (soundMuted) return;
     try {
       const Ctx = (window.AudioContext || (window as any).webkitAudioContext);
       if (!Ctx) return;
@@ -48,7 +57,7 @@ export default function NotificationBar() {
       oscillator.stop(ctx.currentTime + 0.4);
       setTimeout(() => ctx.close().catch(() => {}), 600);
     } catch { /* ignore */ }
-  }, []);
+  }, [soundMuted]);
 
   // Close on outside click
   useEffect(() => {
