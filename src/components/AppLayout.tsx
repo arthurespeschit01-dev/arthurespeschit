@@ -117,6 +117,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <TooltipTrigger asChild>
                     <button
                       onClick={toggleCollapsed}
+                      data-tour-id="nav-processos"
                       className="flex items-center justify-center gap-3 px-2 py-2.5 rounded-lg text-sm transition-all duration-200 w-full text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                     >
                       <FolderOpen className="w-4 h-4 shrink-0" />
@@ -127,6 +128,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               ) : (
                 <button
                   onClick={() => setProcessosOpen(!processosOpen)}
+                  data-tour-id="nav-processos"
                   className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 w-full text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 >
                   <FolderOpen className="w-4 h-4 shrink-0" />
