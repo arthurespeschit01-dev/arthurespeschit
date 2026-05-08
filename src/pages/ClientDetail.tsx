@@ -76,7 +76,8 @@ export default function ClientDetail() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [client, setClient] = useState<Client | null>(null);
-  const [tab, setTab] = useState<'dados' | 'campanhas' | 'anexos' | 'meta' | 'google'>('dados');
+  const [tab, setTab] = useState<'dados' | 'anexos' | 'meta' | 'google'>('dados');
+  const [metaActiveAccount, setMetaActiveAccount] = useState<string | null>(null);
   const [importingMeta, setImportingMeta] = useState(false);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [filter, setFilter] = useState('Todas');
@@ -152,11 +153,16 @@ export default function ClientDetail() {
     }
   };
 
-  const loadCampaigns = async () => {
-    // Buscar conta Meta ativa para filtrar campanhas Meta de outras contas
+  const loadMetaActiveAccount = async () => {
     const { data: conn } = await supabase.from('meta_connections')
       .select('selected_ad_account_id').eq('client_id', id).maybeSingle();
-    const activeAccount = conn?.selected_ad_account_id || null;
+    setMetaActiveAccount(conn?.selected_ad_account_id || null);
+    return conn?.selected_ad_account_id || null;
+  };
+
+  const loadCampaigns = async () => {
+    // Buscar conta Meta ativa para filtrar campanhas Meta de outras contas
+    const activeAccount = await loadMetaActiveAccount();
     const { data } = await supabase.from('campaigns').select('*').eq('client_id', id).order('created_at', { ascending: false });
     const filtered = (data || []).filter((c: any) =>
       c.source !== 'meta' || !activeAccount || c.meta_ad_account_id === activeAccount
@@ -542,7 +548,6 @@ export default function ClientDetail() {
       {/* Tabs */}
       <div className="flex gap-1 p-1 bg-secondary/50 rounded-lg w-fit flex-wrap">
         <button onClick={() => setTab('dados')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'dados' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>Dados do Cliente</button>
-        <button onClick={() => { setTab('campanhas'); setSelectedCampaign(null); }} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'campanhas' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>Campanhas</button>
         <button onClick={() => setTab('meta')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'meta' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>Meta Ads</button>
         <button onClick={() => setTab('google')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'google' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>Google Ads</button>
         <button onClick={() => setTab('anexos')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'anexos' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
@@ -551,7 +556,57 @@ export default function ClientDetail() {
       </div>
 
       {/* Meta Ads Tab */}
-      {tab === 'meta' && id && <MetaAdsTab clientId={id} onCampaignsImported={() => { loadCampaigns(); setTab('campanhas'); }} />}
+      {tab === 'meta' && id && (
+        <div className="space-y-4">
+          <MetaAdsTab
+            clientId={id}
+            onCampaignsImported={() => { loadCampaigns(); loadMetaActiveAccount(); }}
+          />
+          {metaActiveAccount && (
+            <MetaHierarchyTabs
+              clientId={id}
+              campaigns={campaigns as any}
+              insightsByCamp={insightsByCamp}
+              loadingInsights={loadingInsights}
+              dateRange={dateRange}
+              onDateRangeChange={setDateRange}
+              onReloadCampaigns={loadCampaigns}
+              onOpenNewCampaign={openNewCampaign}
+              onOpenEditCampaign={(c) => openEditCampaign(c as any)}
+              onDeleteCampaign={(cid, e) => deleteCampaign(cid, e)}
+              onOpenNewCreative={() => openNewCreative()}
+              onOpenEditCreative={(cr) => openEditCreative(cr as any)}
+              onDeleteCreative={(crId) => deleteCreative(crId)}
+              onPreviewCreative={(cr) => setPreviewCreative(cr as any)}
+              buildPeriodBody={buildPeriodBody}
+              importingMeta={importingMeta}
+              onImportFromMeta={async () => {
+                setImportingMeta(true);
+                const { data, error } = await supabase.functions.invoke('meta-import-campaigns', {
+                  body: { client_id: id, ...buildPeriodBody() },
+                });
+                setImportingMeta(false);
+                if (error || data?.error) {
+                  const msg = (data?.error || error?.message || '').toString();
+                  if (msg.includes('no_connection')) toast.error('Conecte a Meta Ads acima primeiro');
+                  else if (msg.includes('no_selected_account')) toast.error('Selecione uma conta de anúncio acima');
+                  else toast.error('Falha ao importar: ' + msg);
+                  return;
+                }
+                toast.success(`${data.imported} campanhas importadas da Meta`);
+                loadCampaigns();
+              }}
+              onExportPDF={() => {
+                if (campaigns.length === 0) { toast.error('Nenhuma campanha para exportar'); return; }
+                setExportStatusFilter('todas');
+                setExportObjectives([]);
+                setExportSelectedIds(Object.fromEntries(campaigns.map(c => [c.id, true])));
+                setExportOpen(true);
+              }}
+            />
+          )}
+        </div>
+      )}
 
       {/* Google Ads Tab */}
       {tab === 'google' && id && <GoogleAdsTab clientId={id} />}
@@ -644,50 +699,7 @@ export default function ClientDetail() {
         </div>
       )}
 
-      {/* Campanhas Tab - hierarquia Meta (Campanhas > Conjuntos > Anúncios) */}
-      {tab === 'campanhas' && id && (
-        <MetaHierarchyTabs
-          clientId={id}
-          campaigns={campaigns as any}
-          insightsByCamp={insightsByCamp}
-          loadingInsights={loadingInsights}
-          dateRange={dateRange}
-          onDateRangeChange={setDateRange}
-          onReloadCampaigns={loadCampaigns}
-          onOpenNewCampaign={openNewCampaign}
-          onOpenEditCampaign={(c) => openEditCampaign(c as any)}
-          onDeleteCampaign={(cid, e) => deleteCampaign(cid, e)}
-          onOpenNewCreative={() => openNewCreative()}
-          onOpenEditCreative={(cr) => openEditCreative(cr as any)}
-          onDeleteCreative={(crId) => deleteCreative(crId)}
-          onPreviewCreative={(cr) => setPreviewCreative(cr as any)}
-          buildPeriodBody={buildPeriodBody}
-          importingMeta={importingMeta}
-          onImportFromMeta={async () => {
-            setImportingMeta(true);
-            const { data, error } = await supabase.functions.invoke('meta-import-campaigns', {
-              body: { client_id: id, ...buildPeriodBody() },
-            });
-            setImportingMeta(false);
-            if (error || data?.error) {
-              const msg = (data?.error || error?.message || '').toString();
-              if (msg.includes('no_connection')) toast.error('Conecte a Meta Ads na aba "Meta Ads" primeiro');
-              else if (msg.includes('no_selected_account')) toast.error('Selecione uma conta de anúncio na aba "Meta Ads"');
-              else toast.error('Falha ao importar: ' + msg);
-              return;
-            }
-            toast.success(`${data.imported} campanhas importadas da Meta`);
-            loadCampaigns();
-          }}
-          onExportPDF={() => {
-            if (campaigns.length === 0) { toast.error('Nenhuma campanha para exportar'); return; }
-            setExportStatusFilter('todas');
-            setExportObjectives([]);
-            setExportSelectedIds(Object.fromEntries(campaigns.map(c => [c.id, true])));
-            setExportOpen(true);
-          }}
-        />
-      )}
+      {/* (Aba Campanhas removida — conteúdo agora dentro da aba Meta Ads) */}
 
       {/* Anexos Tab */}
       {tab === 'anexos' && (
