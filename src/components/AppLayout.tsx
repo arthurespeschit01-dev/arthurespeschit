@@ -216,6 +216,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <NotificationBar />
               <span className="text-sm text-muted-foreground truncate max-w-[140px] sm:max-w-[220px] md:max-w-none">{user?.email}</span>
               {(() => {
+                const isGoogle =
+                  user?.app_metadata?.provider === 'google' ||
+                  (user?.app_metadata?.providers as string[] | undefined)?.includes('google');
+                if (!isGoogle) return null;
                 const avatarUrl = (user?.user_metadata as any)?.avatar_url || (user?.user_metadata as any)?.picture;
                 const fullName = (user?.user_metadata as any)?.full_name || (user?.user_metadata as any)?.name || user?.email || '';
                 const initials = fullName.split(' ').map((p: string) => p[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'U';
