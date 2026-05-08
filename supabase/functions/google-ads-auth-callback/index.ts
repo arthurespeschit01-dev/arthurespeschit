@@ -20,14 +20,30 @@ function htmlClose(message: string, ok: boolean) {
 </body></html>`;
 }
 
+function decodeOrigin(state: string | null): string | null {
+  if (!state || !state.includes('~')) return null;
+  try { return atob(state.split('~')[1]); } catch { return null; }
+}
+
+function redirectOrHtml(origin: string | null, ok: boolean, message: string) {
+  if (origin) {
+    const dest = new URL(origin);
+    dest.searchParams.set('google_ads', ok ? 'ok' : 'err');
+    if (!ok) dest.searchParams.set('msg', message);
+    return new Response(null, { status: 302, headers: { Location: dest.toString() } });
+  }
+  return new Response(htmlClose(message, ok), { headers: { 'Content-Type': 'text/html' } });
+}
+
 Deno.serve(async (req) => {
   const url = new URL(req.url);
   const code = url.searchParams.get('code');
   const state = url.searchParams.get('state');
   const error = url.searchParams.get('error_description') || url.searchParams.get('error');
+  const origin = decodeOrigin(state);
 
-  if (error) return new Response(htmlClose(error, false), { headers: { 'Content-Type': 'text/html' } });
-  if (!code || !state) return new Response(htmlClose('Parâmetros ausentes', false), { headers: { 'Content-Type': 'text/html' } });
+  if (error) return redirectOrHtml(origin, false, error);
+  if (!code || !state) return redirectOrHtml(origin, false, 'Parâmetros ausentes');
 
   try {
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -61,11 +77,9 @@ Deno.serve(async (req) => {
 
     await admin.from('google_ads_oauth_states').delete().eq('state', state);
 
-    return new Response(htmlClose('Você já pode selecionar a conta de anúncio.', true), {
-      headers: { 'Content-Type': 'text/html' },
-    });
+    return redirectOrHtml(origin, true, 'Você já pode selecionar a conta de anúncio.');
   } catch (e) {
     console.error('google-ads-auth-callback error', e);
-    return new Response(htmlClose(String(e), false), { headers: { 'Content-Type': 'text/html' } });
+    return redirectOrHtml(origin, false, String(e));
   }
 });

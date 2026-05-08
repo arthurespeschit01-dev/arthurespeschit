@@ -67,49 +67,38 @@ export default function GoogleAdsTab({ clientId }: { clientId: string }) {
   useEffect(() => { loadConnection(); }, [loadConnection]);
   useEffect(() => { if (connection?.selected_customer_id) loadMetrics(); }, [loadMetrics, connection?.selected_customer_id]);
 
+  // Detecta retorno do OAuth (?google_ads=ok|err) e mostra toast
   useEffect(() => {
-    const handler = (ev: MessageEvent) => {
-      if (ev.data?.type === 'google-ads-oauth') {
-        if (ev.data.ok) { toast.success('Google Ads conectado!'); loadConnection(); }
-        else toast.error('Falha ao conectar Google Ads');
-        setConnecting(false);
-      }
-    };
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get('google_ads');
+    if (!result) return;
+    const stored = localStorage.getItem('google-ads-return');
+    if (result === 'ok') {
+      toast.success('Google Ads conectado!');
+      loadConnection();
+    } else {
+      toast.error(params.get('msg') || 'Falha ao conectar Google Ads');
+    }
+    if (stored) localStorage.removeItem('google-ads-return');
+    params.delete('google_ads');
+    params.delete('msg');
+    const newSearch = params.toString();
+    window.history.replaceState({}, '', `${window.location.pathname}${newSearch ? `?${newSearch}` : ''}`);
   }, [loadConnection]);
 
   const connect = async () => {
     setConnecting(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-ads-auth?client_id=${clientId}`;
+      const returnUrl = `${window.location.origin}${window.location.pathname}`;
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-ads-auth?client_id=${clientId}&origin=${encodeURIComponent(returnUrl)}`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${session?.access_token}` } });
       const json = await res.json();
       if (!res.ok || !json.auth_url) throw new Error(json.error || 'Falha');
-      // Abrir em nova aba (sem features para não virar popup, evita ERR_BLOCKED_BY_RESPONSE do Google)
-      const tab = window.open(json.auth_url, '_blank', 'noopener,noreferrer');
-      if (!tab) {
-        // Fallback: navegar a própria janela
-        window.location.href = json.auth_url;
-        return;
-      }
-      toast.info('Conclua o login do Google na nova aba — voltaremos a buscar a conexão automaticamente.');
-      // Polling: verifica se a conexão chegou ao banco
-      const start = Date.now();
-      const poll = setInterval(async () => {
-        const { data } = await supabase.from('google_ads_connections')
-          .select('id').eq('client_id', clientId).maybeSingle();
-        if (data) {
-          clearInterval(poll);
-          setConnecting(false);
-          toast.success('Google Ads conectado!');
-          loadConnection();
-        } else if (Date.now() - start > 5 * 60 * 1000) {
-          clearInterval(poll);
-          setConnecting(false);
-        }
-      }, 2500);
+      localStorage.setItem('google-ads-return', JSON.stringify({ clientId, ts: Date.now() }));
+      // Redirecionar a janela TOP-level (escapa do iframe do preview) — evita ERR_BLOCKED_BY_RESPONSE
+      const target: Window = (() => { try { return window.top || window; } catch { return window; } })();
+      target.location.href = json.auth_url;
     } catch (e: any) {
       toast.error(e.message || 'Falha ao iniciar OAuth');
       setConnecting(false);
