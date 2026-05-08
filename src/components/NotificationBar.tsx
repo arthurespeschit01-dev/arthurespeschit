@@ -28,6 +28,27 @@ export default function NotificationBar() {
   const toastShownRef = useRef(false);
   const statesLoadedRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const prevUnreadCountRef = useRef<number | null>(null);
+  const [bellShake, setBellShake] = useState(false);
+
+  const playNotificationSound = useCallback(() => {
+    try {
+      const Ctx = (window.AudioContext || (window as any).webkitAudioContext);
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      oscillator.frequency.setValueAtTime(880, ctx.currentTime);
+      oscillator.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
+      gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      oscillator.start(ctx.currentTime);
+      oscillator.stop(ctx.currentTime + 0.4);
+      setTimeout(() => ctx.close().catch(() => {}), 600);
+    } catch { /* ignore */ }
+  }, []);
 
   // Close on outside click
   useEffect(() => {
@@ -183,6 +204,20 @@ export default function NotificationBar() {
   const overdueUnreadCount = useMemo(() => unreadList.filter(n => n.type === 'task_overdue' || n.type === 'contract_expired').length, [unreadList]);
   const currentList = tab === 'unread' ? unreadList : readList;
 
+  // Detect new notifications: trigger shake + sound when unread count increases
+  useEffect(() => {
+    if (!statesLoadedRef.current) return;
+    const prev = prevUnreadCountRef.current;
+    if (prev !== null && unreadCount > prev) {
+      setBellShake(true);
+      playNotificationSound();
+      const t = setTimeout(() => setBellShake(false), 1000);
+      prevUnreadCountRef.current = unreadCount;
+      return () => clearTimeout(t);
+    }
+    prevUnreadCountRef.current = unreadCount;
+  }, [unreadCount, playNotificationSound]);
+
   const toggleRead = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (readIds.has(id)) {
@@ -261,9 +296,9 @@ export default function NotificationBar() {
             : 'bg-secondary/50 border-border/50 hover:bg-secondary'
         }`}
       >
-        <Bell className={`w-4 h-4 ${overdueUnreadCount > 0 ? 'text-destructive' : 'text-foreground'}`} />
+        <Bell className={`w-4 h-4 ${overdueUnreadCount > 0 ? 'text-destructive' : 'text-foreground'} ${bellShake ? 'bell-shake' : ''}`} />
         {unreadCount > 0 ? (
-          <Badge className={`${overdueUnreadCount > 0 ? 'bg-destructive' : 'bg-primary'} text-primary-foreground text-[10px] px-1.5 py-0 h-4 min-w-4`}>
+          <Badge className={`${overdueUnreadCount > 0 ? 'bg-destructive' : 'bg-primary'} text-primary-foreground text-[10px] px-1.5 py-0 h-4 min-w-4 notif-badge-pulse`}>
             {unreadCount}
           </Badge>
         ) : (
