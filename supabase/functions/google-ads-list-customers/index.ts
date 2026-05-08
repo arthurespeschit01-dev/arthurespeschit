@@ -80,14 +80,71 @@ Deno.serve(async (req) => {
       });
     }
 
-    // resourceNames: ["customers/1234567890", ...]
-    const customers = (listData.resourceNames || []).map((rn: string) => {
-      const id = rn.replace('customers/', '');
-      const formatted = id.length === 10 ? `${id.slice(0, 3)}-${id.slice(3, 6)}-${id.slice(6)}` : id;
-      return { id, formatted };
-    });
+    const fmt = (id: string) => id.length === 10 ? `${id.slice(0, 3)}-${id.slice(3, 6)}-${id.slice(6)}` : id;
+    const accessibleIds: string[] = (listData.resourceNames || []).map((rn: string) => rn.replace('customers/', ''));
 
-    return new Response(JSON.stringify({ customers }), {
+    const results: Array<{ id: string; formatted: string; name: string; manager: boolean; login_customer_id?: string }> = [];
+
+    await Promise.all(accessibleIds.map(async (cid) => {
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${accessToken}`,
+        'developer-token': GOOGLE_ADS_DEVELOPER_TOKEN,
+        'Content-Type': 'application/json',
+        'login-customer-id': cid,
+      };
+      try {
+        const meRes = await fetch(`https://googleads.googleapis.com/v17/customers/${cid}/googleAds:search`, {
+          method: 'POST', headers,
+          body: JSON.stringify({ query: 'SELECT customer.id, customer.descriptive_name, customer.manager FROM customer LIMIT 1' }),
+        });
+        const meData = await meRes.json();
+        const me = meData?.results?.[0]?.customer;
+        const isManager = !!me?.manager;
+        const myName = me?.descriptiveName || `Conta ${fmt(cid)}`;
+
+        if (!isManager) {
+          results.push({ id: cid, formatted: fmt(cid), name: myName, manager: false });
+          return;
+        }
+
+        // MCC — buscar filhas
+        const childRes = await fetch(`https://googleads.googleapis.com/v17/customers/${cid}/googleAds:search`, {
+          method: 'POST', headers,
+          body: JSON.stringify({
+            query: `SELECT customer_client.id, customer_client.descriptive_name, customer_client.manager, customer_client.level FROM customer_client WHERE customer_client.level <= 1`,
+          }),
+        });
+        const childData = await childRes.json();
+        const children = (childData?.results || [])
+          .map((r: any) => r.customerClient)
+          .filter((c: any) => c && !c.manager && String(c.id) !== cid);
+
+        if (children.length === 0) {
+          results.push({ id: cid, formatted: fmt(cid), name: `${myName} (MCC)`, manager: true });
+          return;
+        }
+        for (const c of children) {
+          const childId = String(c.id);
+          results.push({
+            id: childId,
+            formatted: fmt(childId),
+            name: c.descriptiveName || `Conta ${fmt(childId)}`,
+            manager: false,
+            login_customer_id: cid,
+          });
+        }
+      } catch (e) {
+        console.error('Erro ao detalhar', cid, e);
+        results.push({ id: cid, formatted: fmt(cid), name: `Conta ${fmt(cid)}`, manager: false });
+      }
+    }));
+
+    // dedup por id
+    const seen = new Set<string>();
+    const unique = results.filter(r => (seen.has(r.id) ? false : (seen.add(r.id), true)));
+    unique.sort((a, b) => a.name.localeCompare(b.name));
+
+    return new Response(JSON.stringify({ customers: unique }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {
