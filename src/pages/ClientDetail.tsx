@@ -153,11 +153,16 @@ export default function ClientDetail() {
     }
   };
 
-  const loadCampaigns = async () => {
-    // Buscar conta Meta ativa para filtrar campanhas Meta de outras contas
+  const loadMetaActiveAccount = async () => {
     const { data: conn } = await supabase.from('meta_connections')
       .select('selected_ad_account_id').eq('client_id', id).maybeSingle();
-    const activeAccount = conn?.selected_ad_account_id || null;
+    setMetaActiveAccount(conn?.selected_ad_account_id || null);
+    return conn?.selected_ad_account_id || null;
+  };
+
+  const loadCampaigns = async () => {
+    // Buscar conta Meta ativa para filtrar campanhas Meta de outras contas
+    const activeAccount = await loadMetaActiveAccount();
     const { data } = await supabase.from('campaigns').select('*').eq('client_id', id).order('created_at', { ascending: false });
     const filtered = (data || []).filter((c: any) =>
       c.source !== 'meta' || !activeAccount || c.meta_ad_account_id === activeAccount
