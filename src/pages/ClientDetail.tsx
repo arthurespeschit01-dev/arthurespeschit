@@ -12,6 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ArrowLeft, Plus, Edit2, Trash2, Send, Upload, FileText, X, Paperclip, Image, BookOpen, BarChart3, Film, Type as TypeIcon, ExternalLink, Sparkles, Link2, Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import MetaAdsTab from '@/components/MetaAdsTab';
+import GoogleAdsTab from '@/components/GoogleAdsTab';
 import { DateRangePicker, type DateRangeValue } from '@/components/DateRangePicker';
 import { metricsForObjective, type CampaignInsights } from '@/lib/campaignMetrics';
 import { exportCampaignsPDF } from '@/lib/exportCampaignsPDF';
@@ -550,6 +551,9 @@ export default function ClientDetail() {
 
       {/* Meta Ads Tab */}
       {tab === 'meta' && id && <MetaAdsTab clientId={id} onCampaignsImported={() => { loadCampaigns(); setTab('campanhas'); }} />}
+
+      {/* Google Ads Tab */}
+      {tab === 'google' && id && <GoogleAdsTab clientId={id} />}
 
       {/* Dados Tab */}
       {tab === 'dados' && (
