@@ -22,7 +22,8 @@ Deno.serve(async (req) => {
     }
     const url = new URL(req.url);
     const clientId = url.searchParams.get('client_id');
-    if (!clientId) {
+    const onboarding = url.searchParams.get('onboarding') === '1';
+    if (!clientId && !onboarding) {
       return new Response(JSON.stringify({ error: 'client_id required' }), { status: 400, headers: corsHeaders });
     }
 
