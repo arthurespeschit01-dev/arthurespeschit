@@ -189,7 +189,7 @@ export default function Clientes() {
           <div>Nicho</div>
           <div className="text-right">Fee mensal</div>
           <div className="text-right">Verba mensal</div>
-          <div>Duração</div>
+          <div className="text-center">Duração</div>
           <div>Status</div>
           <div className="w-16"></div>
         </div>
@@ -212,7 +212,7 @@ export default function Clientes() {
             </div>
             <div className="text-right text-sm text-foreground font-medium">R$ {c.monthly_fee?.toLocaleString('pt-BR')}</div>
             <div className="text-right text-sm text-primary font-semibold">R$ {(c.verba_mensal || 0).toLocaleString('pt-BR')}</div>
-            <div className="text-sm text-foreground">{c.contract_duration || '—'}</div>
+            <div className="text-sm text-foreground text-center">{c.contract_duration || '—'}</div>
             <div>
               <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor(c.status)}`}>{c.status}</span>
             </div>
