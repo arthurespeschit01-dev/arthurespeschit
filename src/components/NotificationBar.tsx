@@ -10,7 +10,7 @@ import { useClientsQuery, useTasksQuery, useContractsQuery, useNotificationState
 
 interface Notification {
   id: string;
-  type: 'task_overdue' | 'task_due_today' | 'task_due_soon' | 'contract_expiring' | 'contract_expired' | 'payment_today' | 'payment_soon';
+  type: 'task_overdue' | 'task_due_today' | 'task_due_soon' | 'contract_expiring' | 'contract_expired' | 'payment_today' | 'payment_soon' | 'meta_token_expiring' | 'meta_token_expired';
   title: string;
   description: string;
   route: string;
