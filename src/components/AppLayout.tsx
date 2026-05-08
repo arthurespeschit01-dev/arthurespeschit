@@ -215,6 +215,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <ThemeToggle />
               <NotificationBar />
               <span className="text-sm text-muted-foreground truncate max-w-[140px] sm:max-w-[220px] md:max-w-none">{user?.email}</span>
+              {(() => {
+                const avatarUrl = (user?.user_metadata as any)?.avatar_url || (user?.user_metadata as any)?.picture;
+                const fullName = (user?.user_metadata as any)?.full_name || (user?.user_metadata as any)?.name || user?.email || '';
+                const initials = fullName.split(' ').map((p: string) => p[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'U';
+                return (
+                  <Avatar className="w-9 h-9">
+                    {avatarUrl && <AvatarImage src={avatarUrl} alt="Foto de perfil" referrerPolicy="no-referrer" />}
+                    <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+                  </Avatar>
+                );
+              })()}
             </div>
           </header>
           <main className="flex-1 min-w-0 p-4 lg:p-6">
