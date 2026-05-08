@@ -313,17 +313,17 @@ export default function NotificationBar() {
   };
 
   const getIcon = (type: Notification['type']) => {
-    if (type === 'task_overdue' || type === 'contract_expired') return <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />;
+    if (type === 'task_overdue' || type === 'contract_expired' || type === 'meta_token_expired') return <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />;
     if (type === 'task_due_today' || type === 'payment_today') return <Clock className="w-4 h-4 text-amber-400 shrink-0" />;
-    if (type === 'contract_expiring') return <FileText className="w-4 h-4 text-amber-400 shrink-0" />;
+    if (type === 'contract_expiring' || type === 'meta_token_expiring') return <FileText className="w-4 h-4 text-amber-400 shrink-0" />;
     if (type === 'payment_soon') return <Clock className="w-4 h-4 text-[hsl(var(--neon-blue))] shrink-0" />;
     return <Clock className="w-4 h-4 text-[hsl(var(--neon-blue))] shrink-0" />;
   };
 
   const getBg = (type: Notification['type'], isRead: boolean) => {
     if (isRead) return 'bg-muted/30 border-border/30 opacity-60';
-    if (type === 'task_overdue' || type === 'contract_expired') return 'bg-destructive/10 border-destructive/20';
-    if (type === 'task_due_today' || type === 'payment_today') return 'bg-amber-400/10 border-amber-400/20';
+    if (type === 'task_overdue' || type === 'contract_expired' || type === 'meta_token_expired') return 'bg-destructive/10 border-destructive/20';
+    if (type === 'task_due_today' || type === 'payment_today' || type === 'meta_token_expiring') return 'bg-amber-400/10 border-amber-400/20';
     return 'bg-[hsl(var(--neon-blue))]/10 border-[hsl(var(--neon-blue))]/20';
   };
 
@@ -335,12 +335,14 @@ export default function NotificationBar() {
     if (type === 'contract_expiring') return 'EXPIRANDO';
     if (type === 'payment_today') return 'HOJE';
     if (type === 'payment_soon') return 'EM BREVE';
+    if (type === 'meta_token_expired') return 'META OFF';
+    if (type === 'meta_token_expiring') return 'META 7D';
     return '';
   };
 
   const getLabelColor = (type: Notification['type']) => {
-    if (type === 'task_overdue' || type === 'contract_expired') return 'bg-destructive/20 text-destructive text-[9px]';
-    if (type === 'task_due_today' || type === 'payment_today') return 'bg-amber-500/20 text-amber-400 text-[9px]';
+    if (type === 'task_overdue' || type === 'contract_expired' || type === 'meta_token_expired') return 'bg-destructive/20 text-destructive text-[9px]';
+    if (type === 'task_due_today' || type === 'payment_today' || type === 'meta_token_expiring') return 'bg-amber-500/20 text-amber-400 text-[9px]';
     return 'bg-primary/20 text-primary text-[9px]';
   };
 
