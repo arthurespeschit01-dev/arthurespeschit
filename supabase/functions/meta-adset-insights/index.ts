@@ -152,7 +152,18 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {
+    const msg = String(e);
     console.error(e);
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: corsHeaders });
+    if (msg.includes('"code":190') || msg.includes('OAuthException')) {
+      try {
+        const admin2 = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+        const body2 = await req.clone().json().catch(() => ({}));
+        if (body2?.client_id) {
+          await admin2.from('meta_connections').update({ access_token: null, selected_ad_account_id: null }).eq('client_id', body2.client_id);
+        }
+      } catch {}
+      return new Response(JSON.stringify({ error: 'token_expired', message: 'Sua conexão com a Meta expirou. Reconecte sua conta.' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    return new Response(JSON.stringify({ error: msg }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });
