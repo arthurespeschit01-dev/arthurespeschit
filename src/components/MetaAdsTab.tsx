@@ -41,7 +41,17 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
       .select('selected_ad_account_id, selected_ad_account_name, token_expires_at')
       .eq('client_id', clientId).maybeSingle();
     setConnection(data);
-    if (data) await loadAccounts();
+    if (data) {
+      // Renovação silenciosa do token longo (60d) se faltar < 7 dias
+      supabase.functions.invoke('meta-token-refresh', { body: { client_id: clientId, threshold_days: 7 } })
+        .then(({ data: r }) => {
+          if (r?.refreshed && r?.token_expires_at) {
+            setConnection(prev => prev ? { ...prev, token_expires_at: r.token_expires_at } : prev);
+          }
+        })
+        .catch(() => { /* silencioso */ });
+      await loadAccounts();
+    }
     setLoading(false);
   }, [clientId]);
 
