@@ -212,7 +212,7 @@ export default function Clientes() {
             </div>
             <div className="text-right text-sm text-foreground font-medium">R$ {c.monthly_fee?.toLocaleString('pt-BR')}</div>
             <div className="text-right text-sm text-primary font-semibold">R$ {(c.verba_mensal || 0).toLocaleString('pt-BR')}</div>
-            <div className="text-sm text-foreground text-center">{c.contract_duration || '—'}</div>
+            <div className="text-sm text-foreground text-center">{c.contract_duration ? `${c.contract_duration}/${Number(c.contract_duration) === 1 ? 'Mês' : 'Meses'}` : '—'}</div>
             <div>
               <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor(c.status)}`}>{c.status}</span>
             </div>
