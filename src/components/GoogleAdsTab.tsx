@@ -1,11 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Loader2, Link2, CheckCircle2, RefreshCw, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
-interface Customer { id: string; formatted: string; }
+interface Customer { id: string; formatted: string; name: string; manager: boolean; login_customer_id?: string; }
 interface Connection {
   selected_customer_id: string | null;
   selected_customer_name: string | null;
