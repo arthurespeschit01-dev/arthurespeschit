@@ -96,7 +96,12 @@ export default function Clientes() {
 
   const startMetaConnection = async () => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-auth?onboarding=1`);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) { toast.error('Sessão expirada. Faça login novamente.'); return; }
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-auth?onboarding=1`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
       const json = await res.json();
       if (json?.auth_url) {
         window.open(json.auth_url, 'meta-oauth', 'width=600,height=700');
