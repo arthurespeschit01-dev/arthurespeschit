@@ -16,17 +16,17 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import logoCentralGestor from '@/assets/logo-central-gestor.png';
 
 const mainNavItems = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/clientes', label: 'Clientes', icon: Users },
-  { to: '/relatorios', label: 'Relatórios ', icon: FileText },
-  { to: '/tasks', label: 'Tarefas', icon: ListTodo },
-  { to: '/financeiro', label: 'Financeiro', icon: DollarSign },
+  { to: '/', label: 'Dashboard', icon: LayoutDashboard, tourId: 'nav-dashboard' },
+  { to: '/clientes', label: 'Clientes', icon: Users, tourId: 'nav-clientes' },
+  { to: '/relatorios', label: 'Relatórios ', icon: FileText, tourId: 'nav-relatorios' },
+  { to: '/tasks', label: 'Tarefas', icon: ListTodo, tourId: 'nav-tarefas' },
+  { to: '/financeiro', label: 'Financeiro', icon: DollarSign, tourId: 'nav-financeiro' },
   // { to: '/planilha', label: 'Planilha', icon: BarChart3 },
-  { to: '/planilha-teste', label: 'Planilha acompanhamento', icon: BarChart3 },
-  { to: '/contratos', label: 'Contratos', icon: FileText },
-  { to: '/estrategias', label: 'Geração de Estratégia', icon: Sparkles },
-  { to: '/utm', label: 'Gerador de UTMs', icon: Link2 },
-  { to: '/configuracoes', label: 'Configurações', icon: Settings },
+  { to: '/planilha-teste', label: 'Planilha acompanhamento', icon: BarChart3, tourId: 'nav-planilha' },
+  { to: '/contratos', label: 'Contratos', icon: FileText, tourId: 'nav-contratos' },
+  { to: '/estrategias', label: 'Geração de Estratégia', icon: Sparkles, tourId: 'nav-estrategia' },
+  { to: '/utm', label: 'Gerador de UTMs', icon: Link2, tourId: 'nav-utms' },
+  { to: '/configuracoes', label: 'Configurações', icon: Settings, tourId: 'nav-config' },
 ];
 
 const processosSubItems = [
