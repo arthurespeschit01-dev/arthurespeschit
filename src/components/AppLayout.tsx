@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import NotificationBar from '@/components/NotificationBar';
 import SupportFAB from '@/components/SupportFAB';
 import ThemeToggle from '@/components/ThemeToggle';
+import OnboardingTour from '@/components/OnboardingTour';
 
 import { NavLink } from 'react-router-dom';
 import {
