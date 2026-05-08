@@ -248,17 +248,30 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
     );
   }
 
-  const expired = connection.token_expires_at && new Date(connection.token_expires_at) < new Date();
+  const expAt = connection.token_expires_at ? new Date(connection.token_expires_at) : null;
+  const daysLeft = expAt ? (expAt.getTime() - Date.now()) / 86400000 : null;
+  const expired = daysLeft !== null && daysLeft <= 0;
+  const expiringSoon = !expired && daysLeft !== null && daysLeft < 7;
+  const statusLabel = expired
+    ? 'Token expirado'
+    : expiringSoon
+      ? `Expira em ${Math.max(1, Math.ceil(daysLeft!))} dia(s)`
+      : 'Meta Ads conectado';
+  const statusDotClass = expired ? 'bg-destructive' : expiringSoon ? 'bg-amber-400' : 'bg-emerald-400';
+  const statusBgClass = expired ? 'bg-destructive/10' : expiringSoon ? 'bg-amber-400/10' : 'bg-emerald-500/10';
 
   return (
     <div className="space-y-4">
       <div className="glass-surface rounded-xl p-4 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${expired ? 'bg-destructive/10' : 'bg-emerald-500/10'}`}>
-            {expired ? <AlertCircle className="w-5 h-5 text-destructive" /> : <CheckCircle2 className="w-5 h-5 text-emerald-400" />}
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${statusBgClass}`}>
+            {expired ? <AlertCircle className="w-5 h-5 text-destructive" /> : <CheckCircle2 className={`w-5 h-5 ${expiringSoon ? 'text-amber-400' : 'text-emerald-400'}`} />}
           </div>
           <div>
-            <p className="text-sm font-semibold text-foreground">{expired ? 'Token expirado' : 'Meta Ads conectado'}</p>
+            <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <span className={`inline-block w-2 h-2 rounded-full ${statusDotClass} ${expiringSoon ? 'animate-pulse' : ''}`} />
+              {statusLabel}
+            </p>
             {connection.selected_ad_account_name ? (
               <p className="text-xs text-muted-foreground">Conta ativa: {connection.selected_ad_account_name}</p>
             ) : (
@@ -270,7 +283,7 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
           <Button variant="outline" size="sm" onClick={refresh} disabled={importing} className="gap-1">
             <RefreshCw className={`w-3 h-3 ${importing ? 'animate-spin' : ''}`} /> Atualizar
           </Button>
-          {expired && <Button size="sm" onClick={connect} disabled={connecting}>Reconectar</Button>}
+          {(expired || expiringSoon) && <Button size="sm" onClick={connect} disabled={connecting}>Reconectar Meta Ads</Button>}
           <Button variant="ghost" size="sm" onClick={disconnectAccount} className="text-destructive">Desconectar conta</Button>
           <Button variant="ghost" size="sm" onClick={disconnectMetaFully} className="text-destructive">Desconectar Meta totalmente</Button>
         </div>
