@@ -214,3 +214,19 @@
 .light ::-webkit-scrollbar-track { background: hsl(220 14% 94%); }
 .light ::-webkit-scrollbar-thumb { background: hsl(220 13% 75%); }
 .light ::-webkit-scrollbar-thumb:hover { background: hsl(220 13% 65%); }
+
+/* Notification bell */
+@keyframes notif-pulse {
+  0% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.7); }
+  70% { box-shadow: 0 0 0 8px hsl(var(--primary) / 0); }
+  100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0); }
+}
+@keyframes bell-shake {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(-15deg); }
+  40% { transform: rotate(15deg); }
+  60% { transform: rotate(-10deg); }
+  80% { transform: rotate(10deg); }
+}
+.notif-badge-pulse { animation: notif-pulse 1.6s ease-out infinite; border-radius: 9999px; }
+.bell-shake { animation: bell-shake 1s ease-in-out; transform-origin: top center; }
