@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Bell, X, AlertTriangle, Clock, FileText, ChevronUp, CheckCheck, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { Bell, X, AlertTriangle, Clock, FileText, ChevronUp, CheckCheck, Eye, EyeOff, Trash2, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
@@ -30,8 +30,17 @@ export default function NotificationBar() {
   const containerRef = useRef<HTMLDivElement>(null);
   const prevUnreadCountRef = useRef<number | null>(null);
   const [bellShake, setBellShake] = useState(false);
+  const [soundMuted, setSoundMuted] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('notif_sound_muted') === '1';
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem('notif_sound_muted', soundMuted ? '1' : '0'); } catch { /* ignore */ }
+  }, [soundMuted]);
 
   const playNotificationSound = useCallback(() => {
+    if (soundMuted) return;
     try {
       const Ctx = (window.AudioContext || (window as any).webkitAudioContext);
       if (!Ctx) return;
@@ -48,7 +57,7 @@ export default function NotificationBar() {
       oscillator.stop(ctx.currentTime + 0.4);
       setTimeout(() => ctx.close().catch(() => {}), 600);
     } catch { /* ignore */ }
-  }, []);
+  }, [soundMuted]);
 
   // Close on outside click
   useEffect(() => {
@@ -315,9 +324,20 @@ export default function NotificationBar() {
                   <Bell className="w-4 h-4 text-primary" />
                   <span className="text-sm font-semibold text-foreground">Notificações</span>
                 </div>
-                <Button variant="ghost" size="sm" className="text-[11px] h-6 px-2 text-muted-foreground gap-1 hover:text-destructive" onClick={clearAll}>
-                  <Trash2 className="w-3 h-3" /> Limpar tudo
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-[11px] h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                    onClick={() => setSoundMuted(m => !m)}
+                    title={soundMuted ? 'Ativar som de notificações' : 'Silenciar som de notificações'}
+                  >
+                    {soundMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                  </Button>
+                  <Button variant="ghost" size="sm" className="text-[11px] h-6 px-2 text-muted-foreground gap-1 hover:text-destructive" onClick={clearAll}>
+                    <Trash2 className="w-3 h-3" /> Limpar tudo
+                  </Button>
+                </div>
               </div>
 
               <div className="flex items-center gap-1 mt-2 bg-muted/50 rounded-lg p-0.5">
