@@ -795,6 +795,33 @@ export type Database = {
         }
         Relationships: []
       }
+      notificacoes_enviadas: {
+        Row: {
+          enviada_data: string | null
+          enviada_em: string | null
+          id: string
+          referencia_id: string | null
+          tipo: string
+          user_id: string | null
+        }
+        Insert: {
+          enviada_data?: string | null
+          enviada_em?: string | null
+          id?: string
+          referencia_id?: string | null
+          tipo: string
+          user_id?: string | null
+        }
+        Update: {
+          enviada_data?: string | null
+          enviada_em?: string | null
+          id?: string
+          referencia_id?: string | null
+          tipo?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       notification_states: {
         Row: {
           created_at: string
@@ -931,6 +958,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          id: string
+          notif_config: Json
+          notif_email: boolean
+          notif_email_destino: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notif_config?: Json
+          notif_email?: boolean
+          notif_email_destino?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notif_config?: Json
+          notif_email?: boolean
+          notif_email_destino?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       report_templates: {
         Row: {

@@ -8,7 +8,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ClipboardList,
   BookOpen, FileText, MessageSquare, ShieldAlert,
-  BarChart3, LogOut, Zap, Menu, X, ListTodo, ChevronDown, FolderOpen, Link2, Sparkles, DollarSign, PanelLeftClose, PanelLeftOpen
+  BarChart3, LogOut, Zap, Menu, X, ListTodo, ChevronDown, FolderOpen, Link2, Sparkles, DollarSign, PanelLeftClose, PanelLeftOpen, Settings
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -25,6 +25,7 @@ const mainNavItems = [
   { to: '/contratos', label: 'Contratos', icon: FileText },
   { to: '/estrategias', label: 'Geração de Estratégia', icon: Sparkles },
   { to: '/utm', label: 'Gerador de UTMs', icon: Link2 },
+  { to: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
 
 const processosSubItems = [
