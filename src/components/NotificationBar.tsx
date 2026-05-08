@@ -324,9 +324,20 @@ export default function NotificationBar() {
                   <Bell className="w-4 h-4 text-primary" />
                   <span className="text-sm font-semibold text-foreground">Notificações</span>
                 </div>
-                <Button variant="ghost" size="sm" className="text-[11px] h-6 px-2 text-muted-foreground gap-1 hover:text-destructive" onClick={clearAll}>
-                  <Trash2 className="w-3 h-3" /> Limpar tudo
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-[11px] h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                    onClick={() => setSoundMuted(m => !m)}
+                    title={soundMuted ? 'Ativar som de notificações' : 'Silenciar som de notificações'}
+                  >
+                    {soundMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                  </Button>
+                  <Button variant="ghost" size="sm" className="text-[11px] h-6 px-2 text-muted-foreground gap-1 hover:text-destructive" onClick={clearAll}>
+                    <Trash2 className="w-3 h-3" /> Limpar tudo
+                  </Button>
+                </div>
               </div>
 
               <div className="flex items-center gap-1 mt-2 bg-muted/50 rounded-lg p-0.5">
