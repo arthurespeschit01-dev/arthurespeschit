@@ -204,6 +204,20 @@ export default function NotificationBar() {
   const overdueUnreadCount = useMemo(() => unreadList.filter(n => n.type === 'task_overdue' || n.type === 'contract_expired').length, [unreadList]);
   const currentList = tab === 'unread' ? unreadList : readList;
 
+  // Detect new notifications: trigger shake + sound when unread count increases
+  useEffect(() => {
+    if (!statesLoadedRef.current) return;
+    const prev = prevUnreadCountRef.current;
+    if (prev !== null && unreadCount > prev) {
+      setBellShake(true);
+      playNotificationSound();
+      const t = setTimeout(() => setBellShake(false), 1000);
+      prevUnreadCountRef.current = unreadCount;
+      return () => clearTimeout(t);
+    }
+    prevUnreadCountRef.current = unreadCount;
+  }, [unreadCount, playNotificationSound]);
+
   const toggleRead = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (readIds.has(id)) {
