@@ -39,11 +39,15 @@ export default function GoogleAdsTab({ clientId }: { clientId: string }) {
       .select('selected_customer_id, selected_customer_name, login_customer_id, token_expires_at')
       .eq('client_id', clientId).maybeSingle();
     setConnection(data);
-    if (data) {
+    setLoading(false);
+    if (data && !data.selected_customer_id) {
+      setLoadingCustomers(true);
       const { data: list } = await supabase.functions.invoke('google-ads-list-customers', { body: { client_id: clientId } });
       if (list?.customers) setCustomers(list.customers);
+      setLoadingCustomers(false);
+    } else {
+      setCustomers([]);
     }
-    setLoading(false);
   }, [clientId]);
 
   const loadMetrics = useCallback(async () => {
