@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import logoCentralGestor from '@/assets/logo-central-gestor.png';
+import { lovable } from '@/integrations/lovable';
 
 export default function AuthPage() {
   const { signIn, signUp } = useAuth();
