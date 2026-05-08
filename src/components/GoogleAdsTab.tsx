@@ -116,17 +116,17 @@ export default function GoogleAdsTab({ clientId }: { clientId: string }) {
     }
   };
 
-  const selectCustomer = async (customerId: string) => {
+  const selectCustomer = async (customerId: string, loginCustomerId?: string) => {
     const cleaned = customerId.replace(/\D/g, '');
-    if (cleaned.length !== 10) { toast.error('Customer ID deve ter 10 dígitos (ex.: 123-456-7890)'); return; }
+    if (cleaned.length !== 10) { toast.error('Customer ID inválido'); return; }
     setSelecting(cleaned);
-    const loginCleaned = loginCustomerId.replace(/\D/g, '');
+    const loginCleaned = (loginCustomerId || '').replace(/\D/g, '');
     const { data, error } = await supabase.functions.invoke('google-ads-list-customers', {
       body: { client_id: clientId, select_customer_id: cleaned, login_customer_id: loginCleaned || null },
     });
     setSelecting(null);
     if (error || data?.error) { toast.error('Falha ao selecionar conta'); return; }
-    toast.success('Conta selecionada');
+    toast.success('Conta vinculada com sucesso');
     await loadConnection();
   };
 
