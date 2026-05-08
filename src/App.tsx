@@ -28,6 +28,7 @@ const Tasks = lazy(() => import("./pages/Tasks"));
 const UTMGenerator = lazy(() => import("./pages/UTMGenerator"));
 const Estrategias = lazy(() => import("./pages/Estrategias"));
 const RelatoriosDiarios = lazy(() => import("./pages/RelatoriosDiarios"));
+const Configuracoes = lazy(() => import("./pages/Configuracoes"));
 const Bloqueado = lazy(() => import("./pages/Bloqueado"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
