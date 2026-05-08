@@ -211,34 +211,45 @@ export default function GoogleAdsTab({ clientId }: { clientId: string }) {
       {!connection.selected_customer_id && (
         <div className="glass-surface rounded-xl p-4 space-y-4">
           <div>
-            <h4 className="text-sm font-semibold text-foreground mb-1">Selecionar conta do cliente</h4>
-            <p className="text-xs text-muted-foreground">Informe o Customer ID (formato 123-456-7890) que você encontra no canto superior direito do Google Ads.</p>
+            <h4 className="text-sm font-semibold text-foreground mb-1">Selecione a conta Google Ads</h4>
+            <p className="text-xs text-muted-foreground">Escolha qual conta deseja vincular a este cliente. As contas abaixo são as que sua autorização permite acessar.</p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
-            <div>
-              <label className="text-xs text-muted-foreground">Customer ID da conta</label>
-              <Input placeholder="123-456-7890" value={manualCustomerId} onChange={(e) => setManualCustomerId(e.target.value)} />
+          {loadingCustomers ? (
+            <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-sm">Buscando suas contas no Google Ads…</span>
             </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Login Customer ID (MCC, opcional)</label>
-              <Input placeholder="000-000-0000" value={loginCustomerId} onChange={(e) => setLoginCustomerId(e.target.value)} />
-            </div>
-            <div className="flex items-end">
-              <Button onClick={() => selectCustomer(manualCustomerId)} disabled={!manualCustomerId || !!selecting} className="gap-1">
-                {selecting ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />} Conectar
+          ) : customers.length === 0 ? (
+            <div className="text-center py-6 space-y-3">
+              <AlertCircle className="w-8 h-8 text-muted-foreground mx-auto" />
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                Nenhuma conta Google Ads encontrada para este login. Verifique se você tem acesso a alguma conta em ads.google.com
+              </p>
+              <Button size="sm" variant="outline" onClick={connect} disabled={connecting} className="gap-1">
+                {connecting ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                Reconectar com outra conta
               </Button>
             </div>
-          </div>
-
-          {customers.length > 0 && (
+          ) : (
             <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">Contas acessíveis com sua autorização:</p>
               {customers.map(c => (
-                <div key={c.id} className="flex items-center justify-between p-3 rounded-lg border border-border/50">
-                  <p className="text-sm font-medium text-foreground">{c.formatted}</p>
-                  <Button size="sm" variant="outline" onClick={() => selectCustomer(c.id)} disabled={!!selecting}>
-                    {selecting === c.id ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Selecionar'}
+                <div key={c.id} className="flex items-center justify-between p-3 rounded-lg border border-border/50 hover:border-primary/40 transition-colors">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-2 h-2 rounded-full bg-primary shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate flex items-center gap-2">
+                        {c.name}
+                        {c.manager && (
+                          <span className="text-[10px] uppercase tracking-wide bg-primary/15 text-primary px-1.5 py-0.5 rounded">MCC</span>
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground font-mono">{c.formatted}</p>
+                    </div>
+                  </div>
+                  <Button size="sm" onClick={() => selectCustomer(c.id, c.login_customer_id)} disabled={!!selecting} className="gap-1">
+                    {selecting === c.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+                    Vincular
                   </Button>
                 </div>
               ))}
