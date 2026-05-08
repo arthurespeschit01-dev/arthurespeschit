@@ -85,8 +85,29 @@ export default function GoogleAdsTab({ clientId }: { clientId: string }) {
       const res = await fetch(url, { headers: { Authorization: `Bearer ${session?.access_token}` } });
       const json = await res.json();
       if (!res.ok || !json.auth_url) throw new Error(json.error || 'Falha');
-      const popup = window.open(json.auth_url, 'google-ads-oauth', 'width=600,height=700');
-      if (!popup) { toast.error('Permita popups para conectar'); setConnecting(false); }
+      // Abrir em nova aba (sem features para não virar popup, evita ERR_BLOCKED_BY_RESPONSE do Google)
+      const tab = window.open(json.auth_url, '_blank', 'noopener,noreferrer');
+      if (!tab) {
+        // Fallback: navegar a própria janela
+        window.location.href = json.auth_url;
+        return;
+      }
+      toast.info('Conclua o login do Google na nova aba — voltaremos a buscar a conexão automaticamente.');
+      // Polling: verifica se a conexão chegou ao banco
+      const start = Date.now();
+      const poll = setInterval(async () => {
+        const { data } = await supabase.from('google_ads_connections')
+          .select('id').eq('client_id', clientId).maybeSingle();
+        if (data) {
+          clearInterval(poll);
+          setConnecting(false);
+          toast.success('Google Ads conectado!');
+          loadConnection();
+        } else if (Date.now() - start > 5 * 60 * 1000) {
+          clearInterval(poll);
+          setConnecting(false);
+        }
+      }, 2500);
     } catch (e: any) {
       toast.error(e.message || 'Falha ao iniciar OAuth');
       setConnecting(false);
