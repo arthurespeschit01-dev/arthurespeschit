@@ -119,6 +119,7 @@ function ProtectedRoutes() {
                 <Route path="/tasks" element={<Tasks />} />
                 <Route path="/estrategias" element={<Estrategias />} />
                 <Route path="/utm" element={<UTMGenerator />} />
+                <Route path="/configuracoes" element={<Configuracoes />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
