@@ -76,7 +76,7 @@ export default function ClientDetail() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [client, setClient] = useState<Client | null>(null);
-  const [tab, setTab] = useState<'dados' | 'campanhas' | 'anexos' | 'meta'>('dados');
+  const [tab, setTab] = useState<'dados' | 'campanhas' | 'anexos' | 'meta' | 'google'>('dados');
   const [importingMeta, setImportingMeta] = useState(false);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [filter, setFilter] = useState('Todas');
