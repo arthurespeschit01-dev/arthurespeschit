@@ -296,9 +296,9 @@ export default function NotificationBar() {
             : 'bg-secondary/50 border-border/50 hover:bg-secondary'
         }`}
       >
-        <Bell className={`w-4 h-4 ${overdueUnreadCount > 0 ? 'text-destructive' : 'text-foreground'}`} />
+        <Bell className={`w-4 h-4 ${overdueUnreadCount > 0 ? 'text-destructive' : 'text-foreground'} ${bellShake ? 'bell-shake' : ''}`} />
         {unreadCount > 0 ? (
-          <Badge className={`${overdueUnreadCount > 0 ? 'bg-destructive' : 'bg-primary'} text-primary-foreground text-[10px] px-1.5 py-0 h-4 min-w-4`}>
+          <Badge className={`${overdueUnreadCount > 0 ? 'bg-destructive' : 'bg-primary'} text-primary-foreground text-[10px] px-1.5 py-0 h-4 min-w-4 notif-badge-pulse`}>
             {unreadCount}
           </Badge>
         ) : (
