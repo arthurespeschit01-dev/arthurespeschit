@@ -90,7 +90,23 @@ export default function Clientes() {
   const openNew = () => {
     setEditing(null);
     setForm({ name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo', payment_day: '', verba_mensal: 0, niche: '', phone: '', account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '' } });
+    setStep('meta');
     setOpen(true);
+  };
+
+  const startMetaConnection = async () => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-auth?onboarding=1`);
+      const json = await res.json();
+      if (json?.auth_url) {
+        window.open(json.auth_url, 'meta-oauth', 'width=600,height=700');
+        toast.info('Conecte sua conta na janela aberta. Você poderá vincular ao cliente depois de criá-lo.');
+      } else {
+        toast.error('Não foi possível iniciar a conexão.');
+      }
+    } catch {
+      toast.error('Erro ao conectar com Meta Ads');
+    }
   };
 
   const openEdit = (c: Client, e: React.MouseEvent) => {
