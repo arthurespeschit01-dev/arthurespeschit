@@ -296,6 +296,7 @@ export default function Clientes() {
 
             <Button onClick={save} className="w-full neon-glow">Salvar</Button>
           </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
