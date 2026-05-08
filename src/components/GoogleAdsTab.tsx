@@ -26,13 +26,12 @@ export default function GoogleAdsTab({ clientId }: { clientId: string }) {
   const [connection, setConnection] = useState<Connection | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [selecting, setSelecting] = useState<string | null>(null);
   const [days, setDays] = useState(30);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
-  const [manualCustomerId, setManualCustomerId] = useState('');
-  const [loginCustomerId, setLoginCustomerId] = useState('');
 
   const loadConnection = useCallback(async () => {
     setLoading(true);
