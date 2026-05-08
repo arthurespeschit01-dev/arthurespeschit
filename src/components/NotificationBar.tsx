@@ -185,11 +185,11 @@ export default function NotificationBar() {
       if (cl.status !== 'Ativo' || !cl.payment_day) return;
       const payDay = cl.payment_day;
       if (payDay === currentDay) {
-        notifs.push({ id: `payment-today-${cl.id}`, type: 'payment_today', title: `Pagamento de "${cl.name}" é hoje`, description: `Dia ${payDay} — verifique o recebimento.`, route: `/clientes/${cl.id}`, priority: 1 });
+        notifs.push({ id: `payment-today-${cl.id}`, type: 'payment_today', title: `Pagamento de "${cl.name}" é hoje`, description: `Dia ${payDay} — verifique o recebimento.`, route: '/financeiro', priority: 1 });
       } else {
         const daysUntilPay = ((payDay - currentDay) + 31) % 31 || 31;
         if (daysUntilPay <= 3 && daysUntilPay > 0) {
-          notifs.push({ id: `payment-soon-${cl.id}`, type: 'payment_soon', title: `Pagamento de "${cl.name}" em ${daysUntilPay} dia${daysUntilPay > 1 ? 's' : ''}`, description: `Dia ${payDay} de cada mês.`, route: `/clientes/${cl.id}`, priority: 2 });
+          notifs.push({ id: `payment-soon-${cl.id}`, type: 'payment_soon', title: `Pagamento de "${cl.name}" em ${daysUntilPay} dia${daysUntilPay > 1 ? 's' : ''}`, description: `Dia ${payDay} de cada mês.`, route: '/financeiro', priority: 2 });
         }
       }
     });
