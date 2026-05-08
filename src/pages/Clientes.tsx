@@ -183,42 +183,47 @@ export default function Clientes() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="glass-surface rounded-xl overflow-hidden">
+        <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr_0.8fr_0.8fr_auto] gap-4 px-5 py-3 border-b border-border/50 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          <div>Cliente</div>
+          <div>Nicho</div>
+          <div className="text-right">Fee mensal</div>
+          <div className="text-right">Verba mensal</div>
+          <div>Duração</div>
+          <div>Status</div>
+          <div className="w-16"></div>
+        </div>
         {clients.map((c) => (
-          <div key={c.id} onClick={() => navigate(`/clientes/${c.id}`)} className="glass-surface rounded-xl p-5 cursor-pointer hover:border-primary/30 transition-all group">
-            <div className="flex items-start justify-between mb-2">
-              <h3 className="font-semibold text-foreground">{c.name}</h3>
+          <div
+            key={c.id}
+            onClick={() => navigate(`/clientes/${c.id}`)}
+            className="grid grid-cols-[1.5fr_1fr_1fr_1fr_0.8fr_0.8fr_auto] gap-4 px-5 py-3 items-center border-b border-border/30 last:border-0 cursor-pointer hover:bg-primary/5 transition-colors group"
+          >
+            <div className="min-w-0">
+              <h3 className="font-semibold text-foreground truncate">{c.name}</h3>
+              {c.payment_day && (
+                <p className="text-[11px] text-muted-foreground">📅 Dia {c.payment_day}</p>
+              )}
+            </div>
+            <div className="min-w-0">
+              {c.niche ? (
+                <span className="inline-block text-[11px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium truncate max-w-full">{c.niche}</span>
+              ) : <span className="text-muted-foreground text-xs">—</span>}
+            </div>
+            <div className="text-right text-sm text-foreground font-medium">R$ {c.monthly_fee?.toLocaleString('pt-BR')}</div>
+            <div className="text-right text-sm text-primary font-semibold">R$ {(c.verba_mensal || 0).toLocaleString('pt-BR')}</div>
+            <div className="text-sm text-foreground">{c.contract_duration || '—'}</div>
+            <div>
               <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor(c.status)}`}>{c.status}</span>
             </div>
-            {c.niche && (
-              <span className="inline-block text-[11px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium mb-2">{c.niche}</span>
-            )}
-            <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{c.services}</p>
-            <div className="space-y-1.5 text-sm border-t border-border/50 pt-3">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground text-xs">Fee mensal</span>
-                <span className="text-foreground font-medium">R$ {c.monthly_fee?.toLocaleString('pt-BR')}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground text-xs">Verba mensal</span>
-                <span className="text-primary font-semibold">R$ {(c.verba_mensal || 0).toLocaleString('pt-BR')}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground text-xs">Duração</span>
-                <span className="text-foreground">{c.contract_duration || '—'}</span>
-              </div>
-            </div>
-            {c.payment_day && (
-              <p className="text-xs text-muted-foreground mt-2">📅 Pagamento dia {c.payment_day}</p>
-            )}
-            <div className="flex gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <Button variant="ghost" size="sm" onClick={(e) => openEdit(c, e)}><Edit2 className="w-3 h-3" /></Button>
               <Button variant="ghost" size="sm" onClick={(e) => remove(c.id, e)} className="hover:text-destructive"><Trash2 className="w-3 h-3" /></Button>
             </div>
           </div>
         ))}
         {clients.length === 0 && (
-          <div className="col-span-full text-center py-12 text-muted-foreground">
+          <div className="text-center py-12 text-muted-foreground">
             Nenhum cliente cadastrado. Clique em "Novo Cliente" para começar.
           </div>
         )}
