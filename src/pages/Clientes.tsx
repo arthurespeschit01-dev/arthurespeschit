@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Edit2, Trash2, AlertTriangle } from 'lucide-react';
+import { Plus, Edit2, Trash2, AlertTriangle, Link2, ArrowRight, SkipForward } from 'lucide-react';
 import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import AccountBalancesPanel, { getBalanceStatus, type AccountBalance, useAccountBalancesCount } from '@/components/AccountBalancesPanel';
@@ -40,6 +40,7 @@ export default function Clientes() {
   const navigate = useNavigate();
   const [clients, setClients] = useState<Client[]>([]);
   const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<'meta' | 'form'>('meta');
   const [balanceAccounts, setBalanceAccounts] = useState<AccountBalance[]>([]);
   const [editing, setEditing] = useState<Client | null>(null);
   const { accounts: preloadedBalanceAccounts } = useAccountBalancesCount();
@@ -89,7 +90,23 @@ export default function Clientes() {
   const openNew = () => {
     setEditing(null);
     setForm({ name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo', payment_day: '', verba_mensal: 0, niche: '', phone: '', account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '' } });
+    setStep('meta');
     setOpen(true);
+  };
+
+  const startMetaConnection = async () => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-auth?onboarding=1`);
+      const json = await res.json();
+      if (json?.auth_url) {
+        window.open(json.auth_url, 'meta-oauth', 'width=600,height=700');
+        toast.info('Conecte sua conta na janela aberta. Você poderá vincular ao cliente depois de criá-lo.');
+      } else {
+        toast.error('Não foi possível iniciar a conexão.');
+      }
+    } catch {
+      toast.error('Erro ao conectar com Meta Ads');
+    }
   };
 
   const openEdit = (c: Client, e: React.MouseEvent) => {
@@ -101,6 +118,7 @@ export default function Clientes() {
       verba_mensal: c.verba_mensal || 0, niche: c.niche || '', phone: c.phone || '',
       account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '', ...c.account_ids },
     });
+    setStep('form');
     setOpen(true);
   };
 
@@ -208,8 +226,33 @@ export default function Clientes() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="bg-card border-border max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
+            <DialogTitle>
+              {editing ? 'Editar Cliente' : step === 'meta' ? 'Conectar Meta Ads' : 'Novo Cliente — dados'}
+            </DialogTitle>
           </DialogHeader>
+
+          {!editing && step === 'meta' ? (
+            <div className="space-y-5 py-2">
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-5 text-center space-y-3">
+                <div className="mx-auto w-12 h-12 rounded-full bg-primary/15 flex items-center justify-center">
+                  <Link2 className="w-6 h-6 text-primary" />
+                </div>
+                <h3 className="text-foreground font-semibold">Conecte sua conta do Meta Ads</h3>
+                <p className="text-sm text-muted-foreground">
+                  Antes de cadastrar os dados do cliente, conecte uma conta do Meta para puxar métricas e relatórios automaticamente. Você pode pular essa etapa e conectar depois.
+                </p>
+                <Button onClick={startMetaConnection} className="neon-glow gap-2 w-full sm:w-auto">
+                  <Link2 className="w-4 h-4" /> Conectar Meta Ads
+                </Button>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+                <Button variant="outline" onClick={() => setStep('form')} className="gap-2">
+                  Pular e continuar <ArrowRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          ) : (
           <div className="space-y-4">
             <div><Label className="text-muted-foreground text-sm">Nome do cliente *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" /></div>
             <div className="grid grid-cols-2 gap-4">
@@ -253,6 +296,7 @@ export default function Clientes() {
 
             <Button onClick={save} className="w-full neon-glow">Salvar</Button>
           </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
