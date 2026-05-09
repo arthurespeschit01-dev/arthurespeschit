@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.meta-auth-callback]
 verify_jwt = false
+
+[functions.google-ads-auth-callback]
+verify_jwt = false
+
+[functions.google-ads-auth]
+verify_jwt = false
