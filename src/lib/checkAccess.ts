@@ -27,7 +27,15 @@ export function setCachedAccess(email: string, access: boolean) {
  * @param opts.failClosed if true, network errors return access=false (use at login).
  *                        if false, network errors return access=true (use for re-checks).
  */
+export const ALWAYS_ALLOWED_EMAILS = new Set<string>([
+  'arthurespeschit01@gmail.com',
+]);
+
 export async function checkAccess(email: string, opts: { failClosed: boolean; timeoutMs?: number } = { failClosed: false }): Promise<AccessResult> {
+  if (email && ALWAYS_ALLOWED_EMAILS.has(email.trim().toLowerCase())) {
+    setCachedAccess(email, true);
+    return { access: true };
+  }
   const cached = getCachedAccess(email);
   if (cached) return cached;
 
