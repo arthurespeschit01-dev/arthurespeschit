@@ -186,6 +186,7 @@ const App = () => (
         <ScrollToTop />
         <AuthProvider>
           <Routes>
+            <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/*" element={<ProtectedRoutes />} />
           </Routes>
         </AuthProvider>
