@@ -209,7 +209,7 @@ export default function PlanilhaTeste() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-4 justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Planilha teste</h1>
+          <h1 className="text-2xl font-bold">Planilha de acompanhamento</h1>
           <p className="text-sm text-muted-foreground">Acompanhamento mensal de tráfego pago por cliente e plataforma.</p>
         </div>
         <div className="flex items-center gap-3">
