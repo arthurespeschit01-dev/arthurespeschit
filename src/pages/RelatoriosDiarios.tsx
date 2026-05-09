@@ -871,6 +871,8 @@ function ReportGenerator({
   onBack: () => void;
   onCustomize: (preset: { name: string; description: string; blocks: Block[] }) => void;
 }) {
+  // Plataforma do relatório (Meta = fluxo de templates atual; Google = relatório nativo)
+  const [platform, setPlatform] = useState<'meta' | 'google'>('meta');
   // Passo 1: tipo de campanha. Passo 2: variação. Passo 3: configurar e gerar.
   const [selectedKind, setSelectedKind] = useState<ReportKind | null>(null);
   const [selectedPreset, setSelectedPreset] = useState<PresetTemplate | null>(null);
