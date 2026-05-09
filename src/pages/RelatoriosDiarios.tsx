@@ -1455,6 +1455,7 @@ function ReportGenerator({
           </Card>
         </div>
       </div>
+      )}
     </div>
   );
 }
