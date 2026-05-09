@@ -1175,6 +1175,39 @@ function ReportGenerator({
         <ArrowLeft className="w-4 h-4 mr-1" /> Voltar
       </Button>
 
+      {/* ===== Plataforma ===== */}
+      <div className="rounded-md border border-border/40 p-3 bg-secondary/20">
+        <Label className="text-xs">Plataforma</Label>
+        <div className="flex gap-1 mt-1">
+          {([
+            { v: 'meta', l: 'Meta Ads', emoji: '📘' },
+            { v: 'google', l: 'Google Ads', emoji: '🟢' },
+          ] as const).map(p => {
+            const active = platform === p.v;
+            return (
+              <button
+                key={p.v}
+                type="button"
+                onClick={() => setPlatform(p.v)}
+                className={`text-xs px-3 py-1.5 rounded-md border inline-flex items-center gap-1.5 transition-all ${
+                  active ? 'border-primary bg-primary/15 text-primary' : 'border-border/40 bg-card hover:border-primary/50'
+                }`}
+              >
+                <span>{p.emoji}</span><span>{p.l}</span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[11px] text-muted-foreground mt-1">
+          {platform === 'meta'
+            ? 'Gera mensagem pronta no formato do template selecionado, com dados do Meta Ads.'
+            : 'Mostra o relatório nativo do Google Ads (tabela + colunas customizáveis + gráfico).'}
+        </p>
+      </div>
+
+      {platform === 'google' ? (
+        <GoogleAdsReport />
+      ) : (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Configurações */}
         <div className="lg:col-span-7 space-y-3">
