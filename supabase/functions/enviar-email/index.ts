@@ -20,7 +20,7 @@ function buildHtml(icone: string, titulo: string, mensagem: string) {
           <div style="font-size:40px;line-height:1;margin:8px 0 8px;">${icone}</div>
           <h1 style="margin:8px 0 12px;font-size:22px;font-weight:600;color:#ffffff;">${titulo}</h1>
           <p style="margin:0 0 24px;font-size:15px;line-height:1.55;color:#c4c4d1;">${mensagem}</p>
-          <a href="https://arthurespeschit.lovable.app" style="display:inline-block;background:#3b82f6;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 20px;border-radius:10px;font-size:14px;">Acessar o sistema →</a>
+          <a href="https://www.centraldogestor.site" style="display:inline-block;background:#3b82f6;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 20px;border-radius:10px;font-size:14px;">Acessar o sistema →</a>
         </td></tr>
         <tr><td style="padding:28px 32px;border-top:1px solid #26262f;margin-top:24px;">
           <p style="margin:0;color:#6c6c7a;font-size:12px;">Central do Gestor · notificacoes@centraldogestor.site</p>
