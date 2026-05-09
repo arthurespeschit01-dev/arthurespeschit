@@ -96,9 +96,18 @@ export default function GoogleAdsTab({ clientId }: { clientId: string }) {
       const json = await res.json();
       if (!res.ok || !json.auth_url) throw new Error(json.error || 'Falha');
       localStorage.setItem('google-ads-return', JSON.stringify({ clientId, ts: Date.now() }));
-      // Redirecionar a janela TOP-level (escapa do iframe do preview) — evita ERR_BLOCKED_BY_RESPONSE
-      const target: Window = (() => { try { return window.top || window; } catch { return window; } })();
-      target.location.href = json.auth_url;
+      // Tenta redirecionar top-level; se estiver dentro de iframe cross-origin (preview do Lovable),
+      // usa window.open com _top como fallback (evita SecurityError de "permission to navigate target frame").
+      try {
+        if (window.top && window.top !== window) {
+          window.top.location.href = json.auth_url;
+        } else {
+          window.location.href = json.auth_url;
+        }
+      } catch {
+        const opened = window.open(json.auth_url, '_top');
+        if (!opened) window.location.href = json.auth_url;
+      }
     } catch (e: any) {
       toast.error(e.message || 'Falha ao iniciar OAuth');
       setConnecting(false);
