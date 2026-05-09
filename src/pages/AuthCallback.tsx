@@ -1,34 +1,45 @@
 import { useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { checkAccess, CHECKOUT_URL } from '@/lib/checkAccess';
 
 export default function AuthCallback() {
   useEffect(() => {
-    // Supabase client (with detectSessionInUrl) processes the OAuth tokens
-    // from the URL hash automatically. We just wait briefly and redirect.
     let cancelled = false;
 
     const finish = async () => {
-      const { data, error } = await supabase.auth.getSession();
+      // Give the SDK a moment to process the OAuth hash.
+      let session = (await supabase.auth.getSession()).data.session;
+      if (!session) {
+        await new Promise((r) => setTimeout(r, 800));
+        session = (await supabase.auth.getSession()).data.session;
+      }
       if (cancelled) return;
-      if (error) {
-        toast.error(error.message || 'Erro ao concluir login');
+
+      if (!session?.user?.email) {
+        toast.error('Não foi possível concluir o login');
         window.location.href = 'https://www.centraldogestor.site';
         return;
       }
-      if (data.session) {
-        window.location.href = 'https://www.centraldogestor.site';
-      } else {
-        // Give the SDK a moment to parse the hash and persist the session
-        setTimeout(async () => {
-          const { data: d2 } = await supabase.auth.getSession();
-          if (cancelled) return;
-          window.location.href = 'https://www.centraldogestor.site';
-        }, 800);
+
+      // fail-closed: must have active subscription to enter
+      const result = await checkAccess(session.user.email, { failClosed: true });
+      if (cancelled) return;
+
+      if (!result.access) {
+        try { await supabase.auth.signOut(); } catch { /* ignore */ }
+        toast.error('Sua assinatura não está ativa. Redirecionando para o checkout...');
+        window.location.href = CHECKOUT_URL;
+        return;
       }
+
+      window.location.href = 'https://www.centraldogestor.site';
     };
 
-    finish();
+    finish().catch(() => {
+      if (!cancelled) window.location.href = CHECKOUT_URL;
+    });
+
     return () => { cancelled = true; };
   }, []);
 
@@ -36,7 +47,7 @@ export default function AuthCallback() {
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="text-center space-y-3">
         <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-        <p className="text-sm text-muted-foreground">Concluindo login...</p>
+        <p className="text-sm text-muted-foreground">Verificando assinatura...</p>
       </div>
     </div>
   );
