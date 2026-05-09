@@ -23,7 +23,7 @@ const mainNavItems = [
   { to: '/tasks', label: 'Tarefas', icon: ListTodo, tourId: 'nav-tarefas' },
   { to: '/financeiro', label: 'Financeiro', icon: DollarSign, tourId: 'nav-financeiro' },
   // { to: '/planilha', label: 'Planilha', icon: BarChart3 },
-  { to: '/planilha-teste', label: 'Planilha acompanhamento', icon: BarChart3, tourId: 'nav-planilha' },
+  { to: '/planilha-teste', label: 'Planilha de acompanhamento', icon: BarChart3, tourId: 'nav-planilha' },
   { to: '/contratos', label: 'Contratos', icon: FileText, tourId: 'nav-contratos' },
   { to: '/estrategias', label: 'Geração de Estratégia', icon: Sparkles, tourId: 'nav-estrategia' },
   { to: '/utm', label: 'Gerador de UTMs', icon: Link2, tourId: 'nav-utms' },
