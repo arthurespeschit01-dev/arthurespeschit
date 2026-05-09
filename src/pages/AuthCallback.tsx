@@ -1,11 +1,8 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 
 export default function AuthCallback() {
-  const navigate = useNavigate();
-
   useEffect(() => {
     // Supabase client (with detectSessionInUrl) processes the OAuth tokens
     // from the URL hash automatically. We just wait briefly and redirect.
@@ -16,24 +13,24 @@ export default function AuthCallback() {
       if (cancelled) return;
       if (error) {
         toast.error(error.message || 'Erro ao concluir login');
-        navigate('/', { replace: true });
+        window.location.href = 'https://www.centraldogestor.site';
         return;
       }
       if (data.session) {
-        navigate('/', { replace: true });
+        window.location.href = 'https://www.centraldogestor.site';
       } else {
         // Give the SDK a moment to parse the hash and persist the session
         setTimeout(async () => {
           const { data: d2 } = await supabase.auth.getSession();
           if (cancelled) return;
-          navigate(d2.session ? '/' : '/', { replace: true });
+          window.location.href = 'https://www.centraldogestor.site';
         }, 800);
       }
     };
 
     finish();
     return () => { cancelled = true; };
-  }, [navigate]);
+  }, []);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
