@@ -29,6 +29,7 @@ import {
   REPORT_KINDS, getPresetsByKind, VARIANT_LABEL, VARIANT_DESC,
   type ReportKind, type ReportVariant, type PresetTemplate,
 } from '@/lib/reportPresets';
+import GoogleAdsReport from '@/components/GoogleAdsReport';
 
 // =====================================================================
 // Tipos
