@@ -91,11 +91,14 @@ export default function AuthPage() {
             className="w-full"
             onClick={async () => {
               try {
-                const result = await lovable.auth.signInWithOAuth('google', {
-                  redirect_uri: window.location.origin,
+                const { error } = await supabase.auth.signInWithOAuth({
+                  provider: 'google',
+                  options: {
+                    redirectTo: `${window.location.origin}/auth/callback`,
+                  },
                 });
-                if (result.error) {
-                  toast.error(result.error.message || 'Erro ao entrar com Google');
+                if (error) {
+                  toast.error(error.message || 'Erro ao entrar com Google');
                 }
               } catch (err: any) {
                 toast.error(err.message || 'Erro ao entrar com Google');
