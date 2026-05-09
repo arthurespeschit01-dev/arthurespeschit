@@ -67,13 +67,14 @@ Deno.serve(async (req) => {
 
     const expiresAt = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString();
 
-    await admin.from('google_ads_connections').upsert({
+    const { error: upsertErr } = await admin.from('google_ads_connections').upsert({
       user_id: stateRow.user_id,
       client_id: stateRow.client_id,
       access_token: tokenData.access_token,
       refresh_token: tokenData.refresh_token,
       token_expires_at: expiresAt,
-    }, { onConflict: 'client_id' });
+    }, { onConflict: 'user_id,client_id' });
+    if (upsertErr) throw new Error(`Salvar conexão: ${upsertErr.message}`);
 
     await admin.from('google_ads_oauth_states').delete().eq('state', state);
 
