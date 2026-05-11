@@ -54,10 +54,10 @@ Deno.serve(async (req) => {
   const error = url.searchParams.get('error_description') || url.searchParams.get('error');
 
   if (error) {
-    return new Response(htmlClose(error, false), { headers: { 'Content-Type': 'text/html' } });
+    return new Response(htmlClose(error, false), { headers: HTML_HEADERS });
   }
   if (!code || !state) {
-    return new Response(htmlClose('Parâmetros ausentes', false), { headers: { 'Content-Type': 'text/html' } });
+    return new Response(htmlClose('Parâmetros ausentes', false), { headers: HTML_HEADERS });
   }
 
   try {
@@ -107,10 +107,10 @@ Deno.serve(async (req) => {
     await admin.from('meta_oauth_states').delete().eq('state', state);
 
     return new Response(htmlClose('Você já pode selecionar a conta de anúncio.', true), {
-      headers: { 'Content-Type': 'text/html' },
+      headers: HTML_HEADERS,
     });
   } catch (e) {
     console.error('callback error', e);
-    return new Response(htmlClose(String(e), false), { headers: { 'Content-Type': 'text/html' } });
+    return new Response(htmlClose(String(e), false), { headers: HTML_HEADERS });
   }
 });
