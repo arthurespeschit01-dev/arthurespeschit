@@ -135,9 +135,43 @@ export default function Clientes() {
     localStorage.removeItem('meta-onboarding-form');
   }, []);
 
+  const loadAdAccounts = async () => {
+    setLoadingAdAccounts(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('meta-pending-ad-accounts', { body: {} });
+      if (error) throw error;
+      setAdAccounts(data?.accounts || []);
+      if (data?.selected_ad_account_id) setSelectedAdAccountId(data.selected_ad_account_id);
+    } catch (e: any) {
+      toast.error('Falha ao listar contas: ' + (e?.message || 'erro'));
+      setAdAccounts([]);
+    } finally {
+      setLoadingAdAccounts(false);
+    }
+  };
+
+  const confirmAdAccount = async () => {
+    if (!selectedAdAccountId) { toast.error('Selecione uma conta'); return; }
+    setConfirmingAccount(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('meta-pending-ad-accounts', {
+        body: { select_account_id: selectedAdAccountId },
+      });
+      if (error || data?.error) throw new Error(error?.message || data?.error);
+      toast.success('Conta selecionada!');
+      setStep('form');
+    } catch (e: any) {
+      toast.error('Falha ao confirmar conta: ' + (e?.message || 'erro'));
+    } finally {
+      setConfirmingAccount(false);
+    }
+  };
+
   const openNew = () => {
     setMetaPending(false);
     setEditing(null);
+    setAdAccounts([]);
+    setSelectedAdAccountId('');
     setForm({ name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo', payment_day: '', verba_mensal: 0, niche: '', phone: '', account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '' } });
     setStep('meta');
     setOpen(true);
