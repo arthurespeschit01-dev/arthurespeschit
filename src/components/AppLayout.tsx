@@ -122,13 +122,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       to="/processos"
                       onClick={() => { if (!collapsed) setSidebarOpen(false); }}
                       data-tour-id="nav-processos"
-                      className={`flex items-center justify-center px-2 py-2.5 rounded-lg text-sm transition-all duration-200 w-full ${
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 justify-center px-2 ${
                         processosActive
                           ? 'bg-primary/15 text-primary font-medium'
-                          : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                          : 'text-primary hover:bg-sidebar-accent hover:text-primary'
                       }`}
                     >
-                      <Folder className="w-4 h-4 shrink-0 mx-auto" />
+                      <Folder className="w-4 h-4 shrink-0" />
                     </NavLink>
                   </TooltipTrigger>
                   <TooltipContent side="right">Processos</TooltipContent>
