@@ -167,7 +167,7 @@ export default function Clientes() {
     }
   };
 
-  const openNew = () => {
+  const openNew = async () => {
     setMetaPending(false);
     setEditing(null);
     setAdAccounts([]);
@@ -175,6 +175,15 @@ export default function Clientes() {
     setForm({ name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo', payment_day: '', verba_mensal: 0, niche: '', phone: '', account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '' } });
     setStep('meta');
     setOpen(true);
+    // Reusa o token Meta já autorizado anteriormente (de outro cliente), se válido.
+    try {
+      const { data, error } = await supabase.functions.invoke('meta-reuse-token', { body: {} });
+      if (!error && data?.reused) {
+        setMetaPending(true);
+        setStep('select-account');
+        loadAdAccounts();
+      }
+    } catch { /* segue fluxo normal */ }
   };
 
   const startMetaConnection = async () => {
