@@ -163,8 +163,22 @@ export default function Clientes() {
       await supabase.from('clients').update(payload).eq('id', editing.id);
       toast.success('Cliente atualizado!');
     } else {
-      await supabase.from('clients').insert({ ...payload, user_id: user.id });
+      const { data: inserted, error: insErr } = await supabase
+        .from('clients').insert({ ...payload, user_id: user.id }).select('id').single();
+      if (insErr || !inserted) { toast.error('Falha ao criar cliente'); return; }
       toast.success('Cliente criado!');
+      if (metaPending) {
+        const { data: attachData, error: attachErr } = await supabase.functions.invoke('meta-attach-pending', {
+          body: { client_id: inserted.id },
+        });
+        if (!attachErr && attachData?.attached) {
+          toast.success('Conta Meta vinculada ao cliente!');
+          setMetaPending(false);
+          setOpen(false);
+          navigate(`/clientes/${inserted.id}`);
+          return;
+        }
+      }
     }
     setOpen(false);
     load();
