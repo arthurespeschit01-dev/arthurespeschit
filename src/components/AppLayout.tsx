@@ -5,7 +5,7 @@ import SupportFAB from '@/components/SupportFAB';
 import ThemeToggle from '@/components/ThemeToggle';
 import OnboardingTour from '@/components/OnboardingTour';
 
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ClipboardList,
   BookOpen, FileText, MessageSquare, ShieldAlert,
@@ -41,6 +41,7 @@ const SIDEBAR_COLLAPSED_KEY = 'sidebar:collapsed';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuth();
+  const { pathname } = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
@@ -58,6 +59,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   };
 
   const asideWidth = collapsed ? 'lg:w-16' : 'lg:w-64';
+  const processosActive = processosSubItems.some((item) => pathname === item.to);
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -119,9 +121,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     <button
                       onClick={toggleCollapsed}
                       data-tour-id="nav-processos"
-                      className="flex items-center justify-center gap-3 px-2 py-2.5 rounded-lg text-sm transition-all duration-200 w-full text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      className={`flex items-center justify-center px-2 py-2.5 rounded-lg text-sm transition-all duration-200 w-full ${
+                        processosActive
+                          ? 'bg-primary/15 text-primary font-medium'
+                          : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                      }`}
                     >
-                      <Folder className="w-4 h-4 shrink-0" />
+                      <Folder className="w-4 h-4 shrink-0 mx-auto" />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="right">Processos</TooltipContent>
@@ -130,7 +136,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <button
                   onClick={() => setProcessosOpen(!processosOpen)}
                   data-tour-id="nav-processos"
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 w-full text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 w-full ${
+                    processosActive
+                      ? 'bg-primary/15 text-primary font-medium'
+                      : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                  }`}
                 >
                   <Folder className="w-4 h-4 shrink-0" />
                   <span className="flex-1 text-left">Processos</span>
