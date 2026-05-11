@@ -52,12 +52,21 @@ Deno.serve(async (req) => {
       });
     }
 
-    const listRes = await fetch(`https://graph.facebook.com/v21.0/me/adaccounts?fields=id,account_id,name,currency,account_status&limit=100&access_token=${pending.access_token}`);
+    const fields = 'id,account_id,name,currency,account_status,business_name,business{id,name}';
+    const listRes = await fetch(`https://graph.facebook.com/v21.0/me/adaccounts?fields=${fields}&limit=200&access_token=${pending.access_token}`);
     const list = await listRes.json();
     if (!listRes.ok) throw new Error(`Meta: ${JSON.stringify(list)}`);
 
+    const accounts = (list.data || []).map((a: any) => ({
+      id: a.id,
+      account_id: a.account_id,
+      name: a.name || a.business_name || a.business?.name || (a.account_id ? `Conta ${a.account_id}` : a.id),
+      currency: a.currency,
+      account_status: a.account_status,
+    }));
+
     return new Response(JSON.stringify({
-      accounts: list.data || [],
+      accounts,
       selected_ad_account_id: pending.selected_ad_account_id,
       selected_ad_account_name: pending.selected_ad_account_name,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
