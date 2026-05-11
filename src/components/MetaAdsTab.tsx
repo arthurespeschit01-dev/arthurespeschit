@@ -384,6 +384,7 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
