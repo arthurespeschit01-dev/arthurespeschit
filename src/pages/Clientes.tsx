@@ -296,49 +296,53 @@ export default function Clientes() {
       </div>
 
       <div className="glass-surface rounded-xl overflow-hidden">
-        <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr_0.8fr_0.8fr_auto] gap-4 px-5 py-3 border-b border-border/50 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          <div>Cliente</div>
-          <div>Nicho</div>
-          <div className="text-right">Fee mensal</div>
-          <div className="text-right">Verba mensal</div>
-          <div className="text-center">Duração</div>
-          <div>Status</div>
-          <div className="w-16"></div>
+        <div className="overflow-x-auto">
+          <div className="min-w-[860px]">
+            <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr_0.8fr_0.8fr_auto] gap-4 px-5 py-3 border-b border-border/50 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              <div>Cliente</div>
+              <div>Nicho</div>
+              <div className="text-right">Fee mensal</div>
+              <div className="text-right">Verba mensal</div>
+              <div className="text-center">Duração</div>
+              <div>Status</div>
+              <div className="w-16"></div>
+            </div>
+            {clients.map((c) => (
+              <div
+                key={c.id}
+                onClick={() => navigate(`/clientes/${c.id}`)}
+                className="grid grid-cols-[1.5fr_1fr_1fr_1fr_0.8fr_0.8fr_auto] gap-4 px-5 py-3 items-center border-b border-border/30 last:border-0 cursor-pointer hover:bg-primary/5 transition-colors group"
+              >
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-foreground truncate">{c.name}</h3>
+                  {c.payment_day && (
+                    <p className="text-[11px] text-muted-foreground">📅 Dia {c.payment_day}</p>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  {c.niche ? (
+                    <span className="inline-block text-[11px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium truncate max-w-full">{c.niche}</span>
+                  ) : <span className="text-muted-foreground text-xs">—</span>}
+                </div>
+                <div className="text-right text-sm text-foreground font-medium">R$ {c.monthly_fee?.toLocaleString('pt-BR')}</div>
+                <div className="text-right text-sm text-primary font-semibold">R$ {(c.verba_mensal || 0).toLocaleString('pt-BR')}</div>
+                <div className="text-sm text-foreground text-center">{c.contract_duration ? `${c.contract_duration}/${Number(c.contract_duration) === 1 ? 'Mês' : 'Meses'}` : '—'}</div>
+                <div>
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor(c.status)}`}>{c.status}</span>
+                </div>
+                <div className="flex gap-1 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                  <Button variant="ghost" size="sm" onClick={(e) => openEdit(c, e)}><Edit2 className="w-3 h-3" /></Button>
+                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setConfirmDelete(c); }} className="hover:text-destructive"><Trash2 className="w-3 h-3" /></Button>
+                </div>
+              </div>
+            ))}
+            {clients.length === 0 && (
+              <div className="text-center py-12 text-muted-foreground">
+                Nenhum cliente cadastrado. Clique em "Novo Cliente" para começar.
+              </div>
+            )}
+          </div>
         </div>
-        {clients.map((c) => (
-          <div
-            key={c.id}
-            onClick={() => navigate(`/clientes/${c.id}`)}
-            className="grid grid-cols-[1.5fr_1fr_1fr_1fr_0.8fr_0.8fr_auto] gap-4 px-5 py-3 items-center border-b border-border/30 last:border-0 cursor-pointer hover:bg-primary/5 transition-colors group"
-          >
-            <div className="min-w-0">
-              <h3 className="font-semibold text-foreground truncate">{c.name}</h3>
-              {c.payment_day && (
-                <p className="text-[11px] text-muted-foreground">📅 Dia {c.payment_day}</p>
-              )}
-            </div>
-            <div className="min-w-0">
-              {c.niche ? (
-                <span className="inline-block text-[11px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium truncate max-w-full">{c.niche}</span>
-              ) : <span className="text-muted-foreground text-xs">—</span>}
-            </div>
-            <div className="text-right text-sm text-foreground font-medium">R$ {c.monthly_fee?.toLocaleString('pt-BR')}</div>
-            <div className="text-right text-sm text-primary font-semibold">R$ {(c.verba_mensal || 0).toLocaleString('pt-BR')}</div>
-            <div className="text-sm text-foreground text-center">{c.contract_duration ? `${c.contract_duration}/${Number(c.contract_duration) === 1 ? 'Mês' : 'Meses'}` : '—'}</div>
-            <div>
-              <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor(c.status)}`}>{c.status}</span>
-            </div>
-            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <Button variant="ghost" size="sm" onClick={(e) => openEdit(c, e)}><Edit2 className="w-3 h-3" /></Button>
-              <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setConfirmDelete(c); }} className="hover:text-destructive"><Trash2 className="w-3 h-3" /></Button>
-            </div>
-          </div>
-        ))}
-        {clients.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground">
-            Nenhum cliente cadastrado. Clique em "Novo Cliente" para começar.
-          </div>
-        )}
       </div>
 
       {/* Painel de Saldos das Contas de Anúncio */}
