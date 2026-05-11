@@ -38,14 +38,15 @@ Deno.serve(async (req) => {
     const userId = userData.user.id;
 
     // Gerar state e salvar
-    const state = crypto.randomUUID();
+    const stateKey = crypto.randomUUID();
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    await admin.from('meta_oauth_states').insert({ state, user_id: userId, client_id: clientId });
+    await admin.from('meta_oauth_states').insert({ state: stateKey, user_id: userId, client_id: clientId });
+    const stateParam = origin ? `${stateKey}~${btoa(origin)}` : stateKey;
 
     const authUrl = new URL('https://www.facebook.com/v21.0/dialog/oauth');
     authUrl.searchParams.set('client_id', META_APP_ID);
     authUrl.searchParams.set('redirect_uri', REDIRECT_URI);
-    authUrl.searchParams.set('state', state);
+    authUrl.searchParams.set('state', stateParam);
     authUrl.searchParams.set('scope', SCOPES);
     authUrl.searchParams.set('response_type', 'code');
 
