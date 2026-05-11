@@ -839,19 +839,19 @@ export type Database = {
       }
       meta_oauth_states: {
         Row: {
-          client_id: string
+          client_id: string | null
           created_at: string
           state: string
           user_id: string
         }
         Insert: {
-          client_id: string
+          client_id?: string | null
           created_at?: string
           state: string
           user_id: string
         }
         Update: {
-          client_id?: string
+          client_id?: string | null
           created_at?: string
           state?: string
           user_id?: string
