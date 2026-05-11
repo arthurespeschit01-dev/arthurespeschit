@@ -1,36 +1,27 @@
-# Corrigir ERR_BLOCKED_BY_RESPONSE no OAuth do Google Ads
+## Problema
+Na aba **Meta Ads** dentro do cliente já criado (segunda etapa), ao clicar em "Conectar Meta Ads" o fluxo abre um popup com `window.open(...)`. Quando o callback termina, o navegador acaba mostrando o HTML cru de `ffvmmnzvmjiddqtywkko.supabase.co/functions/v1/meta-auth-callback?...` em vez de fechar a janela. Isso é o mesmo problema que já corrigimos na primeira etapa (criação do cliente), onde substituímos o popup por um redirect top-level + retorno via `?meta=ok|err`.
 
-## Causa
-O fluxo atual abre `accounts.google.com` em uma nova aba via `window.open(...)`, mas como o app roda dentro do iframe do preview do Lovable, o navegador trata a aba como originária de um contexto de iframe e o Google bloqueia (`ERR_BLOCKED_BY_RESPONSE`). A solução é redirecionar a janela de topo (top-level) com `window.location.href`, sem `window.open`, sem `_blank`, sem iframe.
+## Solução
+Aplicar exatamente o mesmo padrão (já usado em `Clientes.tsx`) no `MetaAdsTab.tsx`:
 
-## Mudanças
+1. **`src/components/MetaAdsTab.tsx`**
+   - Em `connect()`, montar a URL de `meta-auth` incluindo `&origin=<window.location.origin + window.location.pathname>?tab=meta` (ou `&meta_tab=1`) para que o callback saiba para onde voltar.
+   - Substituir `window.open(json.auth_url, ...)` por redirect top-level: `(window.top || window).location.href = json.auth_url`.
+   - Antes de redirecionar, salvar no `localStorage` uma flag `meta-tab-return: { clientId, ts }`.
+   - Remover o listener `message` / `meta-oauth` (não é mais necessário com redirect top-level).
+   - No `useEffect` inicial (junto com `loadConnection`), checar:
+     - se a URL contém `?meta=ok` → `toast.success('Meta conectada!')`, recarregar conexão e contas, limpar o param da URL e o `localStorage`.
+     - se contém `?meta=err` → `toast.error(msg)` e limpar.
 
-### 1. `src/components/GoogleAdsTab.tsx` — usar redirect top-level
-- Trocar `window.open(json.auth_url, '_blank', ...)` e o polling por:
-  ```ts
-  const target = window.top || window;
-  target.location.href = json.auth_url;
-  ```
-- Antes de redirecionar, salvar no `localStorage` a flag `google-ads-return: { clientId, ts }` para que ao voltar do callback consigamos reabrir a aba do cliente certo e mostrar toast de sucesso.
-- Ao montar o componente, se `localStorage` tiver a flag e o `clientId` bater + URL contiver `?google_ads=ok|err`, exibir toast e limpar a flag e o param.
-- Passar `?origin=<window.location.origin>/clientes/<clientId>` na chamada de `google-ads-auth` para que o callback saiba para onde redirecionar.
-- Remover bloco do listener `message` do popup (não é mais necessário) e o polling de 2.5s.
+2. **Backend (sem alterações)**
+   - `meta-auth/index.ts` já aceita `origin` e codifica no `state`.
+   - `meta-auth-callback/index.ts` já redireciona para `${origin}?meta=ok|err` quando o `origin` existe — então o HTML cru só aparece no fluxo atual porque o `MetaAdsTab` ainda **não envia** `origin`. Basta mandar e o problema some.
+   - Nenhuma mudança de schema, nenhuma migração.
 
-### 2. `supabase/functions/google-ads-auth/index.ts` — propagar `origin`
-- Ler `origin` do query string.
-- Codificar `origin` dentro do `state` no formato `uuid~base64(origin)` para recuperar no callback (a tabela `google_ads_oauth_states` já aceita string arbitrária).
-
-### 3. `supabase/functions/google-ads-auth-callback/index.ts` — redirecionar de volta
-- Decodificar `origin` do `state` (parte após `~`).
-- Em vez de devolver HTML com botão "Fechar" + `postMessage`, responder com `302 Redirect` para `${origin}?google_ads=ok` (ou `?google_ads=err&msg=...` em caso de erro).
-- Se não houver `origin` no state (fallback), manter a tela HTML atual.
+## Arquivo afetado
+- `src/components/MetaAdsTab.tsx`
 
 ## Garantias
-- O `redirect_uri` registrado no Google Cloud Console (`https://ffvmmnzvmjiddqtywkko.supabase.co/functions/v1/google-ads-auth-callback`) não muda — continua exatamente igual.
-- Nenhum outro fluxo é tocado (Meta Ads, demais abas, OAuth do app etc.).
-- Após autorizar, o usuário cai direto na tela do cliente, com toast de sucesso e a lista de contas Google Ads aparecendo automaticamente.
-
-## Arquivos afetados
-- `src/components/GoogleAdsTab.tsx`
-- `supabase/functions/google-ads-auth/index.ts`
-- `supabase/functions/google-ads-auth-callback/index.ts`
+- Não muda o `redirect_uri` registrado no Facebook.
+- Não toca em nenhum outro fluxo (Google Ads, primeira etapa de criação de cliente, demais abas).
+- Após autorizar, o usuário cai direto de volta na aba Meta Ads do cliente, com toast de sucesso e a lista de contas carregando — sem nunca ver o HTML do callback.

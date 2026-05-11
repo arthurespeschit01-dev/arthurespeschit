@@ -65,29 +65,34 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
 
   useEffect(() => { loadConnection(); }, [loadConnection]);
 
-  // Listener para postMessage do popup
+  // Detecta retorno do callback OAuth (?meta=ok|err)
   useEffect(() => {
-    const handler = (ev: MessageEvent) => {
-      if (ev.data?.type === 'meta-oauth') {
-        if (ev.data.ok) { toast.success('Meta conectada!'); loadConnection(); }
-        else toast.error('Falha ao conectar Meta');
-        setConnecting(false);
-      }
-    };
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
-  }, [loadConnection]);
+    const params = new URLSearchParams(window.location.search);
+    const meta = params.get('meta');
+    if (!meta) return;
+    const flagRaw = localStorage.getItem('meta-tab-return');
+    let flagClientId: string | null = null;
+    try { flagClientId = flagRaw ? JSON.parse(flagRaw).clientId : null; } catch { /* ignore */ }
+    if (flagClientId && flagClientId !== clientId) return;
+    if (meta === 'ok') { toast.success('Meta conectada!'); loadConnection(); }
+    else toast.error(params.get('msg') || 'Falha ao conectar Meta');
+    localStorage.removeItem('meta-tab-return');
+    params.delete('meta'); params.delete('msg');
+    const newSearch = params.toString();
+    window.history.replaceState({}, '', `${window.location.pathname}${newSearch ? `?${newSearch}` : ''}`);
+  }, [clientId, loadConnection]);
 
   const connect = async () => {
     setConnecting(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-auth?client_id=${clientId}`;
+      const origin = `${window.location.origin}${window.location.pathname}`;
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-auth?client_id=${clientId}&origin=${encodeURIComponent(origin)}`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${session?.access_token}` } });
       const json = await res.json();
       if (!res.ok || !json.auth_url) throw new Error(json.error || 'Falha');
-      const popup = window.open(json.auth_url, 'meta-oauth', 'width=600,height=700');
-      if (!popup) { toast.error('Permita popups para conectar'); setConnecting(false); }
+      localStorage.setItem('meta-tab-return', JSON.stringify({ clientId, ts: Date.now() }));
+      (window.top || window).location.href = json.auth_url;
     } catch (e: any) {
       toast.error(e.message || 'Falha ao iniciar OAuth');
       setConnecting(false);
