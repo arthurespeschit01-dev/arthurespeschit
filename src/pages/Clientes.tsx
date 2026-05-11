@@ -40,10 +40,14 @@ export default function Clientes() {
   const navigate = useNavigate();
   const [clients, setClients] = useState<Client[]>([]);
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<'meta' | 'form'>('meta');
+  const [step, setStep] = useState<'meta' | 'select-account' | 'form'>('meta');
   const [balanceAccounts, setBalanceAccounts] = useState<AccountBalance[]>([]);
   const [editing, setEditing] = useState<Client | null>(null);
   const [metaPending, setMetaPending] = useState(false);
+  const [adAccounts, setAdAccounts] = useState<{ id: string; name: string; account_status?: number; currency?: string }[]>([]);
+  const [loadingAdAccounts, setLoadingAdAccounts] = useState(false);
+  const [selectedAdAccountId, setSelectedAdAccountId] = useState<string>('');
+  const [confirmingAccount, setConfirmingAccount] = useState(false);
   const { accounts: preloadedBalanceAccounts } = useAccountBalancesCount();
 
   useEffect(() => {
