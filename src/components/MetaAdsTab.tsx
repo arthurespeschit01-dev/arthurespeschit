@@ -328,6 +328,7 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
         </div>
       )}
 
+      {!connection.selected_ad_account_id && (
       <div className="glass-surface rounded-xl p-4">
         <h4 className="text-sm font-semibold text-foreground mb-3">Contas de anúncio ({accounts.length})</h4>
         {accounts.length === 0 ? (
