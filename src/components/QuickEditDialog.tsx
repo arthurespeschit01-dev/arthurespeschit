@@ -1145,21 +1145,50 @@ export default function QuickEditDialog({
                     </div>
 
                     <div>
-                      <Label className="text-xs">Modelos salvos</Label>
+                      <Label className="text-xs">
+                        {useMetaTemplates ? 'Modelos do WhatsApp Business (conta Meta conectada)' : 'Modelos salvos'}
+                      </Label>
                       <div className="flex gap-2">
-                        <Select value={selectedTemplateId} onValueChange={applyTemplate}>
-                          <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar modelo..." /></SelectTrigger>
+                        <Select value={selectedTemplateId} onValueChange={applyTemplate} disabled={loadingMetaTemplates}>
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder={loadingMetaTemplates ? 'Carregando templates do Meta...' : 'Selecionar modelo...'} />
+                          </SelectTrigger>
                           <SelectContent>
-                            {templates.length === 0 && <div className="px-2 py-1 text-xs text-muted-foreground">Nenhum modelo</div>}
-                            {templates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                            {useMetaTemplates ? (
+                              <>
+                                {metaTemplates.length === 0 && !loadingMetaTemplates && (
+                                  <div className="px-2 py-1 text-xs text-muted-foreground">
+                                    {metaTemplatesError || 'Nenhum template encontrado'}
+                                  </div>
+                                )}
+                                {metaTemplates.map((t: any) => (
+                                  <SelectItem key={t.id} value={t.id}>
+                                    {t.name} <span className="text-muted-foreground">({t.language} · {t.status})</span>
+                                  </SelectItem>
+                                ))}
+                              </>
+                            ) : (
+                              <>
+                                {templates.length === 0 && <div className="px-2 py-1 text-xs text-muted-foreground">Nenhum modelo</div>}
+                                {templates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                              </>
+                            )}
                           </SelectContent>
                         </Select>
-                        {selectedTemplateId && (
+                        {useMetaTemplates && (
+                          <Button type="button" size="sm" variant="outline" onClick={loadMetaWhatsappTemplates} disabled={loadingMetaTemplates} title="Atualizar">
+                            ↻
+                          </Button>
+                        )}
+                        {!useMetaTemplates && selectedTemplateId && (
                           <Button type="button" size="sm" variant="outline" onClick={deleteTemplate}>
                             <Trash2 className="w-3 h-3" />
                           </Button>
                         )}
                       </div>
+                      {useMetaTemplates && metaTemplatesError && metaTemplates.length === 0 && (
+                        <p className="text-[10px] text-muted-foreground mt-1">{metaTemplatesError}</p>
+                      )}
                     </div>
 
                     <div>
