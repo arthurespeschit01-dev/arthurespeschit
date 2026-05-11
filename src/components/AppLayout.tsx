@@ -118,8 +118,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               {collapsed ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <button
-                      onClick={toggleCollapsed}
+                    <NavLink
+                      to="/processos"
+                      onClick={() => { if (!collapsed) setSidebarOpen(false); }}
                       data-tour-id="nav-processos"
                       className={`flex items-center justify-center px-2 py-2.5 rounded-lg text-sm transition-all duration-200 w-full ${
                         processosActive
@@ -128,7 +129,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       }`}
                     >
                       <Folder className="w-4 h-4 shrink-0 mx-auto" />
-                    </button>
+                    </NavLink>
                   </TooltipTrigger>
                   <TooltipContent side="right">Processos</TooltipContent>
                 </Tooltip>
