@@ -122,16 +122,13 @@ export default function Clientes() {
         try {
           const saved = JSON.parse(savedRaw);
           setForm(saved.form);
-          setStep('form');
-          setMetaPending(true);
-          setOpen(true);
-          toast.success('Meta conectada! Finalize o cadastro do cliente para vincular.');
-        } catch {
-          toast.success('Meta conectada!');
-        }
-      } else {
-        toast.success('Meta conectada!');
+        } catch { /* ignore */ }
       }
+      setMetaPending(true);
+      setStep('select-account');
+      setOpen(true);
+      loadAdAccounts();
+      toast.success('Meta conectada! Selecione a conta de anúncio.');
     } else {
       toast.error('Falha ao conectar Meta: ' + (params.get('msg') || 'erro desconhecido'));
     }
