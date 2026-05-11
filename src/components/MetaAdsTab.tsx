@@ -203,6 +203,18 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
     await supabase.from('campaigns').delete().eq('client_id', clientId).eq('source', 'meta');
   };
 
+  const switchAccount = async () => {
+    if (!confirm('Trocar de conta? Os dados importados (campanhas, conjuntos e criativos) da conta atual serão removidos e você poderá selecionar outra.')) return;
+    const { error } = await supabase.from('meta_connections')
+      .update({ selected_ad_account_id: null, selected_ad_account_name: null })
+      .eq('client_id', clientId);
+    if (error) { toast.error('Falha ao trocar conta'); return; }
+    await clearMetaData();
+    toast.success('Conta desvinculada. Selecione outra abaixo.');
+    await loadConnection();
+    onCampaignsImported?.();
+  };
+
   const disconnectAccount = async () => {
     if (!confirm('Desconectar esta conta? Os dados importados (campanhas, conjuntos e criativos) serão removidos.')) return;
     const { error } = await supabase.from('meta_connections')
@@ -281,10 +293,12 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={refresh} disabled={importing} className="gap-1">
-            <RefreshCw className={`w-3 h-3 ${importing ? 'animate-spin' : ''}`} /> Atualizar
+            <RefreshCw className={`w-3 h-3 ${importing ? 'animate-spin' : ''}`} /> Atualizar dados
           </Button>
           {(expired || expiringSoon) && <Button size="sm" onClick={connect} disabled={connecting}>Reconectar Meta Ads</Button>}
-          <Button variant="ghost" size="sm" onClick={disconnectAccount} className="text-destructive">Desconectar conta</Button>
+          {connection.selected_ad_account_id && (
+            <Button variant="ghost" size="sm" onClick={switchAccount} className="text-muted-foreground hover:text-foreground">Trocar conta</Button>
+          )}
           <Button variant="ghost" size="sm" onClick={disconnectMetaFully} className="text-destructive">Desconectar Meta totalmente</Button>
         </div>
       </div>
@@ -314,6 +328,7 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
         </div>
       )}
 
+      {!connection.selected_ad_account_id && (
       <div className="glass-surface rounded-xl p-4">
         <h4 className="text-sm font-semibold text-foreground mb-3">Contas de anúncio ({accounts.length})</h4>
         {accounts.length === 0 ? (
@@ -369,6 +384,7 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
