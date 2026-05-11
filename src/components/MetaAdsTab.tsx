@@ -293,13 +293,17 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={refresh} disabled={importing} className="gap-1">
-            <RefreshCw className={`w-3 h-3 ${importing ? 'animate-spin' : ''}`} /> Atualizar
+            <RefreshCw className={`w-3 h-3 ${importing ? 'animate-spin' : ''}`} /> Atualizar dados
           </Button>
           {(expired || expiringSoon) && <Button size="sm" onClick={connect} disabled={connecting}>Reconectar Meta Ads</Button>}
-          <Button variant="ghost" size="sm" onClick={disconnectAccount} className="text-destructive">Desconectar conta</Button>
+          {connection.selected_ad_account_id && (
+            <Button variant="ghost" size="sm" onClick={switchAccount} className="text-muted-foreground hover:text-foreground">Trocar conta</Button>
+          )}
           <Button variant="ghost" size="sm" onClick={disconnectMetaFully} className="text-destructive">Desconectar Meta totalmente</Button>
         </div>
       </div>
+
+      {!connection.selected_ad_account_id && (
 
       {importing && (
         <div className="glass-surface rounded-xl p-4 space-y-3 animate-fade-in">
