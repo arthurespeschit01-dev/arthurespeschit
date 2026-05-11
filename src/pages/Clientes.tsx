@@ -43,6 +43,7 @@ export default function Clientes() {
   const [step, setStep] = useState<'meta' | 'form'>('meta');
   const [balanceAccounts, setBalanceAccounts] = useState<AccountBalance[]>([]);
   const [editing, setEditing] = useState<Client | null>(null);
+  const [metaPending, setMetaPending] = useState(false);
   const { accounts: preloadedBalanceAccounts } = useAccountBalancesCount();
 
   useEffect(() => {
@@ -87,7 +88,24 @@ export default function Clientes() {
 
   useEffect(() => { load(); }, [user]);
 
+  // Escuta o callback do popup do Meta durante o onboarding
+  useEffect(() => {
+    const handler = (ev: MessageEvent) => {
+      if (ev.data?.type === 'meta-oauth') {
+        if (ev.data.ok) {
+          setMetaPending(true);
+          toast.success('Meta conectada! Será vinculada ao cliente após salvar.');
+        } else {
+          toast.error('Falha ao conectar Meta');
+        }
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
   const openNew = () => {
+    setMetaPending(false);
     setEditing(null);
     setForm({ name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo', payment_day: '', verba_mensal: 0, niche: '', phone: '', account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '' } });
     setStep('meta');
@@ -145,8 +163,22 @@ export default function Clientes() {
       await supabase.from('clients').update(payload).eq('id', editing.id);
       toast.success('Cliente atualizado!');
     } else {
-      await supabase.from('clients').insert({ ...payload, user_id: user.id });
+      const { data: inserted, error: insErr } = await supabase
+        .from('clients').insert({ ...payload, user_id: user.id }).select('id').single();
+      if (insErr || !inserted) { toast.error('Falha ao criar cliente'); return; }
       toast.success('Cliente criado!');
+      if (metaPending) {
+        const { data: attachData, error: attachErr } = await supabase.functions.invoke('meta-attach-pending', {
+          body: { client_id: inserted.id },
+        });
+        if (!attachErr && attachData?.attached) {
+          toast.success('Conta Meta vinculada ao cliente!');
+          setMetaPending(false);
+          setOpen(false);
+          navigate(`/clientes/${inserted.id}`);
+          return;
+        }
+      }
     }
     setOpen(false);
     load();

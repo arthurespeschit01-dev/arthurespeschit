@@ -858,6 +858,33 @@ export type Database = {
         }
         Relationships: []
       }
+      meta_pending_connections: {
+        Row: {
+          access_token: string
+          created_at: string
+          meta_user_id: string | null
+          token_expires_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          meta_user_id?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          meta_user_id?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notificacoes_enviadas: {
         Row: {
           enviada_data: string | null
