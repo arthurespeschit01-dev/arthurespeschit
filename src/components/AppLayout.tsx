@@ -9,7 +9,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ClipboardList,
   BookOpen, FileText, MessageSquare, ShieldAlert,
-  BarChart3, LogOut, Zap, Menu, X, ListTodo, ChevronDown, FolderOpen, Link2, Sparkles, DollarSign, PanelLeftClose, PanelLeftOpen, Settings
+  BarChart3, LogOut, Zap, Menu, X, ListTodo, ChevronDown, Folder, Link2, Sparkles, DollarSign, PanelLeftClose, PanelLeftOpen, Settings
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -121,7 +121,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       data-tour-id="nav-processos"
                       className="flex items-center justify-center gap-3 px-2 py-2.5 rounded-lg text-sm transition-all duration-200 w-full text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                     >
-                      <FolderOpen className="w-4 h-4 shrink-0" />
+                      <Folder className="w-4 h-4 shrink-0" />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="right">Processos</TooltipContent>
@@ -132,7 +132,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   data-tour-id="nav-processos"
                   className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 w-full text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 >
-                  <FolderOpen className="w-4 h-4 shrink-0" />
+                  <Folder className="w-4 h-4 shrink-0" />
                   <span className="flex-1 text-left">Processos</span>
                   <ChevronDown className={`w-4 h-4 shrink-0 transition-transform duration-200 ${processosOpen ? 'rotate-180' : ''}`} />
                 </button>
