@@ -10,7 +10,7 @@ const META_APP_ID = Deno.env.get('META_APP_ID')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const REDIRECT_URI = `${SUPABASE_URL}/functions/v1/meta-auth-callback`;
-const SCOPES = 'ads_read,ads_management,business_management,read_insights';
+const SCOPES = 'ads_read,ads_management,business_management,read_insights,whatsapp_business_management';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
