@@ -496,13 +496,17 @@ export default function QuickEditDialog({
   const [videoId, setVideoId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // Templates
+  // Templates (locais ou do WhatsApp Business via Meta API)
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [templateName, setTemplateName] = useState('');
+  const [loadingMetaTemplates, setLoadingMetaTemplates] = useState(false);
+  const [metaTemplatesError, setMetaTemplatesError] = useState<string | null>(null);
+  const [metaTemplates, setMetaTemplates] = useState<any[]>([]);
 
   const isMessageCta = cta === 'WHATSAPP_MESSAGE' || cta === 'MESSAGE_PAGE';
   const templateChannel = cta === 'WHATSAPP_MESSAGE' ? 'whatsapp' : cta === 'MESSAGE_PAGE' ? 'messenger' : null;
+  const useMetaTemplates = cta === 'WHATSAPP_MESSAGE';
 
   async function loadTemplates() {
     if (!templateChannel) { setTemplates([]); return; }
@@ -515,10 +519,43 @@ export default function QuickEditDialog({
     if (error) return;
     setTemplates((data as MessageTemplate[]) || []);
   }
+
+  async function loadMetaWhatsappTemplates() {
+    if (!useMetaTemplates || !clientId) { setMetaTemplates([]); return; }
+    setLoadingMetaTemplates(true);
+    setMetaTemplatesError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('meta-whatsapp-templates', {
+        body: { client_id: clientId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.hint || data.error);
+      setMetaTemplates(data?.templates || []);
+      if ((data?.templates || []).length === 0) {
+        setMetaTemplatesError('Nenhum template do WhatsApp encontrado nesta conta Meta.');
+      }
+    } catch (e: any) {
+      setMetaTemplatesError(e?.message || 'Falha ao carregar templates do Meta');
+      setMetaTemplates([]);
+    } finally {
+      setLoadingMetaTemplates(false);
+    }
+  }
+
   useEffect(() => { loadTemplates(); /* eslint-disable-next-line */ }, [templateChannel, clientId]);
+  useEffect(() => { loadMetaWhatsappTemplates(); /* eslint-disable-next-line */ }, [useMetaTemplates, clientId]);
 
   function applyTemplate(id: string) {
     setSelectedTemplateId(id);
+    if (useMetaTemplates) {
+      const m = metaTemplates.find((x) => x.id === id);
+      if (m) {
+        setConvoGreeting(m.header_text || '');
+        setConvoMessage(m.body_text || '');
+        setTemplateName(m.name);
+      }
+      return;
+    }
     const t = templates.find(x => x.id === id);
     if (t) {
       setConvoGreeting(t.greeting);
@@ -1108,21 +1145,50 @@ export default function QuickEditDialog({
                     </div>
 
                     <div>
-                      <Label className="text-xs">Modelos salvos</Label>
+                      <Label className="text-xs">
+                        {useMetaTemplates ? 'Modelos do WhatsApp Business (conta Meta conectada)' : 'Modelos salvos'}
+                      </Label>
                       <div className="flex gap-2">
-                        <Select value={selectedTemplateId} onValueChange={applyTemplate}>
-                          <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar modelo..." /></SelectTrigger>
+                        <Select value={selectedTemplateId} onValueChange={applyTemplate} disabled={loadingMetaTemplates}>
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder={loadingMetaTemplates ? 'Carregando templates do Meta...' : 'Selecionar modelo...'} />
+                          </SelectTrigger>
                           <SelectContent>
-                            {templates.length === 0 && <div className="px-2 py-1 text-xs text-muted-foreground">Nenhum modelo</div>}
-                            {templates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                            {useMetaTemplates ? (
+                              <>
+                                {metaTemplates.length === 0 && !loadingMetaTemplates && (
+                                  <div className="px-2 py-1 text-xs text-muted-foreground">
+                                    {metaTemplatesError || 'Nenhum template encontrado'}
+                                  </div>
+                                )}
+                                {metaTemplates.map((t: any) => (
+                                  <SelectItem key={t.id} value={t.id}>
+                                    {t.name} <span className="text-muted-foreground">({t.language} · {t.status})</span>
+                                  </SelectItem>
+                                ))}
+                              </>
+                            ) : (
+                              <>
+                                {templates.length === 0 && <div className="px-2 py-1 text-xs text-muted-foreground">Nenhum modelo</div>}
+                                {templates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                              </>
+                            )}
                           </SelectContent>
                         </Select>
-                        {selectedTemplateId && (
+                        {useMetaTemplates && (
+                          <Button type="button" size="sm" variant="outline" onClick={loadMetaWhatsappTemplates} disabled={loadingMetaTemplates} title="Atualizar">
+                            ↻
+                          </Button>
+                        )}
+                        {!useMetaTemplates && selectedTemplateId && (
                           <Button type="button" size="sm" variant="outline" onClick={deleteTemplate}>
                             <Trash2 className="w-3 h-3" />
                           </Button>
                         )}
                       </div>
+                      {useMetaTemplates && metaTemplatesError && metaTemplates.length === 0 && (
+                        <p className="text-[10px] text-muted-foreground mt-1">{metaTemplatesError}</p>
+                      )}
                     </div>
 
                     <div>
