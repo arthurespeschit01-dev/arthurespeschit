@@ -230,3 +230,52 @@
 }
 .notif-badge-pulse { animation: notif-pulse 1.6s ease-out infinite; border-radius: 9999px; }
 .bell-shake { animation: bell-shake 1s ease-in-out; transform-origin: top center; }
+
+/* ==========================================
+   MOBILE RESPONSIVENESS — global safety net
+   ========================================== */
+
+/* Prevent horizontal page overflow caused by wide grids/tables */
+html, body, #root { max-width: 100vw; overflow-x: hidden; }
+
+/* Wide HTML tables get horizontal scroll on small screens */
+@media (max-width: 768px) {
+  table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Touch targets — buttons/inputs at least 40px high on mobile */
+  button:not(.h-7):not(.h-8):not(.h-9):not([data-no-min]),
+  [role="button"]:not(.h-7):not(.h-8):not(.h-9):not([data-no-min]),
+  a.btn, .btn {
+    min-height: 40px;
+  }
+
+  /* Inputs/selects/textareas comfortable on touch */
+  input:not([type="checkbox"]):not([type="radio"]):not(.h-7):not(.h-8),
+  select,
+  textarea {
+    font-size: 16px; /* prevents iOS auto-zoom */
+  }
+
+  /* Tabs list scrollable */
+  [role="tablist"] {
+    max-width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+
+  /* Dialog/Sheet content is already constrained via component, but
+     guarantee long words wrap */
+  [role="dialog"] { word-break: break-word; }
+}
+
+/* Helper for any custom data grid/table — opt-in */
+.responsive-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
