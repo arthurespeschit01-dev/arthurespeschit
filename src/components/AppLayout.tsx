@@ -128,7 +128,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                           : 'text-primary hover:bg-sidebar-accent hover:text-primary'
                       }`}
                     >
-                      <Folder className="w-4 h-4 shrink-0" />
+                      <Folder className="w-4 h-4 shrink-0 -translate-x-0.5" />
                     </NavLink>
                   </TooltipTrigger>
                   <TooltipContent side="right">Processos</TooltipContent>
