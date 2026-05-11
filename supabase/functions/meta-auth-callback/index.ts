@@ -94,14 +94,23 @@ Deno.serve(async (req) => {
     const meRes = await fetch(`https://graph.facebook.com/v21.0/me?access_token=${accessToken}`);
     const me = await meRes.json();
 
-    // 4) Upsert connection
-    await admin.from('meta_connections').upsert({
-      user_id: stateRow.user_id,
-      client_id: stateRow.client_id,
-      access_token: accessToken,
-      token_expires_at: expiresAt,
-      meta_user_id: me.id || null,
-    }, { onConflict: 'client_id' });
+    // 4) Upsert connection — se for fluxo de onboarding (sem client_id), salva em pending
+    if (stateRow.client_id) {
+      await admin.from('meta_connections').upsert({
+        user_id: stateRow.user_id,
+        client_id: stateRow.client_id,
+        access_token: accessToken,
+        token_expires_at: expiresAt,
+        meta_user_id: me.id || null,
+      }, { onConflict: 'client_id' });
+    } else {
+      await admin.from('meta_pending_connections').upsert({
+        user_id: stateRow.user_id,
+        access_token: accessToken,
+        token_expires_at: expiresAt,
+        meta_user_id: me.id || null,
+      }, { onConflict: 'user_id' });
+    }
 
     // 5) Limpar state
     await admin.from('meta_oauth_states').delete().eq('state', state);
