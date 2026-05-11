@@ -203,6 +203,18 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
     await supabase.from('campaigns').delete().eq('client_id', clientId).eq('source', 'meta');
   };
 
+  const switchAccount = async () => {
+    if (!confirm('Trocar de conta? Os dados importados (campanhas, conjuntos e criativos) da conta atual serão removidos e você poderá selecionar outra.')) return;
+    const { error } = await supabase.from('meta_connections')
+      .update({ selected_ad_account_id: null, selected_ad_account_name: null })
+      .eq('client_id', clientId);
+    if (error) { toast.error('Falha ao trocar conta'); return; }
+    await clearMetaData();
+    toast.success('Conta desvinculada. Selecione outra abaixo.');
+    await loadConnection();
+    onCampaignsImported?.();
+  };
+
   const disconnectAccount = async () => {
     if (!confirm('Desconectar esta conta? Os dados importados (campanhas, conjuntos e criativos) serão removidos.')) return;
     const { error } = await supabase.from('meta_connections')
