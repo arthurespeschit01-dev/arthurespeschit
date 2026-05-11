@@ -134,6 +134,14 @@ export default function Clientes() {
     localStorage.removeItem('meta-onboarding-form');
   }, []);
 
+  const openNew = () => {
+    setMetaPending(false);
+    setEditing(null);
+    setForm({ name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo', payment_day: '', verba_mensal: 0, niche: '', phone: '', account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '' } });
+    setStep('meta');
+    setOpen(true);
+  };
+
   const startMetaConnection = async () => {
     try {
       const { data: sessionData } = await supabase.auth.getSession();
