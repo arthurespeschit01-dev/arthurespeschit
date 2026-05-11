@@ -303,8 +303,6 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
         </div>
       </div>
 
-      {!connection.selected_ad_account_id && (
-
       {importing && (
         <div className="glass-surface rounded-xl p-4 space-y-3 animate-fade-in">
           <div className="flex items-center justify-between">
