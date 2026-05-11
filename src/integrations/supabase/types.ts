@@ -863,6 +863,8 @@ export type Database = {
           access_token: string
           created_at: string
           meta_user_id: string | null
+          selected_ad_account_id: string | null
+          selected_ad_account_name: string | null
           token_expires_at: string | null
           updated_at: string
           user_id: string
@@ -871,6 +873,8 @@ export type Database = {
           access_token: string
           created_at?: string
           meta_user_id?: string | null
+          selected_ad_account_id?: string | null
+          selected_ad_account_name?: string | null
           token_expires_at?: string | null
           updated_at?: string
           user_id: string
@@ -879,6 +883,8 @@ export type Database = {
           access_token?: string
           created_at?: string
           meta_user_id?: string | null
+          selected_ad_account_id?: string | null
+          selected_ad_account_name?: string | null
           token_expires_at?: string | null
           updated_at?: string
           user_id?: string
