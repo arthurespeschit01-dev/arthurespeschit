@@ -265,8 +265,7 @@ export default function Clientes() {
     load();
   };
 
-  const remove = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const remove = async (id: string) => {
     await supabase.from('clients').delete().eq('id', id);
     toast.success('Cliente removido!');
     load();
