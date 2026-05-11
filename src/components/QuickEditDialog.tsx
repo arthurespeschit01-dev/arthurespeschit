@@ -496,13 +496,17 @@ export default function QuickEditDialog({
   const [videoId, setVideoId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // Templates
+  // Templates (locais ou do WhatsApp Business via Meta API)
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [templateName, setTemplateName] = useState('');
+  const [loadingMetaTemplates, setLoadingMetaTemplates] = useState(false);
+  const [metaTemplatesError, setMetaTemplatesError] = useState<string | null>(null);
+  const [metaTemplates, setMetaTemplates] = useState<any[]>([]);
 
   const isMessageCta = cta === 'WHATSAPP_MESSAGE' || cta === 'MESSAGE_PAGE';
   const templateChannel = cta === 'WHATSAPP_MESSAGE' ? 'whatsapp' : cta === 'MESSAGE_PAGE' ? 'messenger' : null;
+  const useMetaTemplates = cta === 'WHATSAPP_MESSAGE';
 
   async function loadTemplates() {
     if (!templateChannel) { setTemplates([]); return; }
@@ -515,10 +519,43 @@ export default function QuickEditDialog({
     if (error) return;
     setTemplates((data as MessageTemplate[]) || []);
   }
+
+  async function loadMetaWhatsappTemplates() {
+    if (!useMetaTemplates || !clientId) { setMetaTemplates([]); return; }
+    setLoadingMetaTemplates(true);
+    setMetaTemplatesError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('meta-whatsapp-templates', {
+        body: { client_id: clientId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.hint || data.error);
+      setMetaTemplates(data?.templates || []);
+      if ((data?.templates || []).length === 0) {
+        setMetaTemplatesError('Nenhum template do WhatsApp encontrado nesta conta Meta.');
+      }
+    } catch (e: any) {
+      setMetaTemplatesError(e?.message || 'Falha ao carregar templates do Meta');
+      setMetaTemplates([]);
+    } finally {
+      setLoadingMetaTemplates(false);
+    }
+  }
+
   useEffect(() => { loadTemplates(); /* eslint-disable-next-line */ }, [templateChannel, clientId]);
+  useEffect(() => { loadMetaWhatsappTemplates(); /* eslint-disable-next-line */ }, [useMetaTemplates, clientId]);
 
   function applyTemplate(id: string) {
     setSelectedTemplateId(id);
+    if (useMetaTemplates) {
+      const m = metaTemplates.find((x) => x.id === id);
+      if (m) {
+        setConvoGreeting(m.header_text || '');
+        setConvoMessage(m.body_text || '');
+        setTemplateName(m.name);
+      }
+      return;
+    }
     const t = templates.find(x => x.id === id);
     if (t) {
       setConvoGreeting(t.greeting);
