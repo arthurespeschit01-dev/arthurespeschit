@@ -49,6 +49,7 @@ export default function Clientes() {
   const [loadingAdAccounts, setLoadingAdAccounts] = useState(false);
   const [selectedAdAccountId, setSelectedAdAccountId] = useState<string>('');
   const [confirmingAccount, setConfirmingAccount] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<Client | null>(null);
   const { accounts: preloadedBalanceAccounts } = useAccountBalancesCount();
 
   useEffect(() => {
