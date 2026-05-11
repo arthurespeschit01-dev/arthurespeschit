@@ -8,14 +8,44 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const REDIRECT_URI = `${SUPABASE_URL}/functions/v1/meta-auth-callback`;
 
 function htmlClose(message: string, ok: boolean) {
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Meta Ads</title>
-<style>body{font-family:system-ui;background:#0a0a0a;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:20px}
-.box{max-width:400px}.ok{color:#a78bfa}.err{color:#f87171}</style></head>
-<body><div class="box"><h2 class="${ok ? 'ok' : 'err'}">${ok ? '✓ Conta Meta conectada!' : '✗ Erro na conexão'}</h2>
-<p>${message}</p><p style="opacity:.6;font-size:14px">Esta janela será fechada automaticamente...</p></div>
-<script>setTimeout(()=>{if(window.opener){window.opener.postMessage({type:'meta-oauth',ok:${ok}},'*');}window.close();},1500);</script>
-</body></html>`;
+  return `<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Meta Ads</title>
+<style>
+  body{font-family:system-ui,-apple-system,sans-serif;background:#0a0a0a;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:20px}
+  .box{max-width:400px}
+  .ok{color:#a78bfa}
+  .err{color:#f87171}
+  button{margin-top:16px;background:#a78bfa;color:#0a0a0a;border:0;padding:10px 18px;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px}
+</style>
+</head>
+<body>
+<div class="box">
+  <h2 class="${ok ? 'ok' : 'err'}">${ok ? '✓ Conta Meta conectada!' : '✗ Erro na conexão'}</h2>
+  <p>${message}</p>
+  <p style="opacity:.6;font-size:14px">Esta janela será fechada automaticamente...</p>
+  <button onclick="doClose()">Fechar janela</button>
+</div>
+<script>
+  function doClose(){
+    try{ if(window.opener && !window.opener.closed){ window.opener.postMessage({type:'meta-oauth',ok:${ok}},'*'); } }catch(e){}
+    try{ window.close(); }catch(e){}
+  }
+  try{ if(window.opener && !window.opener.closed){ window.opener.postMessage({type:'meta-oauth',ok:${ok}},'*'); } }catch(e){}
+  setTimeout(doClose, 1200);
+</script>
+</body>
+</html>`;
 }
+
+const HTML_HEADERS = {
+  'Content-Type': 'text/html; charset=utf-8',
+  'Cache-Control': 'no-store',
+  'X-Content-Type-Options': 'nosniff',
+};
 
 Deno.serve(async (req) => {
   const url = new URL(req.url);
@@ -24,10 +54,10 @@ Deno.serve(async (req) => {
   const error = url.searchParams.get('error_description') || url.searchParams.get('error');
 
   if (error) {
-    return new Response(htmlClose(error, false), { headers: { 'Content-Type': 'text/html' } });
+    return new Response(htmlClose(error, false), { headers: HTML_HEADERS });
   }
   if (!code || !state) {
-    return new Response(htmlClose('Parâmetros ausentes', false), { headers: { 'Content-Type': 'text/html' } });
+    return new Response(htmlClose('Parâmetros ausentes', false), { headers: HTML_HEADERS });
   }
 
   try {
@@ -77,10 +107,10 @@ Deno.serve(async (req) => {
     await admin.from('meta_oauth_states').delete().eq('state', state);
 
     return new Response(htmlClose('Você já pode selecionar a conta de anúncio.', true), {
-      headers: { 'Content-Type': 'text/html' },
+      headers: HTML_HEADERS,
     });
   } catch (e) {
     console.error('callback error', e);
-    return new Response(htmlClose(String(e), false), { headers: { 'Content-Type': 'text/html' } });
+    return new Response(htmlClose(String(e), false), { headers: HTML_HEADERS });
   }
 });
