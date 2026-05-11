@@ -55,6 +55,8 @@ Deno.serve(async (req) => {
       access_token: pending.access_token,
       token_expires_at: pending.token_expires_at,
       meta_user_id: pending.meta_user_id,
+      selected_ad_account_id: pending.selected_ad_account_id || null,
+      selected_ad_account_name: pending.selected_ad_account_name || null,
     }, { onConflict: 'client_id' });
 
     await admin.from('meta_pending_connections').delete().eq('user_id', userId);

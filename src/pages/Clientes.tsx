@@ -40,10 +40,14 @@ export default function Clientes() {
   const navigate = useNavigate();
   const [clients, setClients] = useState<Client[]>([]);
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<'meta' | 'form'>('meta');
+  const [step, setStep] = useState<'meta' | 'select-account' | 'form'>('meta');
   const [balanceAccounts, setBalanceAccounts] = useState<AccountBalance[]>([]);
   const [editing, setEditing] = useState<Client | null>(null);
   const [metaPending, setMetaPending] = useState(false);
+  const [adAccounts, setAdAccounts] = useState<{ id: string; name: string; account_status?: number; currency?: string }[]>([]);
+  const [loadingAdAccounts, setLoadingAdAccounts] = useState(false);
+  const [selectedAdAccountId, setSelectedAdAccountId] = useState<string>('');
+  const [confirmingAccount, setConfirmingAccount] = useState(false);
   const { accounts: preloadedBalanceAccounts } = useAccountBalancesCount();
 
   useEffect(() => {
@@ -118,25 +122,56 @@ export default function Clientes() {
         try {
           const saved = JSON.parse(savedRaw);
           setForm(saved.form);
-          setStep('form');
-          setMetaPending(true);
-          setOpen(true);
-          toast.success('Meta conectada! Finalize o cadastro do cliente para vincular.');
-        } catch {
-          toast.success('Meta conectada!');
-        }
-      } else {
-        toast.success('Meta conectada!');
+        } catch { /* ignore */ }
       }
+      setMetaPending(true);
+      setStep('select-account');
+      setOpen(true);
+      loadAdAccounts();
+      toast.success('Meta conectada! Selecione a conta de anúncio.');
     } else {
       toast.error('Falha ao conectar Meta: ' + (params.get('msg') || 'erro desconhecido'));
     }
     localStorage.removeItem('meta-onboarding-form');
   }, []);
 
+  const loadAdAccounts = async () => {
+    setLoadingAdAccounts(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('meta-pending-ad-accounts', { body: {} });
+      if (error) throw error;
+      setAdAccounts(data?.accounts || []);
+      if (data?.selected_ad_account_id) setSelectedAdAccountId(data.selected_ad_account_id);
+    } catch (e: any) {
+      toast.error('Falha ao listar contas: ' + (e?.message || 'erro'));
+      setAdAccounts([]);
+    } finally {
+      setLoadingAdAccounts(false);
+    }
+  };
+
+  const confirmAdAccount = async () => {
+    if (!selectedAdAccountId) { toast.error('Selecione uma conta'); return; }
+    setConfirmingAccount(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('meta-pending-ad-accounts', {
+        body: { select_account_id: selectedAdAccountId },
+      });
+      if (error || data?.error) throw new Error(error?.message || data?.error);
+      toast.success('Conta selecionada!');
+      setStep('form');
+    } catch (e: any) {
+      toast.error('Falha ao confirmar conta: ' + (e?.message || 'erro'));
+    } finally {
+      setConfirmingAccount(false);
+    }
+  };
+
   const openNew = () => {
     setMetaPending(false);
     setEditing(null);
+    setAdAccounts([]);
+    setSelectedAdAccountId('');
     setForm({ name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo', payment_day: '', verba_mensal: 0, niche: '', phone: '', account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '' } });
     setStep('meta');
     setOpen(true);
@@ -326,6 +361,47 @@ export default function Clientes() {
                 <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
                 <Button variant="outline" onClick={() => setStep('form')} className="gap-2">
                   Pular e continuar <ArrowRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          ) : !editing && step === 'select-account' ? (
+            <div className="space-y-4 py-2">
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+                <h3 className="text-foreground font-semibold text-sm">Selecione a conta de anúncio</h3>
+                <p className="text-xs text-muted-foreground">
+                  Escolha qual conta de anúncio do Meta será vinculada a este cliente. As campanhas dessa conta aparecerão automaticamente após salvar.
+                </p>
+                {loadingAdAccounts ? (
+                  <div className="text-center py-6 text-sm text-muted-foreground">Carregando contas...</div>
+                ) : adAccounts.length === 0 ? (
+                  <div className="text-center py-4 text-sm text-muted-foreground">
+                    Nenhuma conta de anúncio encontrada.
+                    <Button variant="link" size="sm" onClick={loadAdAccounts}>Tentar novamente</Button>
+                  </div>
+                ) : (
+                  <div className="max-h-72 overflow-y-auto rounded-md border border-border/50 divide-y divide-border/30">
+                    {adAccounts.map((acc) => (
+                      <label key={acc.id} className={`flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-primary/5 ${selectedAdAccountId === acc.id ? 'bg-primary/10' : ''}`}>
+                        <input
+                          type="radio"
+                          name="ad-account"
+                          checked={selectedAdAccountId === acc.id}
+                          onChange={() => setSelectedAdAccountId(acc.id)}
+                          className="accent-primary"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm text-foreground truncate">{acc.name}</div>
+                          <div className="text-[11px] text-muted-foreground">{acc.id}{acc.currency ? ` · ${acc.currency}` : ''}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <Button variant="ghost" onClick={() => { setStep('form'); }}>Pular</Button>
+                <Button onClick={confirmAdAccount} disabled={!selectedAdAccountId || confirmingAccount} className="neon-glow gap-2">
+                  {confirmingAccount ? 'Confirmando...' : <>Confirmar <ArrowRight className="w-4 h-4" /></>}
                 </Button>
               </div>
             </div>
