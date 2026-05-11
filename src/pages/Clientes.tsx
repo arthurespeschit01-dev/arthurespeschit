@@ -88,7 +88,7 @@ export default function Clientes() {
 
   useEffect(() => { load(); }, [user]);
 
-  // Escuta o callback do popup do Meta durante o onboarding
+  // Listener para popup do Meta (legado / fallback) e detecção de retorno via redirect top-level
   useEffect(() => {
     const handler = (ev: MessageEvent) => {
       if (ev.data?.type === 'meta-oauth') {
@@ -104,6 +104,36 @@ export default function Clientes() {
     return () => window.removeEventListener('message', handler);
   }, []);
 
+  // Detecta retorno do OAuth Meta (top-level redirect) durante o onboarding
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const metaParam = params.get('meta');
+    if (!metaParam) return;
+    const savedRaw = localStorage.getItem('meta-onboarding-form');
+    // Limpa os params da URL imediatamente
+    const cleanUrl = window.location.pathname;
+    window.history.replaceState({}, '', cleanUrl);
+    if (metaParam === 'ok') {
+      if (savedRaw) {
+        try {
+          const saved = JSON.parse(savedRaw);
+          setForm(saved.form);
+          setStep('form');
+          setMetaPending(true);
+          setOpen(true);
+          toast.success('Meta conectada! Finalize o cadastro do cliente para vincular.');
+        } catch {
+          toast.success('Meta conectada!');
+        }
+      } else {
+        toast.success('Meta conectada!');
+      }
+    } else {
+      toast.error('Falha ao conectar Meta: ' + (params.get('msg') || 'erro desconhecido'));
+    }
+    localStorage.removeItem('meta-onboarding-form');
+  }, []);
+
   const openNew = () => {
     setMetaPending(false);
     setEditing(null);
@@ -117,17 +147,22 @@ export default function Clientes() {
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData?.session?.access_token;
       if (!accessToken) { toast.error('Sessão expirada. Faça login novamente.'); return; }
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-auth?onboarding=1`, {
+      // Persistir o estado do formulário antes de redirecionar
+      localStorage.setItem('meta-onboarding-form', JSON.stringify({ form, ts: Date.now() }));
+      const origin = `${window.location.origin}/clientes`;
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-auth?onboarding=1&origin=${encodeURIComponent(origin)}`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       const json = await res.json();
       if (json?.auth_url) {
-        window.open(json.auth_url, 'meta-oauth', 'width=600,height=700');
-        toast.info('Conecte sua conta na janela aberta. Você poderá vincular ao cliente depois de criá-lo.');
+        const target = window.top || window;
+        target.location.href = json.auth_url;
       } else {
+        localStorage.removeItem('meta-onboarding-form');
         toast.error('Não foi possível iniciar a conexão.');
       }
     } catch {
+      localStorage.removeItem('meta-onboarding-form');
       toast.error('Erro ao conectar com Meta Ads');
     }
   };
