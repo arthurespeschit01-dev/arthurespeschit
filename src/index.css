@@ -247,11 +247,10 @@
     -webkit-overflow-scrolling: touch;
   }
 
-  /* Touch targets — buttons/inputs at least 40px high on mobile */
-  button:not(.h-7):not(.h-8):not(.h-9):not([data-no-min]),
-  [role="button"]:not(.h-7):not(.h-8):not(.h-9):not([data-no-min]),
-  a.btn, .btn {
-    min-height: 40px;
+  /* Touch targets — primary buttons at least 44px high on mobile */
+  button:not(.h-6):not(.h-7):not(.h-8):not(.h-9):not([data-no-min]),
+  [role="button"]:not(.h-6):not(.h-7):not(.h-8):not(.h-9):not([data-no-min]) {
+    min-height: 44px;
   }
 
   /* Inputs/selects/textareas comfortable on touch */
