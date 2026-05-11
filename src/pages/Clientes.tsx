@@ -330,7 +330,7 @@ export default function Clientes() {
             </div>
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <Button variant="ghost" size="sm" onClick={(e) => openEdit(c, e)}><Edit2 className="w-3 h-3" /></Button>
-              <Button variant="ghost" size="sm" onClick={(e) => remove(c.id, e)} className="hover:text-destructive"><Trash2 className="w-3 h-3" /></Button>
+              <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setConfirmDelete(c); }} className="hover:text-destructive"><Trash2 className="w-3 h-3" /></Button>
             </div>
           </div>
         ))}
