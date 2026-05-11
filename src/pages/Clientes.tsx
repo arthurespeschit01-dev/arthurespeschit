@@ -364,6 +364,47 @@ export default function Clientes() {
                 </Button>
               </div>
             </div>
+          ) : !editing && step === 'select-account' ? (
+            <div className="space-y-4 py-2">
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+                <h3 className="text-foreground font-semibold text-sm">Selecione a conta de anúncio</h3>
+                <p className="text-xs text-muted-foreground">
+                  Escolha qual conta de anúncio do Meta será vinculada a este cliente. As campanhas dessa conta aparecerão automaticamente após salvar.
+                </p>
+                {loadingAdAccounts ? (
+                  <div className="text-center py-6 text-sm text-muted-foreground">Carregando contas...</div>
+                ) : adAccounts.length === 0 ? (
+                  <div className="text-center py-4 text-sm text-muted-foreground">
+                    Nenhuma conta de anúncio encontrada.
+                    <Button variant="link" size="sm" onClick={loadAdAccounts}>Tentar novamente</Button>
+                  </div>
+                ) : (
+                  <div className="max-h-72 overflow-y-auto rounded-md border border-border/50 divide-y divide-border/30">
+                    {adAccounts.map((acc) => (
+                      <label key={acc.id} className={`flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-primary/5 ${selectedAdAccountId === acc.id ? 'bg-primary/10' : ''}`}>
+                        <input
+                          type="radio"
+                          name="ad-account"
+                          checked={selectedAdAccountId === acc.id}
+                          onChange={() => setSelectedAdAccountId(acc.id)}
+                          className="accent-primary"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm text-foreground truncate">{acc.name}</div>
+                          <div className="text-[11px] text-muted-foreground">{acc.id}{acc.currency ? ` · ${acc.currency}` : ''}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <Button variant="ghost" onClick={() => { setStep('form'); }}>Pular</Button>
+                <Button onClick={confirmAdAccount} disabled={!selectedAdAccountId || confirmingAccount} className="neon-glow gap-2">
+                  {confirmingAccount ? 'Confirmando...' : <>Confirmar <ArrowRight className="w-4 h-4" /></>}
+                </Button>
+              </div>
+            </div>
           ) : (
           <div className="space-y-4">
             <div><Label className="text-muted-foreground text-sm">Nome do cliente *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" /></div>
