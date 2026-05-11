@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { Plus, Edit2, Trash2, AlertTriangle, Link2, ArrowRight, SkipForward } from 'lucide-react';
 import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -48,6 +49,7 @@ export default function Clientes() {
   const [loadingAdAccounts, setLoadingAdAccounts] = useState(false);
   const [selectedAdAccountId, setSelectedAdAccountId] = useState<string>('');
   const [confirmingAccount, setConfirmingAccount] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<Client | null>(null);
   const { accounts: preloadedBalanceAccounts } = useAccountBalancesCount();
 
   useEffect(() => {
@@ -263,8 +265,7 @@ export default function Clientes() {
     load();
   };
 
-  const remove = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const remove = async (id: string) => {
     await supabase.from('clients').delete().eq('id', id);
     toast.success('Cliente removido!');
     load();
@@ -329,7 +330,7 @@ export default function Clientes() {
             </div>
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <Button variant="ghost" size="sm" onClick={(e) => openEdit(c, e)}><Edit2 className="w-3 h-3" /></Button>
-              <Button variant="ghost" size="sm" onClick={(e) => remove(c.id, e)} className="hover:text-destructive"><Trash2 className="w-3 h-3" /></Button>
+              <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setConfirmDelete(c); }} className="hover:text-destructive"><Trash2 className="w-3 h-3" /></Button>
             </div>
           </div>
         ))}
@@ -461,6 +462,26 @@ export default function Clientes() {
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir cliente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir <strong>{confirmDelete?.name}</strong>? Esta ação não pode ser desfeita e todos os dados vinculados a esse cliente serão removidos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { if (confirmDelete) { remove(confirmDelete.id); setConfirmDelete(null); } }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
