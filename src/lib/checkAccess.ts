@@ -4,7 +4,22 @@ export const ACCESS_CACHE_TTL_MS = 60 * 1000;
 
 export type AccessResult = { access: boolean; cached?: boolean; error?: boolean };
 
+/**
+ * Emails que SEMPRE têm acesso, sem nenhuma verificação de assinatura.
+ * Comparação é case-insensitive e ignora espaços.
+ */
+export const ALWAYS_ALLOWED_EMAILS = new Set<string>([
+  'arthurespeschit01@gmail.com',
+  'lucasmafia27@gmail.com',
+]);
+
+export function isAlwaysAllowed(email?: string | null): boolean {
+  if (!email) return false;
+  return ALWAYS_ALLOWED_EMAILS.has(email.trim().toLowerCase());
+}
+
 export function getCachedAccess(email: string): AccessResult | null {
+  if (isAlwaysAllowed(email)) return { access: true, cached: true };
   try {
     const raw = sessionStorage.getItem(`access-check:${email}`);
     if (!raw) return null;
@@ -22,18 +37,10 @@ export function setCachedAccess(email: string, access: boolean) {
   } catch { /* ignore */ }
 }
 
-/**
- * Checks subscription access for the given email.
- * @param opts.failClosed if true, network errors return access=false (use at login).
- *                        if false, network errors return access=true (use for re-checks).
- */
-export const ALWAYS_ALLOWED_EMAILS = new Set<string>([
-  'arthurespeschit01@gmail.com',
-  'lucasmafia27@gmail.com',
-]);
-
 export async function checkAccess(email: string, opts: { failClosed: boolean; timeoutMs?: number } = { failClosed: false }): Promise<AccessResult> {
-  if (email && ALWAYS_ALLOWED_EMAILS.has(email.trim().toLowerCase())) {
+  if (isAlwaysAllowed(email)) {
+    // Limpa qualquer cache negativo anterior e marca como permitido.
+    try { sessionStorage.removeItem(`access-check:${email}`); } catch { /* ignore */ }
     setCachedAccess(email, true);
     return { access: true };
   }
