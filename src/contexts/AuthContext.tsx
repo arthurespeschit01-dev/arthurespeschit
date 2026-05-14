@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { checkAccess, CHECKOUT_URL } from '@/lib/checkAccess';
+import { checkAccess, CHECKOUT_URL, isAlwaysAllowed, clearAccessCache, setCachedAccess } from '@/lib/checkAccess';
 
 interface AuthContextType {
   user: User | null;
@@ -19,6 +19,12 @@ async function gateSession(session: Session | null): Promise<Session | null> {
   if (!session?.user?.email) return session;
   const email = session.user.email;
   try { localStorage.setItem('user_email', email); } catch { /* ignore */ }
+  // Whitelist: bypass total — limpa cache antigo e libera
+  if (isAlwaysAllowed(email)) {
+    clearAccessCache(email);
+    setCachedAccess(email, true);
+    return session;
+  }
   // fail-closed at login/initial session load
   const result = await checkAccess(email, { failClosed: true });
   if (!result.access) {
@@ -81,6 +87,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
+    // Whitelist: bypass total
+    if (isAlwaysAllowed(email)) {
+      clearAccessCache(email);
+      setCachedAccess(email, true);
+      return;
+    }
     // Block here with fail-closed before considering the user logged in.
     const result = await checkAccess(email, { failClosed: true });
     if (!result.access) {
