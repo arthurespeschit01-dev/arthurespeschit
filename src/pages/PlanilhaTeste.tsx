@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { Loader2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { exportCSV, exportXLSX, exportPDF, type PlatformData as ExportPlatformData } from "@/lib/exportPlanilha";
+import type { PlatformData as ExportPlatformData } from "@/lib/exportPlanilha";
 
 type Client = { id: string; name: string };
 
