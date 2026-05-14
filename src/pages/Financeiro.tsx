@@ -185,6 +185,8 @@ export default function Financeiro() {
       import('jspdf'),
       import('jspdf-autotable'),
     ]);
+    const doc = new jsPDF();
+    doc.setFontSize(16);
     doc.setFontSize(16);
     doc.text(`DRE - ${monthLabel(mes, ano)}`, 14, 18);
     doc.setFontSize(10);
