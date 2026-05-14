@@ -15,8 +15,7 @@ import {
   DollarSign, TrendingDown, TrendingUp, Wallet, Percent, Clock,
   AlertTriangle, ArrowDownCircle, ArrowUpCircle, Download, FileBarChart, MessageCircle, Copy,
 } from 'lucide-react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+// jspdf é carregado sob demanda em exportPDF() para reduzir o bundle inicial
 
 interface Client { id: string; name: string; monthly_fee: number | null; payment_day: number | null; status: string | null; phone?: string | null; }
 interface Transacao {
