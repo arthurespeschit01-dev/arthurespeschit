@@ -4,7 +4,13 @@ export const ACCESS_CACHE_TTL_MS = 60 * 1000;
 
 export type AccessResult = { access: boolean; cached?: boolean; error?: boolean };
 
+export function isAlwaysAllowed(email?: string | null): boolean {
+  if (!email) return false;
+  return ALWAYS_ALLOWED_EMAILS.has(email.trim().toLowerCase());
+}
+
 export function getCachedAccess(email: string): AccessResult | null {
+  if (isAlwaysAllowed(email)) return { access: true, cached: true };
   try {
     const raw = sessionStorage.getItem(`access-check:${email}`);
     if (!raw) return null;
