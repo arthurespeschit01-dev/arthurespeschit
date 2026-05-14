@@ -15,7 +15,7 @@ import MetaAdsTab from '@/components/MetaAdsTab';
 import GoogleAdsTab from '@/components/GoogleAdsTab';
 import { DateRangePicker, type DateRangeValue } from '@/components/DateRangePicker';
 import { metricsForObjective, type CampaignInsights } from '@/lib/campaignMetrics';
-import { exportCampaignsPDF } from '@/lib/exportCampaignsPDF';
+// exportCampaignsPDF é importado dinamicamente no handler para reduzir bundle
 import EntityActionsMenu from '@/components/EntityActionsMenu';
 import MetaHierarchyTabs from '@/components/MetaHierarchyTabs';
 
@@ -1145,6 +1145,7 @@ export default function ClientDetail() {
                       setExporting(true);
                       toast.loading('Gerando PDF...', { id: 'pdf' });
                       try {
+                        const { exportCampaignsPDF } = await import('@/lib/exportCampaignsPDF');
                         await exportCampaignsPDF({ clientName: client.name, periodLabel, campaigns: chosen });
                         toast.success(`PDF com ${chosen.length} campanha(s) gerado!`, { id: 'pdf' });
                         setExportOpen(false);

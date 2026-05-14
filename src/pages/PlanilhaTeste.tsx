@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { Loader2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { exportCSV, exportXLSX, exportPDF, type PlatformData as ExportPlatformData } from "@/lib/exportPlanilha";
+import type { PlatformData as ExportPlatformData } from "@/lib/exportPlanilha";
 
 type Client = { id: string; name: string };
 
@@ -554,13 +554,14 @@ function DownloadMenu({
     { key: "geral", label: "Geral", data: geral },
   ];
 
-  const handle = (format: "csv" | "xlsx" | "pdf", p: { key: string; label: string; data: ExportPlatformData }) => {
+  const handle = async (format: "csv" | "xlsx" | "pdf", p: { key: string; label: string; data: ExportPlatformData }) => {
     const filename = `planilha-${slug}-${p.key}-${year}`;
     const title = `Planilha ${p.label} — ${clientName} — ${year}`;
     try {
-      if (format === "csv") exportCSV(p.data, year, filename);
-      else if (format === "xlsx") exportXLSX(p.data, year, filename, p.label);
-      else exportPDF(p.data, year, filename, title);
+      const mod = await import("@/lib/exportPlanilha");
+      if (format === "csv") mod.exportCSV(p.data, year, filename);
+      else if (format === "xlsx") mod.exportXLSX(p.data, year, filename, p.label);
+      else mod.exportPDF(p.data, year, filename, title);
       toast.success(`Exportado: ${p.label} (${format.toUpperCase()})`);
     } catch (e) {
       console.error(e);
