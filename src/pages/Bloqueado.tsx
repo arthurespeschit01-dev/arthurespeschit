@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { isAlwaysAllowed } from '@/lib/checkAccess';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Lock, ShieldCheck, LifeBuoy, Loader2 } from 'lucide-react';
@@ -13,10 +14,22 @@ export default function Bloqueado() {
   const { user } = useAuth();
   const [checking, setChecking] = useState(false);
 
+  // Whitelist: redireciona automaticamente para o app
+  useEffect(() => {
+    const email = user?.email || localStorage.getItem('user_email');
+    if (isAlwaysAllowed(email)) {
+      window.location.href = '/';
+    }
+  }, [user?.email]);
+
   const handleCheckPayment = async () => {
     const email = user?.email || localStorage.getItem('user_email');
     if (!email) {
       toast.error('Não foi possível identificar seu e-mail. Faça login novamente.');
+      return;
+    }
+    if (isAlwaysAllowed(email)) {
+      window.location.href = '/';
       return;
     }
     setChecking(true);

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { checkAccess, CHECKOUT_URL } from '@/lib/checkAccess';
+import { checkAccess, CHECKOUT_URL, isAlwaysAllowed } from '@/lib/checkAccess';
 
 export default function AuthCallback() {
   useEffect(() => {
@@ -18,6 +18,12 @@ export default function AuthCallback() {
 
       if (!session?.user?.email) {
         toast.error('Não foi possível concluir o login');
+        window.location.href = 'https://www.centraldogestor.site';
+        return;
+      }
+
+      // Whitelist: bypass total de verificação
+      if (isAlwaysAllowed(session.user.email)) {
         window.location.href = 'https://www.centraldogestor.site';
         return;
       }

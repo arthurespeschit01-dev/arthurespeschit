@@ -1,60 +1,38 @@
+## Objetivo
 
-# Auditoria e Otimização de Performance
+Garantir que `lucasmafia27@gmail.com` tenha exatamente o mesmo tratamento de `arthurespeschit01@gmail.com`: nunca passa por verificação de assinatura, nunca vê tela de "Verificando assinatura...", nunca é redirecionado para checkout/bloqueado.
 
-Antes de mexer em qualquer coisa, preciso fazer uma análise real do projeto (bundle, dependências, queries, componentes). Vou propor um plano em fases para não quebrar nada e te entregar resultados mensuráveis.
+## Diagnóstico
 
-## Fase 1 — Auditoria (somente leitura, sem alterações)
+O e-mail já está em `ALWAYS_ALLOWED_EMAILS` (`src/lib/checkAccess.ts`) e o bypass funciona dentro de `checkAccess`. Porém, três pontos ainda fazem o usuário sentir "verificação":
 
-1. Rodar `bun run build` e analisar tamanho dos chunks gerados.
-2. Listar dependências do `package.json` e identificar:
-   - Bibliotecas pesadas (ex: `html2canvas`, `jspdf`, `recharts`) que podem virar lazy.
-   - Pacotes não utilizados (varrer com `rg` por imports).
-   - Componentes shadcn-ui não usados em `src/components/ui/`.
-3. Mapear páginas/componentes pesados:
-   - Tamanho de `MetaAdsTab.tsx`, `Planilha.tsx`, `Dashboard.tsx`, `Financeiro.tsx`, `ClientDetail.tsx`.
-   - Falta de `React.memo`, `useMemo`, `useCallback` em listas grandes.
-4. Auditar queries Supabase:
-   - `select('*')` desnecessários.
-   - Queries N+1 dentro de loops.
-   - Falta de paginação em tabelas grandes.
-5. Checar Edge Functions (35 functions Meta/Google) — duplicação de helpers.
-6. Verificar imagens em `src/assets/` e `public/` (formatos, tamanhos).
-7. Rodar Lighthouse/perf profile no preview.
+1. **`AuthCallback.tsx`** — sempre mostra o spinner "Verificando assinatura..." e chama `checkAccess` (mesmo que retorne instantâneo, há um `getSession` + `setTimeout(800ms)` antes).
+2. **`AuthContext.gateSession`** — chama `checkAccess` no `INITIAL_SESSION` antes de liberar o app. Para e-mails whitelisted, isso é trabalho desnecessário e pode atrasar o render.
+3. **`Bloqueado.tsx` (handleCheckPayment)** — bate direto no endpoint sem checar a whitelist; se o usuário whitelisted cair lá por qualquer motivo, ainda fica "Verificando…".
+4. **Cache negativo antigo em `sessionStorage`** — se o e-mail tiver um registro `access:false` anterior à introdução da whitelist, ele é ignorado por `isAlwaysAllowed` mas só é limpo quando `checkAccess` é chamado. Vale limpar de forma proativa no boot.
 
-**Entrega da Fase 1:** relatório com:
-- O que está deixando pesado (com números: KB do bundle, ms de query, etc.)
-- Lista priorizada de otimizações (impacto vs risco)
+## Mudanças
 
-## Fase 2 — Otimizações de baixo risco (após sua aprovação)
+### 1. `src/pages/AuthCallback.tsx`
+- Antes de qualquer `checkAccess`, ler o e-mail da sessão e, se `isAlwaysAllowed(email)`, redirecionar imediatamente para `https://www.centraldogestor.site` (mesmo destino do fluxo de sucesso).
+- Mantém o restante do fluxo igual para os demais usuários.
 
-- Remover imports e arquivos não usados.
-- Remover componentes shadcn-ui não referenciados.
-- Remover dependências `package.json` órfãs.
-- Adicionar `React.memo` em componentes de lista (cards de cliente, linhas de tabela).
-- Trocar `select('*')` por colunas específicas onde aplicável.
-- Lazy-load de libs pesadas (`jspdf`, `html2canvas`, `xlsx`) só quando o usuário clica em exportar.
-- Otimizar imagens (converter para webp/avif quando aplicável).
+### 2. `src/contexts/AuthContext.tsx`
+- Em `gateSession`, se `isAlwaysAllowed(session.user.email)`, devolver a sessão sem chamar `checkAccess`.
+- Em `signIn`, se `isAlwaysAllowed(email)`, pular o `checkAccess` pós-login.
 
-## Fase 3 — Refatorações maiores (mediante aprovação por item)
+### 3. `src/pages/Bloqueado.tsx`
+- No `useEffect` inicial: se o e-mail do usuário for `isAlwaysAllowed`, redirecionar para `/` automaticamente (fail-safe caso ele caia aqui por engano).
+- Em `handleCheckPayment`, se whitelisted, ir direto para `/` sem fetch.
 
-- Quebrar componentes monstro (>500 linhas) em subcomponentes.
-- Consolidar Edge Functions Meta com helpers compartilhados (igual ao `_shared/google-ads.ts`).
-- Revisar React Query: chaves, `staleTime`, invalidações.
-- Code-splitting adicional por rota onde fizer sentido.
+### 4. `src/hooks/useAccessCheck.ts`
+- Já usa `getCachedAccess` que respeita a whitelist; adicionar early-return explícito no topo para `isAlwaysAllowed(user.email)` (zero trabalho, zero rede).
 
-## Fase 4 — Polimento
+### 5. `src/lib/checkAccess.ts`
+- Exportar uma função `clearAccessCache(email)` e chamá-la para os e-mails whitelisted no boot do `AuthContext` (limpa qualquer `access:false` antigo persistido em `sessionStorage`).
 
-- SEO técnico (meta tags, JSON-LD onde aplicável).
-- Validação mobile final.
-- Documentar padrões adotados.
+## Resultado esperado
 
-## Regras que vou seguir
-
-- Nada de quebrar funcionalidade — após cada mudança, build deve passar.
-- Design preservado (zero mudança visual sem você pedir).
-- Mudanças críticas (remover libs, refatorar página inteira, mexer em auth/queries de dados) eu te mostro antes.
-- Commits lógicos e pequenos para você reverter se quiser.
-
-## Próximo passo
-
-Se aprovar, começo pela **Fase 1** e te trago o relatório de auditoria com números reais antes de tocar em qualquer arquivo. Posso já incluir alguma otimização óbvia da Fase 2 no mesmo turno (ex: remover imports não usados) se preferir ganhar tempo.
+- Login com Google em `lucasmafia27@gmail.com` → spinner curtíssimo (só o tempo do OAuth) → entra no app sem nenhuma chamada ao backend de assinatura.
+- Mesmo comportamento idêntico ao do `arthurespeschit01@gmail.com`.
+- Nenhum impacto para os demais usuários (todo o fluxo de verificação real continua intacto).

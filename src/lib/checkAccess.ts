@@ -31,6 +31,10 @@ export function getCachedAccess(email: string): AccessResult | null {
   return null;
 }
 
+export function clearAccessCache(email: string) {
+  try { sessionStorage.removeItem(`access-check:${email}`); } catch { /* ignore */ }
+}
+
 export function setCachedAccess(email: string, access: boolean) {
   try {
     sessionStorage.setItem(`access-check:${email}`, JSON.stringify({ access, checkedAt: Date.now() }));
