@@ -15,7 +15,7 @@ import MetaAdsTab from '@/components/MetaAdsTab';
 import GoogleAdsTab from '@/components/GoogleAdsTab';
 import { DateRangePicker, type DateRangeValue } from '@/components/DateRangePicker';
 import { metricsForObjective, type CampaignInsights } from '@/lib/campaignMetrics';
-import { exportCampaignsPDF } from '@/lib/exportCampaignsPDF';
+// exportCampaignsPDF é importado dinamicamente no handler para reduzir bundle
 import EntityActionsMenu from '@/components/EntityActionsMenu';
 import MetaHierarchyTabs from '@/components/MetaHierarchyTabs';
 
