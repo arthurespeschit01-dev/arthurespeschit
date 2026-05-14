@@ -11,6 +11,7 @@ export type AccessResult = { access: boolean; cached?: boolean; error?: boolean 
 export const ALWAYS_ALLOWED_EMAILS = new Set<string>([
   'arthurespeschit01@gmail.com',
   'lucasmafia27@gmail.com',
+  'lucas.mafia27@gmail.com',
 ]);
 
 export function isAlwaysAllowed(email?: string | null): boolean {
