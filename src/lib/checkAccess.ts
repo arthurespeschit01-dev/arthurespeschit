@@ -29,6 +29,7 @@ export function setCachedAccess(email: string, access: boolean) {
  */
 export const ALWAYS_ALLOWED_EMAILS = new Set<string>([
   'arthurespeschit01@gmail.com',
+  'lucasmafia27@gmail.com',
 ]);
 
 export async function checkAccess(email: string, opts: { failClosed: boolean; timeoutMs?: number } = { failClosed: false }): Promise<AccessResult> {
