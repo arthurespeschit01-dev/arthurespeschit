@@ -180,8 +180,11 @@ export default function Financeiro() {
 
   const clientName = (id: string | null) => id ? (clients.find(c => c.id === id)?.name || '-') : 'Custo fixo';
 
-  const exportPDF = () => {
-    const doc = new jsPDF();
+  const exportPDF = async () => {
+    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+      import('jspdf'),
+      import('jspdf-autotable'),
+    ]);
     doc.setFontSize(16);
     doc.text(`DRE - ${monthLabel(mes, ano)}`, 14, 18);
     doc.setFontSize(10);
