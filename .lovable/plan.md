@@ -1,27 +1,60 @@
-## Problema
-Na aba **Meta Ads** dentro do cliente já criado (segunda etapa), ao clicar em "Conectar Meta Ads" o fluxo abre um popup com `window.open(...)`. Quando o callback termina, o navegador acaba mostrando o HTML cru de `ffvmmnzvmjiddqtywkko.supabase.co/functions/v1/meta-auth-callback?...` em vez de fechar a janela. Isso é o mesmo problema que já corrigimos na primeira etapa (criação do cliente), onde substituímos o popup por um redirect top-level + retorno via `?meta=ok|err`.
 
-## Solução
-Aplicar exatamente o mesmo padrão (já usado em `Clientes.tsx`) no `MetaAdsTab.tsx`:
+# Auditoria e Otimização de Performance
 
-1. **`src/components/MetaAdsTab.tsx`**
-   - Em `connect()`, montar a URL de `meta-auth` incluindo `&origin=<window.location.origin + window.location.pathname>?tab=meta` (ou `&meta_tab=1`) para que o callback saiba para onde voltar.
-   - Substituir `window.open(json.auth_url, ...)` por redirect top-level: `(window.top || window).location.href = json.auth_url`.
-   - Antes de redirecionar, salvar no `localStorage` uma flag `meta-tab-return: { clientId, ts }`.
-   - Remover o listener `message` / `meta-oauth` (não é mais necessário com redirect top-level).
-   - No `useEffect` inicial (junto com `loadConnection`), checar:
-     - se a URL contém `?meta=ok` → `toast.success('Meta conectada!')`, recarregar conexão e contas, limpar o param da URL e o `localStorage`.
-     - se contém `?meta=err` → `toast.error(msg)` e limpar.
+Antes de mexer em qualquer coisa, preciso fazer uma análise real do projeto (bundle, dependências, queries, componentes). Vou propor um plano em fases para não quebrar nada e te entregar resultados mensuráveis.
 
-2. **Backend (sem alterações)**
-   - `meta-auth/index.ts` já aceita `origin` e codifica no `state`.
-   - `meta-auth-callback/index.ts` já redireciona para `${origin}?meta=ok|err` quando o `origin` existe — então o HTML cru só aparece no fluxo atual porque o `MetaAdsTab` ainda **não envia** `origin`. Basta mandar e o problema some.
-   - Nenhuma mudança de schema, nenhuma migração.
+## Fase 1 — Auditoria (somente leitura, sem alterações)
 
-## Arquivo afetado
-- `src/components/MetaAdsTab.tsx`
+1. Rodar `bun run build` e analisar tamanho dos chunks gerados.
+2. Listar dependências do `package.json` e identificar:
+   - Bibliotecas pesadas (ex: `html2canvas`, `jspdf`, `recharts`) que podem virar lazy.
+   - Pacotes não utilizados (varrer com `rg` por imports).
+   - Componentes shadcn-ui não usados em `src/components/ui/`.
+3. Mapear páginas/componentes pesados:
+   - Tamanho de `MetaAdsTab.tsx`, `Planilha.tsx`, `Dashboard.tsx`, `Financeiro.tsx`, `ClientDetail.tsx`.
+   - Falta de `React.memo`, `useMemo`, `useCallback` em listas grandes.
+4. Auditar queries Supabase:
+   - `select('*')` desnecessários.
+   - Queries N+1 dentro de loops.
+   - Falta de paginação em tabelas grandes.
+5. Checar Edge Functions (35 functions Meta/Google) — duplicação de helpers.
+6. Verificar imagens em `src/assets/` e `public/` (formatos, tamanhos).
+7. Rodar Lighthouse/perf profile no preview.
 
-## Garantias
-- Não muda o `redirect_uri` registrado no Facebook.
-- Não toca em nenhum outro fluxo (Google Ads, primeira etapa de criação de cliente, demais abas).
-- Após autorizar, o usuário cai direto de volta na aba Meta Ads do cliente, com toast de sucesso e a lista de contas carregando — sem nunca ver o HTML do callback.
+**Entrega da Fase 1:** relatório com:
+- O que está deixando pesado (com números: KB do bundle, ms de query, etc.)
+- Lista priorizada de otimizações (impacto vs risco)
+
+## Fase 2 — Otimizações de baixo risco (após sua aprovação)
+
+- Remover imports e arquivos não usados.
+- Remover componentes shadcn-ui não referenciados.
+- Remover dependências `package.json` órfãs.
+- Adicionar `React.memo` em componentes de lista (cards de cliente, linhas de tabela).
+- Trocar `select('*')` por colunas específicas onde aplicável.
+- Lazy-load de libs pesadas (`jspdf`, `html2canvas`, `xlsx`) só quando o usuário clica em exportar.
+- Otimizar imagens (converter para webp/avif quando aplicável).
+
+## Fase 3 — Refatorações maiores (mediante aprovação por item)
+
+- Quebrar componentes monstro (>500 linhas) em subcomponentes.
+- Consolidar Edge Functions Meta com helpers compartilhados (igual ao `_shared/google-ads.ts`).
+- Revisar React Query: chaves, `staleTime`, invalidações.
+- Code-splitting adicional por rota onde fizer sentido.
+
+## Fase 4 — Polimento
+
+- SEO técnico (meta tags, JSON-LD onde aplicável).
+- Validação mobile final.
+- Documentar padrões adotados.
+
+## Regras que vou seguir
+
+- Nada de quebrar funcionalidade — após cada mudança, build deve passar.
+- Design preservado (zero mudança visual sem você pedir).
+- Mudanças críticas (remover libs, refatorar página inteira, mexer em auth/queries de dados) eu te mostro antes.
+- Commits lógicos e pequenos para você reverter se quiser.
+
+## Próximo passo
+
+Se aprovar, começo pela **Fase 1** e te trago o relatório de auditoria com números reais antes de tocar em qualquer arquivo. Posso já incluir alguma otimização óbvia da Fase 2 no mesmo turno (ex: remover imports não usados) se preferir ganhar tempo.
