@@ -1145,6 +1145,7 @@ export default function ClientDetail() {
                       setExporting(true);
                       toast.loading('Gerando PDF...', { id: 'pdf' });
                       try {
+                        const { exportCampaignsPDF } = await import('@/lib/exportCampaignsPDF');
                         await exportCampaignsPDF({ clientName: client.name, periodLabel, campaigns: chosen });
                         toast.success(`PDF com ${chosen.length} campanha(s) gerado!`, { id: 'pdf' });
                         setExportOpen(false);
