@@ -81,6 +81,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
           <nav className="flex-1 p-3 space-y-1 overflow-y-auto overflow-x-hidden">
             {mainNavItems.map((item) => {
+              const isConfig = item.to === '/configuracoes';
               const link = (
                 <NavLink
                   key={item.to}
@@ -102,15 +103,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <span className={collapsed ? 'hidden' : ''}>{item.label}</span>
                 </NavLink>
               );
-              if (collapsed) {
-                return (
-                  <Tooltip key={item.to}>
-                    <TooltipTrigger asChild>{link}</TooltipTrigger>
-                    <TooltipContent side="right">{item.label}</TooltipContent>
-                  </Tooltip>
-                );
+              const wrapped = collapsed ? (
+                <Tooltip key={item.to}>
+                  <TooltipTrigger asChild>{link}</TooltipTrigger>
+                  <TooltipContent side="right">{item.label}</TooltipContent>
+                </Tooltip>
+              ) : link;
+              if (isConfig) {
+                return <div key={item.to} className="pt-6 mt-2 border-t border-sidebar-border">{wrapped}</div>;
               }
-              return link;
+              return wrapped;
             })}
 
             {/* Processos folder */}
