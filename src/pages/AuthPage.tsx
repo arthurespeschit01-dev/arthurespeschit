@@ -30,13 +30,8 @@ export default function AuthPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      if (isLogin) {
-        await signIn(email, password);
-        toast.success('Login realizado com sucesso!');
-      } else {
-        await signUp(email, password);
-        toast.success('Conta criada! Verifique seu email.');
-      }
+      await signIn(email, password);
+      toast.success('Login realizado com sucesso!');
     } catch (err: any) {
       toast.error(err.message || 'Erro ao autenticar');
     } finally {
