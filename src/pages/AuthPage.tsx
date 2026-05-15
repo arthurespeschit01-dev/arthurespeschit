@@ -90,10 +90,10 @@ export default function AuthPage() {
 
             <div className="mb-6">
               <h2 className="text-2xl font-semibold text-foreground tracking-tight">
-                {isLogin ? 'Bem-vindo de volta' : 'Criar conta'}
+                Bem-vindo de volta
               </h2>
               <p className="text-sm text-muted-foreground mt-1">
-                {isLogin ? 'Entre para continuar na Central do Gestor' : 'Comece sua jornada agora'}
+                Entre para continuar na Central do Gestor
               </p>
             </div>
 
