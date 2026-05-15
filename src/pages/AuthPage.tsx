@@ -7,8 +7,7 @@ import logoCentralGestor from '@/assets/logo-central-gestor.png';
 import { supabase } from '@/lib/supabase';
 
 export default function AuthPage() {
-  const { signIn, signUp } = useAuth();
-  const [isLogin, setIsLogin] = useState(true);
+  const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -31,13 +30,8 @@ export default function AuthPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      if (isLogin) {
-        await signIn(email, password);
-        toast.success('Login realizado com sucesso!');
-      } else {
-        await signUp(email, password);
-        toast.success('Conta criada! Verifique seu email.');
-      }
+      await signIn(email, password);
+      toast.success('Login realizado com sucesso!');
     } catch (err: any) {
       toast.error(err.message || 'Erro ao autenticar');
     } finally {
@@ -96,10 +90,10 @@ export default function AuthPage() {
 
             <div className="mb-6">
               <h2 className="text-2xl font-semibold text-foreground tracking-tight">
-                {isLogin ? 'Bem-vindo de volta' : 'Criar conta'}
+                Bem-vindo de volta
               </h2>
               <p className="text-sm text-muted-foreground mt-1">
-                {isLogin ? 'Entre para continuar na Central do Gestor' : 'Comece sua jornada agora'}
+                Entre para continuar na Central do Gestor
               </p>
             </div>
 
@@ -172,7 +166,7 @@ export default function AuthPage() {
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <>
-                      {isLogin ? 'Entrar no sistema' : 'Criar conta'}
+                      Entrar no sistema
                       <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
                     </>
                   )}
@@ -204,15 +198,6 @@ export default function AuthPage() {
               Continuar com Google
             </motion.button>
 
-            <div className="mt-6 text-center text-sm text-muted-foreground">
-              {isLogin ? 'Não tem conta? ' : 'Já tem conta? '}
-              <button
-                onClick={() => setIsLogin(!isLogin)}
-                className="text-primary hover:text-primary/80 font-medium transition-colors"
-              >
-                {isLogin ? 'Criar agora' : 'Entrar'}
-              </button>
-            </div>
           </div>
         </div>
       </motion.div>
