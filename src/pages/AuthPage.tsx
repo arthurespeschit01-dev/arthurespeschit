@@ -166,7 +166,7 @@ export default function AuthPage() {
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <>
-                      {isLogin ? 'Entrar no sistema' : 'Criar conta'}
+                      Entrar no sistema
                       <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
                     </>
                   )}
