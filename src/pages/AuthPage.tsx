@@ -198,15 +198,6 @@ export default function AuthPage() {
               Continuar com Google
             </motion.button>
 
-            <div className="mt-6 text-center text-sm text-muted-foreground">
-              {isLogin ? 'Não tem conta? ' : 'Já tem conta? '}
-              <button
-                onClick={() => setIsLogin(!isLogin)}
-                className="text-primary hover:text-primary/80 font-medium transition-colors"
-              >
-                {isLogin ? 'Criar agora' : 'Entrar'}
-              </button>
-            </div>
           </div>
         </div>
       </motion.div>
