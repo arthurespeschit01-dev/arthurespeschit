@@ -11,6 +11,7 @@ import {
   BookOpen, FileText, MessageSquare, ShieldAlert,
   BarChart3, LogOut, Zap, Menu, X, ListTodo, ChevronDown, Folder, Link2, Sparkles, DollarSign, PanelLeftClose, PanelLeftOpen, Settings
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -38,6 +39,26 @@ const processosSubItems = [
 ];
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar:collapsed';
+const SIDEBAR_ICON_CLASS = 'w-5 h-5 shrink-0';
+const SIDEBAR_ICON_BUTTON_CLASS = 'flex items-center justify-center w-10 h-10 rounded-lg';
+const SIDEBAR_ICON_STROKE_WIDTH = 1.8;
+const iconOpticalAdjustments = new Map<LucideIcon, string>([
+  [Settings, 'translate(0.5px, 0px)'],
+  [Folder, 'translate(0px, -0.5px)'],
+  [LogOut, 'translate(0.5px, 0px)'],
+  [PanelLeftOpen, 'translate(0px, 0.5px)'],
+  [PanelLeftClose, 'translate(0px, 0.5px)'],
+]);
+
+function SidebarIcon({ icon: Icon }: { icon: LucideIcon }) {
+  return (
+    <Icon
+      className={SIDEBAR_ICON_CLASS}
+      strokeWidth={SIDEBAR_ICON_STROKE_WIDTH}
+      style={{ transform: iconOpticalAdjustments.get(Icon) }}
+    />
+  );
+}
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuth();
@@ -91,7 +112,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   onClick={() => { if (!collapsed) setSidebarOpen(false); }}
                   className={({ isActive }) =>
                     `${collapsed
-                      ? 'flex items-center justify-center w-10 h-10 rounded-lg'
+                      ? SIDEBAR_ICON_BUTTON_CLASS
                       : 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm'
                     } transition-all duration-200 ${
                       isActive
@@ -100,7 +121,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     }`
                   }
                 >
-                  <item.icon className="w-5 h-5 shrink-0" />
+                  <SidebarIcon icon={item.icon} />
                   {!collapsed && <span>{item.label}</span>}
                 </NavLink>
               );
@@ -131,13 +152,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     <NavLink
                       to="/processos"
                       data-tour-id="nav-processos"
-                      className={`flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-200 ${
+                      className={`${SIDEBAR_ICON_BUTTON_CLASS} transition-all duration-200 ${
                         processosActive
                           ? 'bg-primary/15 text-primary font-medium'
                           : 'text-primary hover:bg-sidebar-accent hover:text-primary'
                       }`}
                     >
-                      <Folder className="w-5 h-5 shrink-0" />
+                      <SidebarIcon icon={Folder} />
                     </NavLink>
                   </TooltipTrigger>
                   <TooltipContent side="right">Processos</TooltipContent>
@@ -152,9 +173,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                   }`}
                 >
-                  <Folder className="w-5 h-5 shrink-0" />
+                  <SidebarIcon icon={Folder} />
                   <span className="flex-1 text-left">Processos</span>
-                  <ChevronDown className={`w-4 h-4 shrink-0 transition-transform duration-200 ${processosOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-4 h-4 shrink-0 transition-transform duration-200 ${processosOpen ? 'rotate-180' : ''}`} strokeWidth={SIDEBAR_ICON_STROKE_WIDTH} />
                 </button>
               )}
               {processosOpen && !collapsed && (
@@ -172,7 +193,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         }`
                       }
                     >
-                      <item.icon className="w-5 h-5 shrink-0" />
+                      <SidebarIcon icon={item.icon} />
                       <span>{item.label}</span>
                     </NavLink>
                   ))}
@@ -187,9 +208,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <TooltipTrigger asChild>
                   <button
                     onClick={signOut}
-                    className="flex items-center justify-center w-10 h-10 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-200"
+                    className={`${SIDEBAR_ICON_BUTTON_CLASS} text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-200`}
                   >
-                    <LogOut className="w-5 h-5" />
+                    <SidebarIcon icon={LogOut} />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="right">Sair</TooltipContent>
@@ -200,7 +221,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 onClick={signOut}
                 className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
               >
-                <LogOut className="w-5 h-5" />
+                <SidebarIcon icon={LogOut} />
                 Sair
               </Button>
             )}
@@ -209,9 +230,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <TooltipTrigger asChild>
                   <button
                     onClick={toggleCollapsed}
-                    className="flex items-center justify-center w-10 h-10 rounded-lg text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-all duration-200"
+                    className={`${SIDEBAR_ICON_BUTTON_CLASS} text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-all duration-200`}
                   >
-                    <PanelLeftOpen className="w-5 h-5" />
+                    <SidebarIcon icon={PanelLeftOpen} />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="right">Expandir menu</TooltipContent>
@@ -223,7 +244,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 size="sm"
                 className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
               >
-                <PanelLeftClose className="w-5 h-5" /> Minimizar
+                <SidebarIcon icon={PanelLeftClose} /> Minimizar
               </Button>
             )}
           </div>
