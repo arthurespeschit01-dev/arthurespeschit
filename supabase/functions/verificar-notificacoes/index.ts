@@ -115,23 +115,31 @@ Deno.serve(async (req) => {
     }
 
     // Gatilho 4 — Inadimplência
+    // IMPORTANTE: não dependemos do status='atrasado' (que só é atualizado quando
+    // o usuário abre o Financeiro). Consideramos qualquer mensalidade não paga
+    // cujo vencimento já passou do limite configurado.
     if (cfg.inadimplencia) {
-      const dias = parseInt(cfg.inadimplencia_dias || 3);
-      const limiteData = addDays(-dias);
+      const diasLimite = parseInt(cfg.inadimplencia_dias || 3);
+      const limiteData = addDays(-diasLimite);
       const { data: mens } = await admin.from('mensalidades')
         .select('id, cliente_id, valor, vencimento, status')
         .eq('user_id', p.user_id)
-        .eq('status', 'atrasado')
+        .neq('status', 'pago')
         .lte('vencimento', limiteData);
+      console.log(`[inadimplencia] user=${p.user_id} candidatos=${mens?.length ?? 0} limite=${diasLimite}d`);
       for (const m of mens || []) {
         const tipo = 'inadimplente';
         if (await jaEnviado(admin, p.user_id, tipo, m.id)) continue;
+        const valor = Number(m.valor);
+        if (!Number.isFinite(valor)) continue;
+        const vencDate = new Date(m.vencimento + 'T00:00:00');
+        if (isNaN(vencDate.getTime())) continue;
         const cli: any = clienteMap.get(m.cliente_id);
         const nomeCli = cli?.name || 'Cliente';
-        const diasAtraso = Math.floor((today.getTime() - new Date(m.vencimento + 'T00:00:00').getTime()) / 86400000);
+        const diasAtraso = Math.floor((today.getTime() - vencDate.getTime()) / 86400000);
         const assunto = `🚨 Cliente inadimplente há ${diasAtraso} dias — ${nomeCli}`;
         const ok = await enviar(email, assunto, '🚨', `Cliente inadimplente há ${diasAtraso} dias`,
-          `O cliente ${nomeCli} está com ${fmtBRL(Number(m.valor))} em aberto há ${diasAtraso} dias.`);
+          `O cliente ${nomeCli} está com ${fmtBRL(valor)} em aberto há ${diasAtraso} dias (vencimento: ${fmtDate(m.vencimento)}).`);
         if (ok) { await registrar(admin, p.user_id, tipo, m.id); totalEnviados++; }
       }
     }
@@ -180,33 +188,46 @@ Deno.serve(async (req) => {
     }
 
     // Gatilho 1 — Saldo baixo (consulta meta-account-balances)
+    // Só considera contas PRÉ-PAGAS (is_prepaid=true) que possuem saldo real.
+    // Pós-pagas (cartão) não têm saldo disponível, apenas fatura em aberto.
     if (cfg.saldo_baixo) {
-      const limite = Number(cfg.saldo_baixo_limite || 500);
-      try {
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/meta-account-balances`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SERVICE_KEY}` },
-          body: JSON.stringify({ user_id: p.user_id }),
-        });
-        if (res.ok) {
-          const json = await res.json();
-          const accounts = json?.accounts || [];
-          for (const a of accounts) {
-            const saldo = Number(a.balance ?? a.spend_cap_remaining ?? 0);
-            if (saldo >= limite) continue;
-            const refId = a.id || a.account_id || a.name;
-            if (!refId) continue;
-            const tipo = 'saldo_baixo';
-            if (await jaEnviado(admin, p.user_id, tipo, refId)) continue;
-            const nome = a.name || a.account_name || 'Conta';
-            const assunto = `⚠️ Saldo baixo — ${nome}`;
-            const ok = await enviar(email, assunto, '⚠️', 'Saldo abaixo do limite configurado',
-              `A conta ${nome} está com saldo de ${fmtBRL(saldo)}, abaixo do limite de ${fmtBRL(limite)}. Acesse o sistema para tomar uma ação.`);
-            if (ok) { await registrar(admin, p.user_id, tipo, refId); totalEnviados++; }
+      const limite = Number(cfg.saldo_baixo_limite);
+      if (!Number.isFinite(limite) || limite <= 0) {
+        console.log(`[saldo_baixo] user=${p.user_id} limite invalido (${cfg.saldo_baixo_limite}) — pulando`);
+      } else {
+        try {
+          const res = await fetch(`${SUPABASE_URL}/functions/v1/meta-account-balances`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SERVICE_KEY}` },
+            body: JSON.stringify({ user_id: p.user_id }),
+          });
+          if (!res.ok) {
+            const txt = await res.text();
+            console.error(`[saldo_baixo] meta-account-balances ${res.status}: ${txt}`);
+          } else {
+            const json = await res.json();
+            const accounts = json?.accounts || [];
+            console.log(`[saldo_baixo] user=${p.user_id} contas=${accounts.length} limite=${limite}`);
+            for (const a of accounts) {
+              if (a?.error) continue;
+              if (a?.is_prepaid !== true) continue;
+              const saldo = Number(a.available_balance);
+              if (!Number.isFinite(saldo)) continue;
+              if (saldo >= limite) continue;
+              const refId = a.account_id || a.id || a.account_name;
+              if (!refId) continue;
+              const tipo = 'saldo_baixo';
+              if (await jaEnviado(admin, p.user_id, tipo, String(refId))) continue;
+              const nome = a.account_name || a.name || 'Conta';
+              const assunto = `⚠️ Saldo baixo — ${nome}`;
+              const ok = await enviar(email, assunto, '⚠️', 'Saldo abaixo do limite configurado',
+                `A conta ${nome} está com saldo de ${fmtBRL(saldo)}, abaixo do limite de ${fmtBRL(limite)}. Acesse o sistema para tomar uma ação.`);
+              if (ok) { await registrar(admin, p.user_id, tipo, String(refId)); totalEnviados++; }
+            }
           }
+        } catch (e) {
+          console.error('saldo_baixo falhou', e);
         }
-      } catch (e) {
-        console.error('saldo_baixo falhou', e);
       }
     }
   }
