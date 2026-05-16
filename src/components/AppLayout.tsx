@@ -11,6 +11,7 @@ import {
   BookOpen, FileText, MessageSquare, ShieldAlert,
   BarChart3, LogOut, Zap, Menu, X, ListTodo, ChevronDown, Folder, Link2, Sparkles, DollarSign, PanelLeftClose, PanelLeftOpen, Settings
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -38,6 +39,26 @@ const processosSubItems = [
 ];
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar:collapsed';
+const SIDEBAR_ICON_CLASS = 'w-5 h-5 shrink-0';
+const SIDEBAR_ICON_BUTTON_CLASS = 'flex items-center justify-center w-10 h-10 rounded-lg';
+const SIDEBAR_ICON_STROKE_WIDTH = 1.8;
+const iconOpticalAdjustments = new Map<LucideIcon, string>([
+  [Settings, 'translate(0.5px, 0px)'],
+  [Folder, 'translate(0px, -0.5px)'],
+  [LogOut, 'translate(0.5px, 0px)'],
+  [PanelLeftOpen, 'translate(0px, 0.5px)'],
+  [PanelLeftClose, 'translate(0px, 0.5px)'],
+]);
+
+function SidebarIcon({ icon: Icon }: { icon: LucideIcon }) {
+  return (
+    <Icon
+      className={SIDEBAR_ICON_CLASS}
+      strokeWidth={SIDEBAR_ICON_STROKE_WIDTH}
+      style={{ transform: iconOpticalAdjustments.get(Icon) }}
+    />
+  );
+}
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuth();
