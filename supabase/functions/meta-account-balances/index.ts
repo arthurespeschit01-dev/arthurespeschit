@@ -107,12 +107,29 @@ Deno.serve(async (req) => {
     if (!authHeader?.startsWith('Bearer ')) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
     }
-    const supabase = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY')!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData?.user?.id;
-    if (!userId) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+    const token = authHeader.replace('Bearer ', '').trim();
+
+    let userId: string | undefined;
+
+    // Internal call (cron / verificar-notificacoes) authenticated with service role
+    if (token === SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        const body = await req.json();
+        userId = body?.user_id;
+      } catch {
+        // no body
+      }
+      if (!userId) {
+        return new Response(JSON.stringify({ error: 'user_id required for service-role calls' }), { status: 400, headers: corsHeaders });
+      }
+    } else {
+      const supabase = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY')!, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: userData } = await supabase.auth.getUser();
+      userId = userData?.user?.id;
+      if (!userId) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+    }
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
