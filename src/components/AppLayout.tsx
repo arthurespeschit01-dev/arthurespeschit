@@ -79,7 +79,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             )}
           </div>
 
-          <nav className="flex-1 p-3 space-y-1 overflow-y-auto overflow-x-hidden">
+          <nav className={`flex-1 p-3 overflow-y-auto overflow-x-hidden ${collapsed ? 'flex flex-col items-center gap-1' : 'space-y-1'}`}>
             {mainNavItems.map((item) => {
               const isConfig = item.to === '/configuracoes';
               const link = (
@@ -90,17 +90,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   data-tour-id={item.tourId}
                   onClick={() => { if (!collapsed) setSidebarOpen(false); }}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 ${
-                      collapsed ? 'justify-center px-2' : ''
-                    } ${
+                    `${collapsed
+                      ? 'flex items-center justify-center w-10 h-10 rounded-lg'
+                      : 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm'
+                    } transition-all duration-200 ${
                       isActive
                         ? 'bg-primary/15 text-primary font-medium'
                         : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                     }`
                   }
                 >
-                  <item.icon className="w-4 h-4 shrink-0" />
-                  <span className={collapsed ? 'hidden' : ''}>{item.label}</span>
+                  <item.icon className="w-5 h-5 shrink-0" />
+                  {!collapsed && <span>{item.label}</span>}
                 </NavLink>
               );
               const wrapped = collapsed ? (
@@ -110,27 +111,33 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </Tooltip>
               ) : link;
               if (isConfig) {
-                return <div key={item.to} className="pt-6 mt-2 border-t border-sidebar-border">{wrapped}</div>;
+                return (
+                  <div
+                    key={item.to}
+                    className={`${collapsed ? 'w-10 flex justify-center' : ''} pt-6 mt-2 border-t border-sidebar-border`}
+                  >
+                    {wrapped}
+                  </div>
+                );
               }
               return wrapped;
             })}
 
             {/* Processos folder */}
-            <div>
+            <div className={collapsed ? 'w-10 flex justify-center' : ''}>
               {collapsed ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <NavLink
                       to="/processos"
-                      onClick={() => { if (!collapsed) setSidebarOpen(false); }}
                       data-tour-id="nav-processos"
-                      className={`flex items-center gap-3 py-2.5 px-2 rounded-lg text-sm transition-all duration-200 justify-center ${
+                      className={`flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-200 ${
                         processosActive
                           ? 'bg-primary/15 text-primary font-medium'
                           : 'text-primary hover:bg-sidebar-accent hover:text-primary'
                       }`}
                     >
-                      <Folder className="w-4 h-4 shrink-0" />
+                      <Folder className="w-5 h-5 shrink-0" />
                     </NavLink>
                   </TooltipTrigger>
                   <TooltipContent side="right">Processos</TooltipContent>
@@ -145,7 +152,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                   }`}
                 >
-                  <Folder className="w-4 h-4 shrink-0" />
+                  <Folder className="w-5 h-5 shrink-0" />
                   <span className="flex-1 text-left">Processos</span>
                   <ChevronDown className={`w-4 h-4 shrink-0 transition-transform duration-200 ${processosOpen ? 'rotate-180' : ''}`} />
                 </button>
@@ -165,7 +172,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         }`
                       }
                     >
-                      <item.icon className="w-4 h-4 shrink-0" />
+                      <item.icon className="w-5 h-5 shrink-0" />
                       <span>{item.label}</span>
                     </NavLink>
                   ))}
@@ -174,18 +181,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </nav>
 
-          <div className="p-3 border-t border-sidebar-border space-y-1">
+          <div className={`p-3 border-t border-sidebar-border ${collapsed ? 'flex flex-col items-center gap-1' : 'space-y-1'}`}>
             {collapsed ? (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
+                  <button
                     onClick={signOut}
-                    size="icon"
-                    className="w-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    className="flex items-center justify-center w-10 h-10 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-200"
                   >
-                    <LogOut className="w-4 h-4" />
-                  </Button>
+                    <LogOut className="w-5 h-5" />
+                  </button>
                 </TooltipTrigger>
                 <TooltipContent side="right">Sair</TooltipContent>
               </Tooltip>
@@ -195,23 +200,32 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 onClick={signOut}
                 className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="w-5 h-5" />
                 Sair
               </Button>
             )}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  onClick={toggleCollapsed}
-                  size={collapsed ? 'icon' : 'sm'}
-                  className={`flex text-muted-foreground hover:text-foreground ${collapsed ? 'w-full' : 'w-full justify-start gap-3'}`}
-                >
-                  {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <><PanelLeftClose className="w-4 h-4" /> Minimizar</>}
-                </Button>
-              </TooltipTrigger>
-              {collapsed && <TooltipContent side="right">Expandir menu</TooltipContent>}
-            </Tooltip>
+            {collapsed ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={toggleCollapsed}
+                    className="flex items-center justify-center w-10 h-10 rounded-lg text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-all duration-200"
+                  >
+                    <PanelLeftOpen className="w-5 h-5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Expandir menu</TooltipContent>
+              </Tooltip>
+            ) : (
+              <Button
+                variant="ghost"
+                onClick={toggleCollapsed}
+                size="sm"
+                className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
+              >
+                <PanelLeftClose className="w-5 h-5" /> Minimizar
+              </Button>
+            )}
           </div>
         </aside>
 
