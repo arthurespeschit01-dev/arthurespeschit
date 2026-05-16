@@ -112,7 +112,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   onClick={() => { if (!collapsed) setSidebarOpen(false); }}
                   className={({ isActive }) =>
                     `${collapsed
-                      ? 'flex items-center justify-center w-10 h-10 rounded-lg'
+                      ? SIDEBAR_ICON_BUTTON_CLASS
                       : 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm'
                     } transition-all duration-200 ${
                       isActive
@@ -121,7 +121,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     }`
                   }
                 >
-                  <item.icon className="w-5 h-5 shrink-0" />
+                  <SidebarIcon icon={item.icon} />
                   {!collapsed && <span>{item.label}</span>}
                 </NavLink>
               );
@@ -152,13 +152,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     <NavLink
                       to="/processos"
                       data-tour-id="nav-processos"
-                      className={`flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-200 ${
+                      className={`${SIDEBAR_ICON_BUTTON_CLASS} transition-all duration-200 ${
                         processosActive
                           ? 'bg-primary/15 text-primary font-medium'
                           : 'text-primary hover:bg-sidebar-accent hover:text-primary'
                       }`}
                     >
-                      <Folder className="w-5 h-5 shrink-0" />
+                      <SidebarIcon icon={Folder} />
                     </NavLink>
                   </TooltipTrigger>
                   <TooltipContent side="right">Processos</TooltipContent>
@@ -173,9 +173,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                   }`}
                 >
-                  <Folder className="w-5 h-5 shrink-0" />
+                  <SidebarIcon icon={Folder} />
                   <span className="flex-1 text-left">Processos</span>
-                  <ChevronDown className={`w-4 h-4 shrink-0 transition-transform duration-200 ${processosOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-4 h-4 shrink-0 transition-transform duration-200 ${processosOpen ? 'rotate-180' : ''}`} strokeWidth={SIDEBAR_ICON_STROKE_WIDTH} />
                 </button>
               )}
               {processosOpen && !collapsed && (
@@ -193,7 +193,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         }`
                       }
                     >
-                      <item.icon className="w-5 h-5 shrink-0" />
+                      <SidebarIcon icon={item.icon} />
                       <span>{item.label}</span>
                     </NavLink>
                   ))}
