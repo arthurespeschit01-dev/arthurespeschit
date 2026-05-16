@@ -1,38 +1,19 @@
-## Objetivo
+## Problema
 
-Garantir que `lucasmafia27@gmail.com` tenha exatamente o mesmo tratamento de `arthurespeschit01@gmail.com`: nunca passa por verificação de assinatura, nunca vê tela de "Verificando assinatura...", nunca é redirecionado para checkout/bloqueado.
+No menu lateral recolhido, o ícone da pasta (Processos) aparece deslocado para a esquerda em relação ao ícone de engrenagem (Configurações).
 
-## Diagnóstico
+## Causa
 
-O e-mail já está em `ALWAYS_ALLOWED_EMAILS` (`src/lib/checkAccess.ts`) e o bypass funciona dentro de `checkAccess`. Porém, três pontos ainda fazem o usuário sentir "verificação":
+Em `src/components/AppLayout.tsx` (linha ~135), o ícone `Folder` da pasta Processos tem a classe `-translate-x-0.5`, que empurra o ícone 2px para a esquerda. Os demais itens do menu não têm esse deslocamento, então a pasta fica visualmente desalinhada.
 
-1. **`AuthCallback.tsx`** — sempre mostra o spinner "Verificando assinatura..." e chama `checkAccess` (mesmo que retorne instantâneo, há um `getSession` + `setTimeout(800ms)` antes).
-2. **`AuthContext.gateSession`** — chama `checkAccess` no `INITIAL_SESSION` antes de liberar o app. Para e-mails whitelisted, isso é trabalho desnecessário e pode atrasar o render.
-3. **`Bloqueado.tsx` (handleCheckPayment)** — bate direto no endpoint sem checar a whitelist; se o usuário whitelisted cair lá por qualquer motivo, ainda fica "Verificando…".
-4. **Cache negativo antigo em `sessionStorage`** — se o e-mail tiver um registro `access:false` anterior à introdução da whitelist, ele é ignorado por `isAlwaysAllowed` mas só é limpo quando `checkAccess` é chamado. Vale limpar de forma proativa no boot.
+Além disso, o novo wrapper que adicionei para Configurações (`<div className="pt-6 mt-2 border-t ...">`) envolve apenas o link, enquanto Processos não está dentro de um wrapper equivalente — isso pode causar uma diferença sutil de alinhamento horizontal por causa do padding/borda.
 
 ## Mudanças
 
-### 1. `src/pages/AuthCallback.tsx`
-- Antes de qualquer `checkAccess`, ler o e-mail da sessão e, se `isAlwaysAllowed(email)`, redirecionar imediatamente para `https://www.centraldogestor.site` (mesmo destino do fluxo de sucesso).
-- Mantém o restante do fluxo igual para os demais usuários.
+Em `src/components/AppLayout.tsx`:
 
-### 2. `src/contexts/AuthContext.tsx`
-- Em `gateSession`, se `isAlwaysAllowed(session.user.email)`, devolver a sessão sem chamar `checkAccess`.
-- Em `signIn`, se `isAlwaysAllowed(email)`, pular o `checkAccess` pós-login.
+1. Remover `-translate-x-0.5` da classe do ícone `Folder` no modo collapsed para que ele use o mesmo alinhamento dos outros ícones.
+2. Garantir que o NavLink colapsado da pasta Processos use exatamente as mesmas classes de alinhamento do NavLink de Configurações (mesmo `px`, mesmo `justify-center`, mesmo tamanho de ícone `w-4 h-4`).
+3. Manter a linha separadora/espaçamento que já foi adicionada, aplicada de forma consistente tanto para Configurações quanto para Processos (ambos no mesmo bloco com `border-t` no topo), garantindo que o eixo X dos dois ícones fique idêntico.
 
-### 3. `src/pages/Bloqueado.tsx`
-- No `useEffect` inicial: se o e-mail do usuário for `isAlwaysAllowed`, redirecionar para `/` automaticamente (fail-safe caso ele caia aqui por engano).
-- Em `handleCheckPayment`, se whitelisted, ir direto para `/` sem fetch.
-
-### 4. `src/hooks/useAccessCheck.ts`
-- Já usa `getCachedAccess` que respeita a whitelist; adicionar early-return explícito no topo para `isAlwaysAllowed(user.email)` (zero trabalho, zero rede).
-
-### 5. `src/lib/checkAccess.ts`
-- Exportar uma função `clearAccessCache(email)` e chamá-la para os e-mails whitelisted no boot do `AuthContext` (limpa qualquer `access:false` antigo persistido em `sessionStorage`).
-
-## Resultado esperado
-
-- Login com Google em `lucasmafia27@gmail.com` → spinner curtíssimo (só o tempo do OAuth) → entra no app sem nenhuma chamada ao backend de assinatura.
-- Mesmo comportamento idêntico ao do `arthurespeschit01@gmail.com`.
-- Nenhum impacto para os demais usuários (todo o fluxo de verificação real continua intacto).
+Resultado: os dois ícones (engrenagem e pasta) ficam perfeitamente centralizados na mesma coluna vertical da sidebar recolhida.
