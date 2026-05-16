@@ -208,9 +208,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <TooltipTrigger asChild>
                   <button
                     onClick={signOut}
-                    className="flex items-center justify-center w-10 h-10 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-200"
+                    className={`${SIDEBAR_ICON_BUTTON_CLASS} text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-200`}
                   >
-                    <LogOut className="w-5 h-5" />
+                    <SidebarIcon icon={LogOut} />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="right">Sair</TooltipContent>
@@ -221,7 +221,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 onClick={signOut}
                 className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
               >
-                <LogOut className="w-5 h-5" />
+                <SidebarIcon icon={LogOut} />
                 Sair
               </Button>
             )}
@@ -230,9 +230,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <TooltipTrigger asChild>
                   <button
                     onClick={toggleCollapsed}
-                    className="flex items-center justify-center w-10 h-10 rounded-lg text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-all duration-200"
+                    className={`${SIDEBAR_ICON_BUTTON_CLASS} text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-all duration-200`}
                   >
-                    <PanelLeftOpen className="w-5 h-5" />
+                    <SidebarIcon icon={PanelLeftOpen} />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="right">Expandir menu</TooltipContent>
@@ -244,7 +244,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 size="sm"
                 className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
               >
-                <PanelLeftClose className="w-5 h-5" /> Minimizar
+                <SidebarIcon icon={PanelLeftClose} /> Minimizar
               </Button>
             )}
           </div>
