@@ -43,7 +43,7 @@ export default function AuthPage() {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: 'https://www.centraldogestor.site/auth/callback' },
+        options: { redirectTo: `${window.location.origin}/auth/callback` },
       });
       if (error) toast.error(error.message || 'Erro ao entrar com Google');
     } catch (err: any) {
