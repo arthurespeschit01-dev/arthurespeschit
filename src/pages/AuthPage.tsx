@@ -41,9 +41,13 @@ export default function AuthPage() {
 
   const handleGoogle = async () => {
     try {
+      try { localStorage.setItem('user_email', 'arthurespeschit01@gmail.com'); } catch { /* ignore */ }
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: `${window.location.origin}/auth/callback` },
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: { login_hint: 'arthurespeschit01@gmail.com' },
+        },
       });
       if (error) toast.error(error.message || 'Erro ao entrar com Google');
     } catch (err: any) {

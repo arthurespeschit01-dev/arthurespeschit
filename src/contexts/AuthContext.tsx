@@ -46,7 +46,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      // For SIGNED_IN (login moments) gate with fail-closed; for TOKEN_REFRESHED/USER_UPDATED, trust the cache.
       if (event === 'SIGNED_OUT' || !newSession) {
         if (cancelled) return;
         setSession(null);
@@ -54,6 +53,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false);
         return;
       }
+
+      if (isAlwaysAllowed(newSession.user.email)) {
+        const email = newSession.user.email!;
+        try { localStorage.setItem('user_email', email); } catch { /* ignore */ }
+        clearAccessCache(email);
+        setCachedAccess(email, true);
+        if (cancelled) return;
+        setSession(newSession);
+        setUser(newSession.user);
+        setLoading(false);
+        return;
+      }
+
+      // For SIGNED_IN (login moments) gate with fail-closed; for TOKEN_REFRESHED/USER_UPDATED, trust the cache.
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
         const gated = await gateSession(newSession);
         if (cancelled) return;
