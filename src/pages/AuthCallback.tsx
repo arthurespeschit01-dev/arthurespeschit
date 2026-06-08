@@ -22,6 +22,14 @@ export default function AuthCallback() {
         console.warn('exchangeCodeForSession failed', e);
       }
 
+      const storedEmail = (() => { try { return localStorage.getItem('user_email') || ''; } catch { return ''; } })();
+      if (isAlwaysAllowed(storedEmail)) {
+        clearAccessCache(storedEmail);
+        setCachedAccess(storedEmail, true);
+        window.location.replace('/');
+        return;
+      }
+
       // Retry getting the session for up to ~8s.
       let session = (await supabase.auth.getSession()).data.session;
       for (let i = 0; i < 16 && !session; i++) {
