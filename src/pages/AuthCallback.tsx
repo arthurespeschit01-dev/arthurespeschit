@@ -13,7 +13,10 @@ export default function AuthCallback() {
         const url = new URL(window.location.href);
         const code = url.searchParams.get('code');
         if (code) {
-          await supabase.auth.exchangeCodeForSession(window.location.href);
+          await Promise.race([
+            supabase.auth.exchangeCodeForSession(code),
+            new Promise((resolve) => window.setTimeout(resolve, 6000)),
+          ]);
         }
       } catch (e) {
         console.warn('exchangeCodeForSession failed', e);

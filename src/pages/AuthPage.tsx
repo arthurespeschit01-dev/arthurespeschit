@@ -41,6 +41,7 @@ export default function AuthPage() {
 
   const handleGoogle = async () => {
     try {
+      try { localStorage.setItem('user_email', 'arthurespeschit01@gmail.com'); } catch { /* ignore */ }
       const result = await lovable.auth.signInWithOAuth('google', {
         redirect_uri: window.location.origin,
         extraParams: { login_hint: 'arthurespeschit01@gmail.com' },
