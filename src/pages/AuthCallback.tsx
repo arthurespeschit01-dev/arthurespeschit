@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { checkAccess, CHECKOUT_URL, isAlwaysAllowed, setCachedAccess, clearAccessCache } from '@/lib/checkAccess';
+import { isAlwaysAllowed, setCachedAccess, clearAccessCache } from '@/lib/checkAccess';
 
 export default function AuthCallback() {
   useEffect(() => {
@@ -46,16 +46,6 @@ export default function AuthCallback() {
         return;
       }
 
-      const result = await checkAccess(session.user.email, { failClosed: true });
-      if (cancelled) return;
-
-      if (!result.access) {
-        try { await supabase.auth.signOut(); } catch { /* ignore */ }
-        toast.error('Sua assinatura não está ativa. Redirecionando para o checkout...');
-        window.location.href = CHECKOUT_URL;
-        return;
-      }
-
       window.location.replace('/');
     };
 
@@ -70,7 +60,7 @@ export default function AuthCallback() {
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="text-center space-y-3">
         <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-        <p className="text-sm text-muted-foreground">Verificando assinatura...</p>
+        <p className="text-sm text-muted-foreground">Concluindo login...</p>
       </div>
     </div>
   );

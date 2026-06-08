@@ -4,7 +4,7 @@ import { motion, useMotionValue, useTransform } from 'framer-motion';
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import logoCentralGestor from '@/assets/logo-central-gestor.png';
-import { supabase } from '@/lib/supabase';
+import { lovable } from '@/integrations/lovable';
 
 export default function AuthPage() {
   const { signIn } = useAuth();
@@ -41,11 +41,15 @@ export default function AuthPage() {
 
   const handleGoogle = async () => {
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: `${window.location.origin}/auth/callback` },
+      const result = await lovable.auth.signInWithOAuth('google', {
+        redirect_uri: window.location.origin,
+        extraParams: { login_hint: 'arthurespeschit01@gmail.com' },
       });
-      if (error) toast.error(error.message || 'Erro ao entrar com Google');
+      if (result.error) {
+        toast.error(result.error.message || 'Erro ao entrar com Google');
+        return;
+      }
+      if (!result.redirected) window.location.replace('/');
     } catch (err: any) {
       toast.error(err.message || 'Erro ao entrar com Google');
     }
