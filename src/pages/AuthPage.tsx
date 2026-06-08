@@ -4,7 +4,7 @@ import { motion, useMotionValue, useTransform } from 'framer-motion';
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import logoCentralGestor from '@/assets/logo-central-gestor.png';
-import { lovable } from '@/integrations/lovable';
+import { supabase } from '@/lib/supabase';
 
 export default function AuthPage() {
   const { signIn } = useAuth();
@@ -42,15 +42,14 @@ export default function AuthPage() {
   const handleGoogle = async () => {
     try {
       try { localStorage.setItem('user_email', 'arthurespeschit01@gmail.com'); } catch { /* ignore */ }
-      const result = await lovable.auth.signInWithOAuth('google', {
-        redirect_uri: window.location.origin,
-        extraParams: { login_hint: 'arthurespeschit01@gmail.com' },
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: { login_hint: 'arthurespeschit01@gmail.com' },
+        },
       });
-      if (result.error) {
-        toast.error(result.error.message || 'Erro ao entrar com Google');
-        return;
-      }
-      if (!result.redirected) window.location.replace('/');
+      if (error) toast.error(error.message || 'Erro ao entrar com Google');
     } catch (err: any) {
       toast.error(err.message || 'Erro ao entrar com Google');
     }
