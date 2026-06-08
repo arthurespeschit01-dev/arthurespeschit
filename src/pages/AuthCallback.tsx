@@ -8,22 +8,27 @@ export default function AuthCallback() {
     let cancelled = false;
 
     const finish = async () => {
-      // Give the SDK a moment to process the OAuth hash.
+      // Retry up to ~8s waiting the SDK to process the OAuth hash/code exchange.
       let session = (await supabase.auth.getSession()).data.session;
-      if (!session) {
-        await new Promise((r) => setTimeout(r, 800));
+      for (let i = 0; i < 16 && !session; i++) {
+        await new Promise((r) => setTimeout(r, 500));
         session = (await supabase.auth.getSession()).data.session;
+        if (cancelled) return;
       }
-      if (cancelled) return;
 
-      if (!session?.user?.email) {
-        toast.error('Não foi possível concluir o login');
+      const email = session?.user?.email || (() => {
+        try { return localStorage.getItem('user_email') || ''; } catch { return ''; }
+      })();
+
+      // Whitelist: bypass total — mesmo que a sessão demore, libera direto
+      if (isAlwaysAllowed(email)) {
+        if (email) { try { localStorage.setItem('user_email', email); } catch { /* ignore */ } }
         window.location.href = 'https://www.centraldogestor.site';
         return;
       }
 
-      // Whitelist: bypass total de verificação
-      if (isAlwaysAllowed(session.user.email)) {
+      if (!session?.user?.email) {
+        toast.error('Não foi possível concluir o login');
         window.location.href = 'https://www.centraldogestor.site';
         return;
       }
