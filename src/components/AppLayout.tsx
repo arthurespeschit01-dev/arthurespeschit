@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import NotificationBar from '@/components/NotificationBar';
 import SupportFAB from '@/components/SupportFAB';
@@ -9,7 +9,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ClipboardList,
   BookOpen, FileText, MessageSquare, ShieldAlert,
-  BarChart3, LogOut, Zap, Menu, X, ListTodo, ChevronDown, Folder, Link2, Sparkles, DollarSign, PanelLeftClose, PanelLeftOpen, Settings
+  BarChart3, LogOut, Zap, Menu, X, ListTodo, ChevronDown, Folder, Link2, DollarSign, PanelLeftClose, PanelLeftOpen, Settings
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -20,15 +20,20 @@ import logoCentralGestor from '@/assets/logo-central-gestor.png';
 const mainNavItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, tourId: 'nav-dashboard' },
   { to: '/clientes', label: 'Clientes', icon: Users, tourId: 'nav-clientes' },
-  { to: '/relatorios', label: 'Relatórios ', icon: FileText, tourId: 'nav-relatorios' },
-  { to: '/tasks', label: 'Tarefas', icon: ListTodo, tourId: 'nav-tarefas' },
   { to: '/financeiro', label: 'Financeiro', icon: DollarSign, tourId: 'nav-financeiro' },
   // { to: '/planilha', label: 'Planilha', icon: BarChart3 },
   { to: '/planilha-teste', label: 'Planilha de acompanhamento', icon: BarChart3, tourId: 'nav-planilha' },
   { to: '/contratos', label: 'Contratos', icon: FileText, tourId: 'nav-contratos' },
-  { to: '/estrategias', label: 'Geração de Estratégia', icon: Sparkles, tourId: 'nav-estrategia' },
   { to: '/utm', label: 'Gerador de UTMs', icon: Link2, tourId: 'nav-utms' },
   { to: '/configuracoes', label: 'Configurações', icon: Settings, tourId: 'nav-config' },
+];
+
+const operacoesSubItems = [
+  { to: '/chamados', label: 'Chamados', icon: MessageSquare },
+  { to: '/comercial', label: 'Comercial', icon: Users },
+  { to: '/relatorios', label: 'Relatórios', icon: FileText },
+  { to: '/tasks', label: 'Tarefas', icon: ListTodo },
+  { to: '/operacao', label: 'Onboarding e execução', icon: ClipboardList },
 ];
 
 const processosSubItems = [
@@ -68,19 +73,45 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (typeof window === 'undefined') return false;
     return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1';
   });
-  const [processosOpen, setProcessosOpen] = useState(false);
+  const [processosOpen, setProcessosOpen] = useState(() => processosSubItems.some(item => pathname === item.to));
+  const [operacoesOpen, setOperacoesOpen] = useState(() => operacoesSubItems.some(item => pathname === item.to));
+  useEffect(() => {
+    if (operacoesSubItems.some(item => item.to === pathname)) setOperacoesOpen(true);
+    if (processosSubItems.some(item => item.to === pathname)) setProcessosOpen(true);
+  }, [pathname]);
 
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
       const next = !prev;
       try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? '1' : '0'); } catch {}
-      if (next) setProcessosOpen(false);
+      if (next) { setProcessosOpen(false); setOperacoesOpen(false); }
       return next;
     });
   };
 
+  const renderNavGroup = (group: { name: string; id: string; items: typeof processosSubItems; open: boolean; setOpen: (open: boolean) => void }) => {
+              const active = group.items.some(item => pathname === item.to);
+              return <div key={group.id} className={collapsed ? 'w-10 flex justify-center' : ''}>
+                <button
+                  aria-label={group.name}
+                  aria-expanded={!collapsed && group.open}
+                  aria-controls={`nav-${group.id}-items`}
+                  data-tour-id={`nav-${group.id}`}
+                  onClick={() => { if (collapsed) { setCollapsed(false); try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, '0'); } catch {} group.setOpen(true); } else group.setOpen(!group.open); }}
+                  className={`${collapsed ? SIDEBAR_ICON_BUTTON_CLASS : 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm w-full'} transition-all duration-200 ${active ? 'bg-primary/15 text-primary font-medium' : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`}
+                >
+                  <SidebarIcon icon={Folder} />
+                  {!collapsed && <><span className="flex-1 text-left">{group.name}</span><ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${group.open ? 'rotate-180' : ''}`} /></>}
+                </button>
+                {group.open && !collapsed && <div id={`nav-${group.id}-items`} className="ml-3 pl-3 border-l border-sidebar-border space-y-0.5 mt-0.5">
+                  {group.items.map(item => <NavLink key={item.to} to={item.to} onClick={() => setSidebarOpen(false)} className={({isActive}) => `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${isActive ? 'bg-primary/15 text-primary font-medium' : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`}><SidebarIcon icon={item.icon} /><span>{item.label}</span></NavLink>)}
+                </div>}
+              </div>;
+
+  };
+
   const asideWidth = collapsed ? 'lg:w-16' : 'lg:w-64';
-  const processosActive = processosSubItems.some((item) => pathname === item.to);
+
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -141,65 +172,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </div>
                 );
               }
-              return wrapped;
+              return item.to === '/clientes' ? <div key={item.to}>{wrapped}{renderNavGroup({ name: 'Operações', id: 'operacoes', items: operacoesSubItems, open: operacoesOpen, setOpen: setOperacoesOpen })}</div> : wrapped;
             })}
 
-            {/* Processos folder */}
-            <div className={collapsed ? 'w-10 flex justify-center' : ''}>
-              {collapsed ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <NavLink
-                      to="/processos"
-                      data-tour-id="nav-processos"
-                      className={`${SIDEBAR_ICON_BUTTON_CLASS} transition-all duration-200 ${
-                        processosActive
-                          ? 'bg-primary/15 text-primary font-medium'
-                          : 'text-primary hover:bg-sidebar-accent hover:text-primary'
-                      }`}
-                    >
-                      <SidebarIcon icon={Folder} />
-                    </NavLink>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">Processos</TooltipContent>
-                </Tooltip>
-              ) : (
-                <button
-                  onClick={() => setProcessosOpen(!processosOpen)}
-                  data-tour-id="nav-processos"
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 w-full ${
-                    processosActive
-                      ? 'bg-primary/15 text-primary font-medium'
-                      : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                  }`}
-                >
-                  <SidebarIcon icon={Folder} />
-                  <span className="flex-1 text-left">Processos</span>
-                  <ChevronDown className={`w-4 h-4 shrink-0 transition-transform duration-200 ${processosOpen ? 'rotate-180' : ''}`} strokeWidth={SIDEBAR_ICON_STROKE_WIDTH} />
-                </button>
-              )}
-              {processosOpen && !collapsed && (
-                <div className="ml-3 pl-3 border-l border-sidebar-border space-y-0.5 mt-0.5">
-                  {processosSubItems.map((item) => (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      onClick={() => setSidebarOpen(false)}
-                      className={({ isActive }) =>
-                        `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
-                          isActive
-                            ? 'bg-primary/15 text-primary font-medium'
-                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                        }`
-                      }
-                    >
-                      <SidebarIcon icon={item.icon} />
-                      <span>{item.label}</span>
-                    </NavLink>
-                  ))}
-                </div>
-              )}
-            </div>
+            {renderNavGroup({ name: 'Processos', id: 'processos', items: processosSubItems, open: processosOpen, setOpen: setProcessosOpen })}
           </nav>
 
           <div className={`p-3 border-t border-sidebar-border ${collapsed ? 'flex flex-col items-center gap-1' : 'space-y-1'}`}>

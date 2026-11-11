@@ -1,3 +1,5 @@
+import ClientStatusFilter from '@/components/ClientStatusFilter';
+import { matchesClientStatus, type ClientStatusFilter as StatusFilter } from '@/lib/clientStatus';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -40,6 +42,8 @@ export default function Clientes() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [clients, setClients] = useState<Client[]>([]);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('Ativo');
+  const visibleClients = clients.filter(c => matchesClientStatus(c, statusFilter));
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<'meta' | 'select-account' | 'form'>('meta');
   const [balanceAccounts, setBalanceAccounts] = useState<AccountBalance[]>([]);
@@ -50,7 +54,7 @@ export default function Clientes() {
   const [selectedAdAccountId, setSelectedAdAccountId] = useState<string>('');
   const [confirmingAccount, setConfirmingAccount] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Client | null>(null);
-  const { accounts: preloadedBalanceAccounts } = useAccountBalancesCount();
+  const { accounts: preloadedBalanceAccounts, refresh: refreshBalances } = useAccountBalancesCount();
 
   useEffect(() => {
     setBalanceAccounts(preloadedBalanceAccounts);
@@ -241,7 +245,8 @@ export default function Clientes() {
       phone: form.phone,
     };
     if (editing) {
-      await supabase.from('clients').update(payload).eq('id', editing.id);
+      const { error } = await supabase.from('clients').update(payload).eq('id', editing.id);
+      if (error) { toast.error('Falha ao atualizar cliente'); return; }
       toast.success('Cliente atualizado!');
     } else {
       const { data: inserted, error: insErr } = await supabase
@@ -262,11 +267,13 @@ export default function Clientes() {
       }
     }
     setOpen(false);
+    void refreshBalances();
     load();
   };
 
   const remove = async (id: string) => {
-    await supabase.from('clients').delete().eq('id', id);
+    const { error } = await supabase.from('clients').delete().eq('id', id);
+    if (error) { toast.error('Não foi possível excluir. Clientes com histórico devem ser encerrados pelo status.'); return; }
     toast.success('Cliente removido!');
     load();
   };
@@ -295,9 +302,11 @@ export default function Clientes() {
         </div>
       </div>
 
+      <ClientStatusFilter value={statusFilter} onChange={setStatusFilter} />
+
       {/* MOBILE: cards empilhados */}
       <div className="lg:hidden space-y-3">
-        {clients.map((c) => (
+        {visibleClients.map((c) => (
           <div
             key={c.id}
             onClick={() => navigate(`/clientes/${c.id}`)}
@@ -337,7 +346,7 @@ export default function Clientes() {
             </div>
           </div>
         ))}
-        {clients.length === 0 && (
+        {visibleClients.length === 0 && (
           <div className="glass-surface rounded-xl text-center py-12 text-muted-foreground text-sm px-4">
             Nenhum cliente cadastrado. Toque em "Novo Cliente" para começar.
           </div>
@@ -355,7 +364,7 @@ export default function Clientes() {
           <div>Status</div>
           <div className="w-16"></div>
         </div>
-        {clients.map((c) => (
+        {visibleClients.map((c) => (
           <div
             key={c.id}
             onClick={() => navigate(`/clientes/${c.id}`)}
@@ -384,7 +393,7 @@ export default function Clientes() {
             </div>
           </div>
         ))}
-        {clients.length === 0 && (
+        {visibleClients.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">
             Nenhum cliente cadastrado. Clique em "Novo Cliente" para começar.
           </div>

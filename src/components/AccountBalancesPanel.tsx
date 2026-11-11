@@ -58,6 +58,15 @@ const STATUS_CONFIG = {
   error:    { label: 'Erro / Inativa',     icon: AlertCircle,   color: 'bg-red-500/10 text-red-400 border-red-500/30',             dot: 'bg-red-500',     emoji: '🔴', order: 0 },
 };
 
+async function loadActiveBalances() {
+  const { data: clients, error: clientsError } = await supabase.from('clients').select('id').eq('status', 'Ativo');
+  if (clientsError) return { data: null, error: clientsError };
+  const { data, error } = await supabase.functions.invoke('meta-account-balances', { body: {} });
+  if (error) return { data: null, error };
+  const active = new Set((clients || []).map(c => c.id));
+  return { data: { accounts: ((data?.accounts || []) as AccountBalance[]).filter(a => active.has(a.client_id)) }, error: null };
+}
+
 /** Hook leve para somente contar contas problemáticas (badge) */
 export function useAccountBalancesCount() {
   const [problemCount, setProblemCount] = useState(0);
@@ -66,7 +75,7 @@ export function useAccountBalancesCount() {
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase.functions.invoke('meta-account-balances', { body: {} });
+    const { data, error } = await loadActiveBalances();
     setLoading(false);
     if (error) return;
     const list: AccountBalance[] = data?.accounts || [];
@@ -99,7 +108,7 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
   const [actionStatus, setActionStatus] = useState<BalanceStatus | null>(null);
 
   useEffect(() => {
-    if (initialAccounts && initialAccounts.length) {
+    if (initialAccounts) {
       setAccounts(initialAccounts);
       setHasLoaded(true);
     }
@@ -107,7 +116,7 @@ export default function AccountBalancesPanel({ defaultOpen = false, initialAccou
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase.functions.invoke('meta-account-balances', { body: {} });
+    const { data, error } = await loadActiveBalances();
     setLoading(false);
     if (error) {
       toast.error('Falha ao carregar saldos');

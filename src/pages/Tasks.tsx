@@ -145,6 +145,7 @@ function addRecurrence(
 interface Client {
   id: string;
   name: string;
+  status: string | null;
 }
 
 interface Attachment {
@@ -203,7 +204,7 @@ export default function Tasks() {
     if (!user) return;
     const [tasksRes, clientsRes, attachRes, commentsRes] = await Promise.all([
       supabase.from('operational_tasks').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-      supabase.from('clients').select('id, name').eq('user_id', user.id).order('name'),
+      supabase.from('clients').select('id, name, status').eq('user_id', user.id).order('name'),
       supabase.from('task_attachments').select('*').eq('user_id', user.id),
       supabase.from('task_comments').select('*').eq('user_id', user.id).order('created_at', { ascending: true }),
     ]);
@@ -833,7 +834,7 @@ export default function Tasks() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Sem cliente</SelectItem>
-                  {clients.map(c => (
+                  {clients.filter(c => c.status === 'Ativo' || c.id === form.client_id).map(c => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>

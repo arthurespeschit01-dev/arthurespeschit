@@ -10,7 +10,10 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:db": "node tests/pipelines-db.mjs && node tests/legacy-data-db.mjs",
+    "test:browser": "node tests/agency-browser.mjs",
+    "test:edge": "deno test --allow-env supabase/functions/agency-portal/index_test.ts supabase/functions/agency-calendar/index_test.ts supabase/functions/agency-whatsapp/index_test.ts"
   },
   "dependencies": {
     "@lovable.dev/cloud-auth-js": "^1.1.2",
@@ -55,6 +58,7 @@
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.3.14",
     "@eslint/js": "^9.32.0",
     "@tailwindcss/typography": "^0.5.19",
     "@testing-library/jest-dom": "^6.6.0",
@@ -70,6 +74,7 @@
     "globals": "^15.15.0",
     "jsdom": "^20.0.3",
     "lovable-tagger": "^1.1.13",
+    "playwright": "1.56.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",

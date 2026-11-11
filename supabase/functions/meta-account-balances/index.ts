@@ -143,7 +143,8 @@ Deno.serve(async (req) => {
     // Mapeia client_id -> { nome, BM cadastrada manualmente }
     const clientIds = [...new Set(connections.map(c => c.client_id))];
     const { data: clientsData } = await admin.from('clients')
-      .select('id, name, account_ids').in('id', clientIds);
+      .select('id, name, account_ids').eq('user_id', userId).eq('status', 'Ativo').in('id', clientIds);
+    const activeClientIds = new Set((clientsData || []).map(c => c.id));
     const clientName = new Map((clientsData || []).map((c: any) => [c.id, c.name]));
     // BM (Business Manager) cadastrada manualmente no cliente — fallback quando
     // a Meta não retorna `business.id` (ex.: contas pessoais ou tokens com
@@ -155,7 +156,7 @@ Deno.serve(async (req) => {
       }),
     );
 
-    const results = await Promise.all(connections.map(async (c) => {
+    const results = await Promise.all(connections.filter(c => activeClientIds.has(c.client_id)).map(async (c) => {
       try {
         const adAccountId = String(c.selected_ad_account_id).startsWith('act_')
           ? c.selected_ad_account_id

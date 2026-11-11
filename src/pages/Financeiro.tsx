@@ -1,3 +1,5 @@
+import ClientStatusFilter from '@/components/ClientStatusFilter';
+import { isActiveClient, matchesClientStatus, type ClientStatusFilter as StatusFilter } from '@/lib/clientStatus';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -45,6 +47,9 @@ export default function Financeiro() {
   const [clients, setClients] = useState<Client[]>([]);
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
   const [mensalidades, setMensalidades] = useState<Mensalidade[]>([]);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('Ativo');
+  const visibleClients = clients.filter(c => matchesClientStatus(c, statusFilter));
+  const visibleClientIds = new Set(visibleClients.map(c => c.id));
   const [loading, setLoading] = useState(true);
 
   const periodoStart = useMemo(() => new Date(ano, mes, 1).toISOString().slice(0, 10), [mes, ano]);
@@ -72,8 +77,7 @@ export default function Financeiro() {
     const have = new Set(existing.map(m => m.cliente_id));
     const toCreate = cls
       .filter(c => {
-        const st = (c.status ?? '').toLowerCase();
-        const ativo = st === '' || st === 'ativo';
+        const ativo = isActiveClient(c);
         return ativo && c.monthly_fee && c.monthly_fee > 0 && !have.has(c.id);
       })
       .map(c => {
@@ -123,7 +127,7 @@ export default function Financeiro() {
 
   // Rentabilidade por cliente
   const rentabilidade = useMemo(() => {
-    return clients.map(c => {
+    return clients.filter(c => matchesClientStatus(c, statusFilter)).map(c => {
       const recM = mensalidades.filter(m => m.cliente_id === c.id && m.status === 'pago').reduce((s, m) => s + Number(m.valor), 0);
       const recA = transacoes.filter(t => t.tipo === 'entrada' && t.cliente_id === c.id).reduce((s, t) => s + Number(t.valor), 0);
       const receita = recM + recA;
@@ -132,7 +136,7 @@ export default function Financeiro() {
       const marg = receita > 0 ? (lucro / receita) * 100 : 0;
       return { client: c, receita, custo, lucro, margem: marg };
     });
-  }, [clients, transacoes, mensalidades]);
+  }, [clients, transacoes, mensalidades, statusFilter]);
 
   const clientesBaixaMargem = rentabilidade.filter(r => r.margem < 20);
 
@@ -335,6 +339,8 @@ export default function Financeiro() {
         </div>
       </div>
 
+      <ClientStatusFilter value={statusFilter} onChange={setStatusFilter} />
+      <p className="text-xs text-muted-foreground">O filtro organiza as listas de clientes. Totais e lançamentos preservam todo o histórico financeiro, inclusive pendências de clientes pausados ou encerrados.</p>
       <Tabs defaultValue="visao" className="space-y-6">
         <TabsList className="bg-secondary/50">
           <TabsTrigger value="visao">Visão Geral</TabsTrigger>
@@ -375,8 +381,8 @@ export default function Financeiro() {
                   <tr><th className="text-left p-3">Cliente</th><th className="text-left p-3">Mensalidade</th><th className="text-left p-3">Vencimento</th><th className="text-left p-3">Status</th><th className="text-right p-3">Ação</th></tr>
                 </thead>
                 <tbody>
-                  {mensalidades.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Nenhuma mensalidade no período</td></tr>}
-                  {mensalidades.sort((a,b) => a.vencimento.localeCompare(b.vencimento)).map(m => {
+                  {!mensalidades.some(m => statusFilter === 'Todos' || visibleClientIds.has(m.cliente_id)) && <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Nenhuma mensalidade no período</td></tr>}
+                  {mensalidades.filter(m => statusFilter === 'Todos' || visibleClientIds.has(m.cliente_id)).sort((a,b) => a.vencimento.localeCompare(b.vencimento)).map(m => {
                     const c = clients.find(x => x.id === m.cliente_id);
                     return (
                       <tr key={m.id} className="border-t border-border/50">
@@ -472,7 +478,7 @@ export default function Financeiro() {
                     <SelectTrigger><SelectValue placeholder="Sem vínculo" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Sem vínculo</SelectItem>
-                      {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                      {visibleClients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -500,7 +506,7 @@ export default function Financeiro() {
                       <SelectTrigger><SelectValue placeholder="Custo fixo" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">Custo fixo (sem cliente)</SelectItem>
-                        {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                        {visibleClients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
@@ -531,7 +537,7 @@ export default function Financeiro() {
                   <SelectContent>
                     <SelectItem value="todos">Todos os clientes</SelectItem>
                     <SelectItem value="sem">Sem vínculo</SelectItem>
-                    {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    {visibleClients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
