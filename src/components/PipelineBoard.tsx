@@ -1,3 +1,4 @@
+import WhatsAppConversation from "@/components/WhatsAppConversation";
 import { readAllRows } from "@/lib/readAllRows";
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -111,7 +112,7 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
     setLoading(false);
     if (error) {
       setLoadError(
-        "Não foi possível carregar as pipelines. Verifique a conexão e se a atualização do banco foi aplicada.",
+        "Não foi possível carregar suas pipelines. Tente atualizar o quadro.",
       );
       return;
     }
@@ -123,9 +124,24 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
     setSelected((current) =>
       p.data.some((x) => x.id === current) ? current : p.data[0]?.id || "",
     );
+    return c.data;
   }, [user, area]);
   useEffect(() => {
     void load();
+  }, [load]);
+  const refreshConversation = useCallback(async () => {
+    const updated = await load();
+    if (updated)
+      setDraft((current) =>
+        current
+          ? {
+              ...current,
+              contact_status:
+                updated.find((card) => card.id === current.id)
+                  ?.contact_status || current.contact_status,
+            }
+          : current,
+      );
   }, [load]);
 
   const openEditor = (pipeline: Pipeline | null) => {
@@ -237,12 +253,18 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
       return;
     }
     setBusy(true);
-    const { id, ...fields } = draft;
+    const id = draft.id;
     const payload = {
-      ...fields,
-      title: fields.title.trim(),
       user_id: user.id,
-      value: Number(fields.value),
+      pipeline_id: draft.pipeline_id,
+      stage_id: draft.stage_id,
+      client_id: draft.client_id,
+      title: draft.title.trim(),
+      phone: draft.phone,
+      notes: draft.notes,
+      value: Number(draft.value),
+      contact_status: draft.contact_status,
+      meeting_at: draft.meeting_at,
     };
     const result = id
       ? await supabase
@@ -283,15 +305,16 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
 
   if (loading && !pipelines.length)
     return <p role="status">Carregando pipelines…</p>;
-  if (loadError)
-    return (
-      <div className="rounded-xl border p-6 space-y-4">
-        <p role="alert">{loadError}</p>
-        <Button onClick={() => void load()}>Tentar novamente</Button>
-      </div>
-    );
   return (
     <div className="space-y-5">
+      {loadError && (
+        <div className="rounded-xl border p-4 space-y-2">
+          <p role="alert">{loadError}</p>
+          <Button variant="outline" onClick={() => void load()}>
+            Tentar novamente
+          </Button>
+        </div>
+      )}
       <div className="flex flex-wrap gap-3 items-center">
         <label className="min-w-48">
           <span className="sr-only">Pipeline</span>
@@ -395,7 +418,8 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
       )}
       {area === "comercial" && (
         <p className="text-xs text-muted-foreground">
-          Os indicadores de resposta refletem o status registrado no card.
+          Os indicadores de resposta refletem o status do card e são atualizados
+          pelas mensagens do WhatsApp conectado.
         </p>
       )}
       <div
@@ -814,6 +838,14 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
               <Button disabled={busy} onClick={() => void saveCard()}>
                 {busy ? "Salvando…" : "Salvar card"}
               </Button>
+              {area === "comercial" && draft.id && (
+                <WhatsAppConversation
+                  key={draft.id}
+                  cardId={draft.id}
+                  phone={cards.find((c) => c.id === draft.id)?.phone || ""}
+                  onChanged={refreshConversation}
+                />
+              )}
             </div>
           )}
         </DialogContent>

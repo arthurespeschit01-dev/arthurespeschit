@@ -13,7 +13,7 @@
     "test:watch": "vitest",
     "test:db": "node tests/pipelines-db.mjs",
     "test:browser": "node tests/agency-browser.mjs",
-    "test:edge": "deno test --allow-env supabase/functions/agency-portal/index_test.ts supabase/functions/agency-calendar/index_test.ts"
+    "test:edge": "deno test --allow-env supabase/functions/agency-portal/index_test.ts supabase/functions/agency-calendar/index_test.ts supabase/functions/agency-whatsapp/index_test.ts"
   },
   "dependencies": {
     "@lovable.dev/cloud-auth-js": "^1.1.2",

@@ -295,6 +295,93 @@ for (const table of [
 console.log(
   "PASS: portals, tickets, form responses, tenant isolation, client impersonation denial, service-only calendar secrets",
 );
+await db.exec("reset role");
+await db.exec(
+  await readFile(
+    new URL(
+      "../supabase/migrations/20261111152507_agency_whatsapp.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  ),
+);
+await db.query(
+  "update public.agency_pipeline_cards set phone='11999990000' where id=$1",
+  [card],
+);
+await db.exec("set role service_role");
+await db.query(
+  "insert into public.agency_whatsapp_messages(user_id,phone,provider_message_id,direction,status,body) values ($1,'5511999990000','inbound-1','entrada','recebido','Olá')",
+  [owner],
+);
+assert.equal(
+  (
+    await db.query(
+      "select contact_status from public.agency_pipeline_cards where id=$1",
+      [card],
+    )
+  ).rows[0].contact_status,
+  "aguardando_agencia",
+);
+await db.query(
+  "insert into public.agency_whatsapp_messages(user_id,phone,request_id,direction,status,body) values ($1,'5511999990000',$2,'saida','enviado','Resposta')",
+  [owner, randomUUID()],
+);
+assert.equal(
+  (
+    await db.query(
+      "select contact_status from public.agency_pipeline_cards where id=$1",
+      [card],
+    )
+  ).rows[0].contact_status,
+  "aguardando_cliente",
+);
+await assert.rejects(
+  () =>
+    db.query(
+      "insert into public.agency_whatsapp_messages(user_id,phone,provider_message_id,direction,status,body) values ($1,'5511999990000','inbound-1','entrada','recebido','Repetida')",
+      [owner],
+    ),
+  /unique constraint/,
+);
+await login(owner);
+await assert.rejects(
+  () => db.query("select * from public.agency_whatsapp_connections"),
+  /permission denied/,
+);
+assert.equal(
+  (
+    await db.query(
+      "select count(*)::int n from public.agency_whatsapp_messages",
+    )
+  ).rows[0].n,
+  2,
+);
+await assert.rejects(
+  () =>
+    db.query(
+      "insert into public.agency_whatsapp_messages(user_id,phone,direction,status,body) values ($1,'5511999990000','entrada','recebido','Injetada')",
+      [owner],
+    ),
+  /permission denied/,
+);
+await login(other);
+assert.equal(
+  (
+    await db.query(
+      "select count(*)::int n from public.agency_whatsapp_messages",
+    )
+  ).rows[0].n,
+  0,
+);
+await login(null);
+await assert.rejects(
+  () => db.query("select * from public.agency_whatsapp_messages"),
+  /permission denied/,
+);
+console.log(
+  "PASS: WhatsApp phone matching, status synchronization, duplicate rejection, tenant isolation, server-only credentials",
+);
 await db.close();
 console.log(
   "PASS: migration, card preservation, rollback, revisions, pipeline moves, tenant isolation, operation ownership, anonymous denial",

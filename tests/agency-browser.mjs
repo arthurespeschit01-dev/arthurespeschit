@@ -31,6 +31,7 @@ for (const name of [
   "20261111144901_agency_pipelines.sql",
   "20261111145150_agency_portal_forms.sql",
   "20261111145643_agency_calendar.sql",
+  "20261111152507_agency_whatsapp.sql",
 ])
   await db.exec(
     await readFile(
@@ -101,6 +102,43 @@ await context.route("https://*.supabase.co/**", async (route) => {
     if (url.pathname.includes("/auth/v1/"))
       return response(route, url.pathname.endsWith("/user") ? user : session);
     if (url.pathname.includes("/functions/v1/")) {
+      if (url.pathname.endsWith("agency-whatsapp")) {
+        if (body.action === "status")
+          return response(route, {
+            configured: true,
+            connected: false,
+            instance_id: "fixture",
+            receiving_enabled: true,
+          });
+        if (body.action === "connect")
+          return response(route, {
+            qrcode:
+              "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lV8AAAAASUVORK5CYII=",
+          });
+        const card = (
+          await db.query(
+            "select phone,whatsapp_phone_key from agency_pipeline_cards where id=$1",
+            [body.card_id],
+          )
+        ).rows[0];
+        if (body.action === "messages")
+          return response(route, {
+            messages: (
+              await db.query(
+                "select * from agency_whatsapp_messages where user_id=$1 and phone_key=$2 order by created_at",
+                [owner, card.whatsapp_phone_key],
+              )
+            ).rows,
+          });
+        if (body.action === "send") {
+          await db.query(
+            "insert into agency_whatsapp_messages(user_id,request_id,phone,body,direction,status) values($1,$2,$3,$4,'saida','enviado')",
+            [owner, body.request_id, "55" + card.phone, body.text],
+          );
+          return response(route, { ok: true });
+        }
+        throw new Error("Unexpected WhatsApp action");
+      }
       if (url.pathname.endsWith("meta-account-balances"))
         return response(route, { accounts: [] });
       return response(
@@ -197,10 +235,24 @@ try {
   await page
     .getByRole("button", { name: "Editar pipeline", exact: true })
     .waitFor();
+  await page
+    .getByRole("button", { name: "Conectar WhatsApp", exact: true })
+    .click();
+  await page
+    .getByRole("img", {
+      name: "QR Code para conectar seu WhatsApp à Central",
+      exact: true,
+    })
+    .waitFor();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Close", exact: true })
+    .click();
   await page.getByRole("button", { name: "Novo card", exact: true }).click();
   await page
     .getByLabel("Título", { exact: true })
     .fill("Oportunidade de teste");
+  await page.getByLabel("Telefone", { exact: true }).fill("11999990000");
   await page.getByLabel("Valor da oportunidade (R$)").fill("1500");
   await page
     .getByLabel("Status de resposta")
@@ -247,6 +299,25 @@ try {
       .rows[0].n,
     1,
   );
+  await page
+    .getByRole("button", { name: "Oportunidade de teste", exact: true })
+    .click();
+  await page
+    .getByLabel("Mensagem WhatsApp", { exact: true })
+    .fill("Mensagem simulada de teste");
+  await page
+    .getByRole("button", { name: "Enviar pelo WhatsApp", exact: true })
+    .click();
+  await page.getByText("Mensagem simulada de teste", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Salvar card", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Oportunidade de teste", exact: true })
+    .waitFor();
+  assert.equal(
+    (await db.query("select contact_status from agency_pipeline_cards")).rows[0]
+      .contact_status,
+    "aguardando_cliente",
+  );
   await page.goto(`${base}/operacao`);
   await page
     .getByRole("button", { name: "Nova pipeline", exact: true })
@@ -283,6 +354,51 @@ try {
       .count(),
     0,
   );
+  await page.goto(`${base}/clientes/${activeClient}`);
+  await page
+    .getByRole("button", { name: "Criar link de chamados", exact: true })
+    .click();
+  await page
+    .getByLabel("Link exclusivo deste cliente", { exact: true })
+    .waitFor();
+  const customerLink = await page
+    .getByLabel("Link exclusivo deste cliente", { exact: true })
+    .inputValue();
+  assert.match(customerLink, /\/portal\/[a-f0-9]{64}$/);
+  await page
+    .getByRole("link", { name: "Ver chamados deste cliente", exact: true })
+    .click();
+  await page.waitForURL(`**/chamados?cliente=${activeClient}`);
+  await page.waitForFunction(
+    (id) =>
+      document.querySelector('[aria-label="Cliente do portal"]')?.value === id,
+    activeClient,
+  );
+  assert.equal(
+    await page.getByLabel("Cliente do portal").inputValue(),
+    activeClient,
+  );
+  await page.getByRole("button", { name: "Operações", exact: true }).waitFor();
+  assert.equal(
+    await page
+      .getByRole("button", { name: "Operações", exact: true })
+      .getAttribute("aria-expanded"),
+    "true",
+  );
+  for (const label of ["Chamados", "Comercial", "Relatórios", "Tarefas"])
+    assert.equal(
+      await page
+        .getByRole("navigation")
+        .getByRole("link", { name: label, exact: true })
+        .count(),
+      1,
+    );
+  assert.equal(
+    await page
+      .getByRole("link", { name: "Geração de Estratégia", exact: true })
+      .count(),
+    0,
+  );
   await page.goto(`${base}/comercial`);
   await page.getByRole("tab", { name: "Formulários", exact: true }).click();
   await page
@@ -298,7 +414,7 @@ try {
   await page.getByRole("heading", { name: /Briefing de onboarding/ }).waitFor();
   await page.goto(`${base}/chamados`);
   await page.getByLabel("Cliente do portal").selectOption(activeClient);
-  await page.getByRole("button", { name: "Criar portal", exact: true }).click();
+
   await page
     .getByRole("button", { name: "Copiar link", exact: true })
     .waitFor();

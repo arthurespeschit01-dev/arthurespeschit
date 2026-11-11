@@ -1,3 +1,4 @@
+import AgencyWhatsApp from "@/components/AgencyWhatsApp";
 import { useSearchParams } from "react-router-dom";
 import AgencyCalendar from "@/components/AgencyCalendar";
 import AgencyForms from "@/components/AgencyForms";
@@ -23,7 +24,8 @@ export default function Comercial() {
           <TabsTrigger value="formularios">Formulários</TabsTrigger>
           <TabsTrigger value="agenda">Agendamentos</TabsTrigger>
         </TabsList>
-        <TabsContent value="crm">
+        <TabsContent value="crm" className="space-y-5">
+          <AgencyWhatsApp />
           <PipelineBoard area="comercial" />
         </TabsContent>
         <TabsContent value="formularios">

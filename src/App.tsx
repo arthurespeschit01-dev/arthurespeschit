@@ -33,7 +33,6 @@ const Planilha = lazy(() => import("./pages/Planilha"));
 const PlanilhaTeste = lazy(() => import("./pages/PlanilhaTeste"));
 const Tasks = lazy(() => import("./pages/Tasks"));
 const UTMGenerator = lazy(() => import("./pages/UTMGenerator"));
-const Estrategias = lazy(() => import("./pages/Estrategias"));
 const RelatoriosDiarios = lazy(() => import("./pages/RelatoriosDiarios"));
 const Configuracoes = lazy(() => import("./pages/Configuracoes"));
 const Bloqueado = lazy(() => import("./pages/Bloqueado"));
@@ -54,7 +53,6 @@ function RoutePrefetcher() {
       void import("./pages/Planilha");
       void import("./pages/Tasks");
       void import("./pages/UTMGenerator");
-      void import("./pages/Estrategias");
       void import("./pages/Bloqueado");
       void import("./pages/NotFound");
     }, 1200);
@@ -127,7 +125,7 @@ function ProtectedRoutes() {
                 <Route path="/planilha" element={<Planilha />} />
                 <Route path="/planilha-teste" element={<PlanilhaTeste />} />
                 <Route path="/tasks" element={<Tasks />} />
-                <Route path="/estrategias" element={<Estrategias />} />
+                <Route path="/estrategias" element={<Navigate to="/comercial" replace />} />
                 <Route path="/utm" element={<UTMGenerator />} />
                 <Route path="/configuracoes" element={<Configuracoes />} />
                 <Route path="*" element={<NotFound />} />

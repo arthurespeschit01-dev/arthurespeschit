@@ -1,3 +1,4 @@
+import ClientTicketLink from '@/components/ClientTicketLink';
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -544,6 +545,8 @@ export default function ClientDetail() {
           </div>
         </div>
       </div>
+
+      {id && <ClientTicketLink key={id} clientId={id} />}
 
       {/* Tabs */}
       <div className="flex gap-1 p-1 bg-secondary/50 rounded-lg w-fit flex-wrap">

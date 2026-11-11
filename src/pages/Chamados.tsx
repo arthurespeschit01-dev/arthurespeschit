@@ -1,3 +1,4 @@
+import { useSearchParams } from 'react-router-dom';
 import { readAllRows } from "@/lib/readAllRows";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,12 +24,13 @@ import { toast } from "sonner";
 
 export default function Chamados() {
   const { user } = useAuth();
+  const [params] = useSearchParams();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [portals, setPortals] = useState<ClientPortal[]>([]);
   const [clients, setClients] = useState<
     { id: string; name: string; status: string | null }[]
   >([]);
-  const [clientId, setClientId] = useState("");
+  const [clientId, setClientId] = useState(() => params.get("cliente") || "");
   const [status, setStatus] = useState("todos");
   const [selected, setSelected] = useState<Ticket | null>(null);
   const [messages, setMessages] = useState<TicketMessage[]>([]);

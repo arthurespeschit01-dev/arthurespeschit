@@ -8,7 +8,7 @@
 - Comercial tem CRM, formulários e agendamentos. CRM e Operação compartilham um quadro com pipelines independentes por usuário e área.
 - Criar e editar pipelines acontece dentro do quadro: nome, etapas, cores e ordem. Remover uma etapa com cards exige uma etapa de destino. A alteração inteira é transacional e versões concorrentes são rejeitadas.
 - Cards podem ser movidos por arraste, seletor de etapa ou edição da pipeline de destino. Operação exige vínculo com um cliente. Cards vinculados a clientes pausados/encerrados ficam ocultos por padrão, com opção de exibição.
-- Os indicadores comerciais usam **status de resposta registrado manualmente nos cards**. Não há sincronização de mensagens com o WhatsApp nesta entrega. O código do Vértice foi usado como referência; seus leads e credenciais não foram copiados.
+- Os indicadores comerciais usam o status registrado nos cards e são atualizados pelas mensagens do WhatsApp conectado. O código do Vértice foi usado como referência; seus leads e credenciais não foram copiados.
 - Chamados permite criar um portal por cliente, copiar, desativar e substituir seu link. O cliente abre chamados e acompanha respostas sem precisar de acesso à conta interna da agência. Categorias: tráfego, design, sugestão, reclamação e outro.
 - Formulários permitem criar, editar, ordenar, adicionar/remover campos, marcar obrigatoriedade, compartilhar links, desativar e consultar respostas. Tipos: texto curto/longo, e-mail, data e número. As respostas guardam os rótulos dos campos no momento do envio.
 - Agenda consulta os próximos 60 dias da agenda principal do Google e cria compromissos nela. Mostra até 100 compromissos e informa quando existem mais. Datas seguem o fuso do dispositivo.
@@ -43,3 +43,13 @@ Antes de ativar:
 - `npx tsc --noEmit -p tsconfig.app.json` e `npm run build`.
 
 A autorização real do Google, as chamadas reais à Meta e o comportamento das migrações no banco remoto ainda dependem dos acessos/configurações acima.
+
+## Ajustes de navegação, cliente e WhatsApp
+
+- **Operações** é uma categoria expansível, com Chamados, Comercial, Relatórios, Tarefas e Onboarding e execução. As pipelines são criadas e editadas no próprio quadro. Geração de Estratégia saiu da navegação e sua rota antiga redireciona para Comercial.
+- Em Clientes → ficha do cliente, **Link de chamados do cliente** permite criar, copiar, abrir, desativar e substituir o link exclusivo. O atalho de chamados abre a lista filtrada para aquele cliente. É o mesmo portal da seção Chamados, sem criar históricos separados.
+- Comercial → CRM contém **Conectar WhatsApp**. O número é escolhido no celular ao ler o QR Code; trocar o número preserva o histórico. A instância W-API deve ser dedicada à Central e configurada uma vez pela agência dentro do sistema. Não reutilizar a instância do Vértice: isso redirecionaria o webhook dela. É possível vincular o número desejado a uma instância própria para esta conexão.
+- A função `agency-whatsapp` valida a sessão nas ações privadas e usa um segredo aleatório por conexão para os webhooks. Tokens ficam em tabela restrita ao servidor. O recebimento ignora grupos, eventos de status e ecos das mensagens enviadas. O histórico mostra as últimas 100 mensagens recebidas após a conexão e enviadas pela Central; não importa conversas antigas nem mensagens enviadas por outros aplicativos. Mídias recebidas aparecem como indicação de tipo; envio nesta versão é de texto.
+- Abra um card salvo com telefone para conversar. Mensagens recebidas mudam o status para Aguardando nossa resposta; mensagens enviadas pela Central mudam para Aguardando cliente. Telefones brasileiros com/sem DDI ou nono dígito são associados ao mesmo contato.
+- Antes de ativar WhatsApp no ambiente remoto, aplicar também `20261111152507_agency_whatsapp.sql` e publicar `agency-whatsapp` com `verify_jwt = false`: a função verifica a autenticação nas ações privadas e o segredo no webhook. A configuração inicial requer uma instância/token W-API válidos, cadastrados na interface; nunca em chat ou código.
+- Testes do WhatsApp usam rede simulada. Nenhum QR real foi escaneado e nenhuma mensagem real foi enviada durante a implementação.

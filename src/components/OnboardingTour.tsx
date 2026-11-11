@@ -21,7 +21,6 @@ const STEPS: Step[] = [
   { icon: "💰", title: "Controle financeiro da agência", description: "Registre entradas e saídas, veja a rentabilidade por cliente e o DRE simplificado do mês.", target: "nav-financeiro" },
   { icon: "📈", title: "Planilha de acompanhamento", description: "Acompanhe métricas e indicadores dos clientes de forma organizada, com visão consolidada do desempenho.", target: "nav-planilha" },
   { icon: "📄", title: "Controle seus contratos", description: "Registre contratos com valor, início e vencimento. Receba notificações por email antes do contrato vencer.", target: "nav-contratos" },
-  { icon: "🧠", title: "Gere estratégias com IA", description: "Informe o perfil do cliente e os objetivos — o sistema gera uma estratégia completa de marketing automaticamente.", target: "nav-estrategia" },
   { icon: "🔗", title: "Gerador de UTMs", description: "Crie links rastreáveis para suas campanhas com parâmetros UTM padronizados.", target: "nav-utms" },
   { icon: "📁", title: "Processos, Scripts e mais", description: "Acesse Processo de Onboarding, Estudos de Caso, Scripts de vendas e respostas para Objeções.", target: "nav-processos" },
   { icon: "🔔", title: "Notificações e configurações", description: "Configure alertas por email para vencimentos, pagamentos atrasados, tasks urgentes e saldo baixo.", target: "nav-config" },
