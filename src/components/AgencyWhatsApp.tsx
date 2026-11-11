@@ -107,12 +107,12 @@ export default function AgencyWhatsApp() {
   return (
     <section
       className="rounded-xl border bg-card p-4 space-y-3"
-      aria-labelledby="crm-whatsapp-title"
+      aria-labelledby="whatsapp-settings-title"
     >
       <div className="flex flex-wrap justify-between items-center gap-3">
         <div>
-          <h2 id="crm-whatsapp-title" className="font-semibold">
-            WhatsApp do CRM
+          <h2 id="whatsapp-settings-title" className="font-semibold">
+            Conexão WhatsApp
           </h2>
           <p className="text-sm text-muted-foreground">
             {status?.connected
@@ -124,6 +124,7 @@ export default function AgencyWhatsApp() {
           <Button onClick={() => void connect()} disabled={busy}>
             {status?.connected ? "Gerenciar WhatsApp" : "Conectar WhatsApp"}
           </Button>
+          <Button variant="outline" disabled={busy} onClick={() => { setOpen(true); setSettings(true); setForm({ instance_id: status?.instance_id || '', token: '', dedicated: false }); }}>Configurar instância e token</Button>
           <Button
             variant="outline"
             disabled={busy}

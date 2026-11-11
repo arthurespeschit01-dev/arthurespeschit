@@ -56,6 +56,7 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
     moves: Record<string, string>;
   } | null>(null);
   const [draft, setDraft] = useState<CardDraft | null>(null);
+  const [contactStatusDirty, setContactStatusDirty] = useState(false);
   const activePipeline = pipelines.find((p) => p.id === selected);
   const boardStages = stages
     .filter((s) => s.pipeline_id === selected)
@@ -226,6 +227,7 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
   };
   const newCard = () => {
     if (!boardStages[0]) return;
+    setContactStatusDirty(false);
     setDraft({
       title: "",
       phone: "",
@@ -263,19 +265,23 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
       phone: draft.phone,
       notes: draft.notes,
       value: Number(draft.value),
-      contact_status: draft.contact_status,
       meeting_at: draft.meeting_at,
     };
     const result = id
       ? await supabase
           .from("agency_pipeline_cards")
-          .update(payload)
+          .update({
+            ...payload,
+            ...(contactStatusDirty
+              ? { contact_status: draft.contact_status }
+              : {}),
+          })
           .eq("id", id)
           .select("id")
           .single()
       : await supabase
           .from("agency_pipeline_cards")
-          .insert(payload)
+          .insert({ ...payload, contact_status: draft.contact_status })
           .select("id")
           .single();
     setBusy(false);
@@ -461,7 +467,10 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
                   >
                     <button
                       className="text-left w-full font-semibold hover:text-primary"
-                      onClick={() => setDraft({ ...card })}
+                      onClick={() => {
+                        setContactStatusDirty(false);
+                        setDraft({ ...card });
+                      }}
                     >
                       {card.title}
                     </button>
@@ -786,13 +795,14 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
                     id="card-contact"
                     className={selectClass}
                     value={draft.contact_status}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      setContactStatusDirty(true);
                       setDraft({
                         ...draft,
                         contact_status: e.target
                           .value as PipelineCard["contact_status"],
-                      })
-                    }
+                      });
+                    }}
                   >
                     {Object.entries(CONTACT_LABELS).map(([key, label]) => (
                       <option key={key} value={key}>

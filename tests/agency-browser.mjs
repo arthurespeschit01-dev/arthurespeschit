@@ -235,6 +235,13 @@ try {
   await page
     .getByRole("button", { name: "Editar pipeline", exact: true })
     .waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Conectar WhatsApp', exact: true }).count(), 0);
+  assert.equal(await page.getByRole('navigation').getByRole('link', { name: 'Clientes', exact: true }).evaluate(link => link.nextElementSibling?.querySelector('button')?.getAttribute('aria-label')), 'Operações');
+  await page.goto(`${base}/configuracoes`);
+  await page.getByRole('button', { name: 'Configurar instância e token', exact: true }).click();
+  await page.getByLabel('ID da instância', { exact: true }).waitFor();
+  assert.equal(await page.getByLabel('Token da instância', { exact: true }).getAttribute('type'), 'password');
+  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
   await page
     .getByRole("button", { name: "Conectar WhatsApp", exact: true })
     .click();
@@ -248,6 +255,7 @@ try {
     .getByRole("dialog")
     .getByRole("button", { name: "Close", exact: true })
     .click();
+  await page.goto(`${base}/comercial`);
   await page.getByRole("button", { name: "Novo card", exact: true }).click();
   await page
     .getByLabel("Título", { exact: true })

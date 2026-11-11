@@ -89,6 +89,27 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     });
   };
 
+  const renderNavGroup = (group: { name: string; id: string; items: typeof processosSubItems; open: boolean; setOpen: (open: boolean) => void }) => {
+              const active = group.items.some(item => pathname === item.to);
+              return <div key={group.id} className={collapsed ? 'w-10 flex justify-center' : ''}>
+                <button
+                  aria-label={group.name}
+                  aria-expanded={!collapsed && group.open}
+                  aria-controls={`nav-${group.id}-items`}
+                  data-tour-id={`nav-${group.id}`}
+                  onClick={() => { if (collapsed) { setCollapsed(false); try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, '0'); } catch {} group.setOpen(true); } else group.setOpen(!group.open); }}
+                  className={`${collapsed ? SIDEBAR_ICON_BUTTON_CLASS : 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm w-full'} transition-all duration-200 ${active ? 'bg-primary/15 text-primary font-medium' : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`}
+                >
+                  <SidebarIcon icon={Folder} />
+                  {!collapsed && <><span className="flex-1 text-left">{group.name}</span><ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${group.open ? 'rotate-180' : ''}`} /></>}
+                </button>
+                {group.open && !collapsed && <div id={`nav-${group.id}-items`} className="ml-3 pl-3 border-l border-sidebar-border space-y-0.5 mt-0.5">
+                  {group.items.map(item => <NavLink key={item.to} to={item.to} onClick={() => setSidebarOpen(false)} className={({isActive}) => `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${isActive ? 'bg-primary/15 text-primary font-medium' : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`}><SidebarIcon icon={item.icon} /><span>{item.label}</span></NavLink>)}
+                </div>}
+              </div>;
+
+  };
+
   const asideWidth = collapsed ? 'lg:w-16' : 'lg:w-64';
 
 
@@ -151,31 +172,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </div>
                 );
               }
-              return wrapped;
+              return item.to === '/clientes' ? <div key={item.to}>{wrapped}{renderNavGroup({ name: 'Operações', id: 'operacoes', items: operacoesSubItems, open: operacoesOpen, setOpen: setOperacoesOpen })}</div> : wrapped;
             })}
 
-            {[
-              { name: 'Operações', id: 'operacoes', items: operacoesSubItems, open: operacoesOpen, setOpen: setOperacoesOpen },
-              { name: 'Processos', id: 'processos', items: processosSubItems, open: processosOpen, setOpen: setProcessosOpen },
-            ].map(group => {
-              const active = group.items.some(item => pathname === item.to);
-              return <div key={group.id} className={collapsed ? 'w-10 flex justify-center' : ''}>
-                <button
-                  aria-label={group.name}
-                  aria-expanded={!collapsed && group.open}
-                  aria-controls={`nav-${group.id}-items`}
-                  data-tour-id={`nav-${group.id}`}
-                  onClick={() => { if (collapsed) { setCollapsed(false); try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, '0'); } catch {} group.setOpen(true); } else group.setOpen(!group.open); }}
-                  className={`${collapsed ? SIDEBAR_ICON_BUTTON_CLASS : 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm w-full'} transition-all duration-200 ${active ? 'bg-primary/15 text-primary font-medium' : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`}
-                >
-                  <SidebarIcon icon={Folder} />
-                  {!collapsed && <><span className="flex-1 text-left">{group.name}</span><ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${group.open ? 'rotate-180' : ''}`} /></>}
-                </button>
-                {group.open && !collapsed && <div id={`nav-${group.id}-items`} className="ml-3 pl-3 border-l border-sidebar-border space-y-0.5 mt-0.5">
-                  {group.items.map(item => <NavLink key={item.to} to={item.to} onClick={() => setSidebarOpen(false)} className={({isActive}) => `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${isActive ? 'bg-primary/15 text-primary font-medium' : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`}><SidebarIcon icon={item.icon} /><span>{item.label}</span></NavLink>)}
-                </div>}
-              </div>;
-            })}
+            {renderNavGroup({ name: 'Processos', id: 'processos', items: processosSubItems, open: processosOpen, setOpen: setProcessosOpen })}
           </nav>
 
           <div className={`p-3 border-t border-sidebar-border ${collapsed ? 'flex flex-col items-center gap-1' : 'space-y-1'}`}>

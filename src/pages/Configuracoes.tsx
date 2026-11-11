@@ -1,3 +1,4 @@
+import AgencyWhatsApp from '@/components/AgencyWhatsApp';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -103,6 +104,8 @@ export default function Configuracoes() {
         <Bell className="w-6 h-6 text-primary" />
         <h1 className="text-2xl font-bold text-foreground">Configurações</h1>
       </div>
+
+      <AgencyWhatsApp />
 
       <div className="bg-card border border-border rounded-xl p-6 space-y-5">
         <div className="flex items-center gap-2 mb-2">
