@@ -33,6 +33,7 @@ for (const name of [
   "20261111145643_agency_calendar.sql",
   "20261111152507_agency_whatsapp.sql",
   "20261111171948_commercial_dashboard_client_operations.sql",
+  "20261111183242_whatsapp_inbox_shared.sql",
 ])
   await db.exec(
     await readFile(
@@ -119,12 +120,13 @@ await context.route("https://*.supabase.co/**", async (route) => {
             qrcode:
               "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lV8AAAAASUVORK5CYII=",
           });
-        const card = (
+        let card = (
           await db.query(
             "select phone,whatsapp_phone_key from agency_pipeline_cards where id=$1",
             [body.card_id],
           )
         ).rows[0];
+        if (!card && body.phone) card = {phone:body.phone,whatsapp_phone_key:(await db.query("select agency_whatsapp_phone_key($1) key",[body.phone])).rows[0].key};
         if (body.action === "messages")
           return response(route, {
             messages: (
@@ -137,7 +139,7 @@ await context.route("https://*.supabase.co/**", async (route) => {
         if (body.action === "send") {
           await db.query(
             "insert into agency_whatsapp_messages(user_id,request_id,phone,body,direction,status) values($1,$2,$3,$4,'saida','enviado')",
-            [owner, body.request_id, "55" + card.phone, body.text],
+            [owner, body.request_id, card.phone.startsWith("55") ? card.phone : "55" + card.phone, body.text],
           );
           return response(route, { ok: true });
         }
@@ -151,6 +153,7 @@ await context.route("https://*.supabase.co/**", async (route) => {
         503,
       );
     }
+    if (url.pathname.endsWith('/rpc/agency_whatsapp_inbox')) { const result=await db.query("select set_config('request.jwt.claim.sub',$1,false)",[owner]); const inbox=await db.query('select agency_whatsapp_inbox($1,$2) result',[body.p_search,body.p_offset]); return response(route,inbox.rows[0].result); }
     if (url.pathname.endsWith('/rpc/save_agency_client')) {
       const result = await db.query('select public.save_agency_client($1,$2::jsonb,$3::jsonb) id',[body.p_id,JSON.stringify(body.p_client),JSON.stringify(body.p_operation)]);
       return response(route,result.rows[0].id);
@@ -334,6 +337,14 @@ try {
       .contact_status,
     "aguardando_cliente",
   );
+  await db.query("insert into agency_whatsapp_messages(user_id,phone,body,direction,status,contact_name) values($1,'5511888880000','Mensagem recebida fora do CRM','entrada','recebido','Contato externo')",[owner]);
+  await page.goto(`${base}/comercial/conversas`);
+  await page.getByRole('button').filter({hasText:'Contato externo'}).click();
+  await page.getByText('Mensagem recebida fora do CRM',{exact:true}).filter({visible:true}).last().waitFor();
+  await page.getByLabel('Mensagem WhatsApp',{exact:true}).fill('Resposta sem card');
+  await page.getByRole('button',{name:'Enviar pelo WhatsApp',exact:true}).click();
+  await page.getByText('Resposta sem card',{exact:true}).filter({visible:true}).last().waitFor();
+  assert.equal((await db.query("select count(*)::int n from agency_pipeline_cards where phone='5511888880000'")).rows[0].n,0);
   await page.goto(`${base}/operacao`);
   await page
     .getByRole("button", { name: "Nova pipeline", exact: true })

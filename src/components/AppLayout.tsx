@@ -38,6 +38,7 @@ const operacoesSubItems = [
 const comercialSubItems = [
   { to: '/comercial', label: 'Dashboard comercial', icon: LayoutDashboard },
   { to: '/comercial/crm', label: 'CRM', icon: Users },
+  { to: '/comercial/conversas', label: 'Conversas', icon: MessageSquare },
   { to: '/comercial/formularios', label: 'Formulários', icon: FileText },
   { to: '/comercial/agendamentos', label: 'Agendamentos', icon: ClipboardList },
 ];

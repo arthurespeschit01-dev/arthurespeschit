@@ -1,0 +1,23 @@
+import {useCallback,useEffect,useState} from 'react';
+import {supabase} from '@/integrations/supabase/client';
+import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
+import {whatsappRequest} from '@/lib/whatsapp';
+import WhatsAppConversation from '@/components/WhatsAppConversation';
+interface Contact {phone_key:string;phone:string;name:string;body:string;direction:string;status:string;created_at:string;card_id:string|null}
+export default function WhatsAppInbox(){
+ const [contacts,setContacts]=useState<Contact[]>([]),[selected,setSelected]=useState<Contact|null>(null),[search,setSearch]=useState(''),[phone,setPhone]=useState('');
+ const [error,setError]=useState(''),[busy,setBusy]=useState(false),[more,setMore]=useState(false),[syncing,setSyncing]=useState(false),[syncStatus,setSyncStatus]=useState('');
+ const load=useCallback(async(append=false)=>{
+  setBusy(true);const offset=append?contacts.length:0;
+  const {data,error}=await supabase.rpc('agency_whatsapp_inbox',{p_search:search,p_offset:offset});setBusy(false);
+  if(error){setError('Não foi possível carregar as conversas. Tente atualizar.');return;}
+  const rows=data as unknown as Contact[];setContacts(current=>append?[...current,...rows.slice(0,50)]:rows.slice(0,50));setMore(rows.length>50);setError('');
+ },[search,contacts.length]);
+ useEffect(()=>{const timer=setTimeout(()=>void load(),250);return()=>clearTimeout(timer)},[search]);
+ useEffect(()=>{const timer=setInterval(()=>{if(!document.hidden)void load()},10000);return()=>clearInterval(timer)},[load]);
+ const sync=async()=>{setSyncing(true);setError('');let offset=0,total=0;try{for(let i=0;i<1000;i++){const result=await whatsappRequest<{count:number;has_more:boolean;next_offset:number}>('sync_history',{offset});total+=result.count;setSyncStatus(`${total} mensagens consultadas…`);if(!result.has_more)break;offset=result.next_offset;}setSyncStatus('Histórico sincronizado. Mensagens repetidas são ignoradas.');await load();}catch(e){setError((e as Error).message)}finally{setSyncing(false)}};
+ return <div className="space-y-4"><div className="flex flex-wrap justify-between gap-3"><div><h2 className="text-xl font-semibold">Conversas</h2><p className="text-sm text-muted-foreground">WhatsApp da agência, com ou sem oportunidade no CRM.</p></div><div className="flex gap-2"><Button variant="outline" disabled={syncing} onClick={()=>void sync()}>{syncing?'Sincronizando…':'Sincronizar histórico do Vértice'}</Button><Button variant="outline" disabled={busy} onClick={()=>void load()}>Atualizar conversas</Button></div></div>
+ {error&&<p role="alert" className="text-destructive text-sm">{error}</p>}{syncStatus&&<p role="status" className="text-sm text-muted-foreground">{syncStatus}</p>}
+ <div className="grid lg:grid-cols-[320px_1fr] gap-4"><section className="border rounded-xl p-4 space-y-3"><Input aria-label="Buscar conversas" placeholder="Buscar nome ou telefone" value={search} onChange={e=>setSearch(e.target.value)}/><form className="flex gap-2" onSubmit={e=>{e.preventDefault();if(!/^\+?[\d\s()-]{10,25}$/.test(phone)){setError('Informe um telefone com DDI e DDD.');return;}setSelected({phone,phone_key:phone,name:phone,body:'',created_at:'',direction:'',status:'',card_id:null});setError('')}}><Input aria-label="Telefone da nova conversa" placeholder="Telefone com DDI e DDD" value={phone} onChange={e=>setPhone(e.target.value)}/><Button type="submit">Abrir</Button></form><div className="max-h-[65vh] overflow-y-auto space-y-2">{contacts.map(c=><button key={c.phone_key} onClick={()=>setSelected(c)} className={`w-full rounded-lg border p-3 text-left ${selected?.phone_key===c.phone_key?'bg-primary/10 border-primary/40':''}`}><strong className="block text-sm truncate">{c.name}</strong><span className="block text-xs text-muted-foreground">{c.phone} · {c.card_id?'No CRM':'Sem card no CRM'}</span><span className="block text-sm truncate mt-1">{c.direction==='saida'?'Você: ':''}{c.body}</span><time className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleString('pt-BR')}</time></button>)}{!contacts.length&&!busy&&<p className="text-sm text-muted-foreground">Nenhuma conversa registrada. Ative o recebimento em Configurações ou sincronize o histórico.</p>}{more&&<Button variant="outline" disabled={busy} onClick={()=>void load(true)}>Mais conversas</Button>}</div></section><section className="border rounded-xl p-5 min-w-0">{selected?<><h3 className="font-semibold mb-2">{selected.name}</h3><WhatsAppConversation key={selected.phone_key} phone={selected.phone} onChanged={load}/></>:<p className="text-muted-foreground">Selecione uma conversa ou informe um telefone.</p>}</section></div></div>;
+}

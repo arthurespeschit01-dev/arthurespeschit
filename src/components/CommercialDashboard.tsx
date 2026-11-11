@@ -30,7 +30,7 @@ export default function CommercialDashboard() {
    readAllRows<Pipeline>((a,b)=>supabase.from('agency_pipelines').select('*').eq('user_id',user.id).eq('area','comercial').order('created_at').order('id').range(a,b)),
    readAllRows<Stage>((a,b)=>supabase.from('agency_pipeline_stages').select('*').eq('user_id',user.id).order('position').order('id').range(a,b)),
    readAllRows<PipelineCard>((a,b)=>supabase.from('agency_pipeline_cards').select('*').eq('user_id',user.id).order('created_at').order('id').range(a,b)),
-   readAllRows<CommercialMessage>((a,b)=>supabase.from('agency_whatsapp_messages').select('id,user_id,phone_key,direction,status,created_at').eq('user_id',user.id).order('created_at').order('id').range(a,b)),
+   readAllRows<CommercialMessage>((a,b)=>supabase.from('agency_whatsapp_messages').select('id,user_id,phone_key,direction,status,created_at').is('duplicate_of',null).eq('user_id',user.id).order('created_at').order('id').range(a,b)),
    readAllRows<{id:string;status:string}>((a,b)=>supabase.from('clients').select('id,status').eq('user_id',user.id).order('id').range(a,b)),
   ]);
   setBusy(false);if(p.error||s.error||c.error||m.error||cl.error){setError('Não foi possível carregar os indicadores. Tente atualizar.');return;}

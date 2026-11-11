@@ -20,6 +20,7 @@ interface Connection {
   token: string;
   webhook_secret: string;
   receiving_enabled: boolean;
+  bridge_url?: string;
 }
 async function provider(
   connection: Pick<Connection, "instance_id" | "token">,
@@ -91,10 +92,13 @@ Deno.serve(async (request) => {
           provider_message_id: event.providerId,
           body: event.body,
           kind: event.kind,
-          direction: "entrada",
-          status: "recebido",
+          direction: event.direction,
+          status: event.direction === "saida" ? "enviado" : "recebido",
+          contact_name: event.contactName,
+          created_at: event.createdAt,
         });
       if (insertError && insertError.code !== "23505") throw insertError;
+      await db.from("agency_whatsapp_connections").update({last_webhook_at:new Date().toISOString()}).eq('user_id',connection.user_id);
       return respond({ ok: true });
     }
     const auth = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
@@ -117,9 +121,9 @@ Deno.serve(async (request) => {
     if (connectionError) throw connectionError;
     if (body.action === "configure") {
       const instanceId = String(body.instance_id || "").trim();
-      if (!/^[\w-]{1,160}$/.test(instanceId) || body.dedicated !== true)
+      if (!/^[\w-]{1,160}$/.test(instanceId))
         return respond(
-          { error: "Configure uma instância dedicada a esta conexão." },
+          { error: "Informe uma instância válida." },
           400,
         );
       const sameInstance = connection?.instance_id === instanceId;
@@ -142,6 +146,7 @@ Deno.serve(async (request) => {
           ...(!sameInstance
             ? {
                 receiving_enabled: false,
+                bridge_url: null,
                 webhook_secret:
                   crypto.randomUUID().replace(/-/g, "") +
                   crypto.randomUUID().replace(/-/g, ""),
@@ -161,28 +166,26 @@ Deno.serve(async (request) => {
       return respond({ ok: true });
     }
     if (body.action === "messages") {
-      const { data: card, error } = await db
-        .from("agency_pipeline_cards")
-        .select("whatsapp_phone_key")
-        .eq("id", body.card_id)
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (error) throw error;
-      if (!card?.whatsapp_phone_key)
-        return respond(
-          { error: "Cadastre um telefone no card para conversar." },
-          400,
-        );
+      let phone = whatsappPhone(body.phone);
+      if (body.card_id) {
+        const {data:card,error}=await db.from('agency_pipeline_cards').select('phone').eq('id',body.card_id).eq('user_id',user.id).maybeSingle();
+        if(error) throw error;
+        if(!card) return respond({error:'Card não encontrado.'},404);
+        phone=whatsappPhone(card.phone);
+      }
+      if (!/^\d{10,15}$/.test(phone)) return respond({error:'Informe um telefone válido.'},400);
+      const {whatsappPhoneKey}=await import('../_shared/agency-whatsapp.ts');
       const { data, error: messageError } = await db
         .from("agency_whatsapp_messages")
         .select("id,direction,status,body,kind,created_at")
         .eq("user_id", user.id)
-        .eq("phone_key", card.whatsapp_phone_key)
+        .eq("phone_key", whatsappPhoneKey(phone))
+        .is("duplicate_of",null)
         .order("created_at", { ascending: false })
         .order("id")
-        .limit(100);
+        .range(Math.max(0,Number(body.offset)||0),Math.max(0,Number(body.offset)||0)+99);
       if (messageError) throw messageError;
-      return respond({ messages: data.reverse() });
+      return respond({ messages: data.reverse(), has_more:data.length===100 });
     }
     if (!connection)
       return body.action === "status"
@@ -193,6 +196,16 @@ Deno.serve(async (request) => {
             },
             409,
           );
+    if(body.action === 'sync_history') {
+      if(!connection.bridge_url)return respond({error:'O histórico do Vértice ainda não está vinculado a esta instância.'},409);
+      const offset=Math.max(0,Math.min(Number(body.offset)||0,100000));
+      const response=await fetch(connection.bridge_url,{method:'POST',headers:{'content-type':'application/json','x-central-secret':connection.webhook_secret},body:JSON.stringify({action:'history',instance_id:connection.instance_id,offset}),signal:AbortSignal.timeout(20000)});
+      if(!response.ok)return respond({error:'Não foi possível consultar o histórico do Vértice.'},502);
+      const result=await response.json();
+      const rows=result.messages.map((m:any)=>({user_id:user.id,provider_message_id:m.provider_id,phone:whatsappPhone(m.phone),body:String(m.body || `[${m.kind}]`).slice(0,10000),kind:m.kind,direction:m.direction,status:m.status,created_at:m.created_at})).filter((m:any)=>/^\d{10,15}$/.test(m.phone));
+      if(rows.length){const {error}=await db.from('agency_whatsapp_messages').upsert(rows,{onConflict:'user_id,provider_message_id',ignoreDuplicates:true});if(error)throw error;}
+      return respond({count:rows.length,has_more:result.has_more,next_offset:offset+result.messages.length});
+    }
     if (body.action === "status") {
       const info = await provider(connection, "GET", "instance/fetch-instance");
       return respond({
@@ -201,19 +214,29 @@ Deno.serve(async (request) => {
         phone: info.connectedPhone || null,
         instance_id: connection.instance_id,
         receiving_enabled: connection.receiving_enabled,
+        shared: !!connection.bridge_url,
+        last_webhook_at: connection.last_webhook_at || null,
+        webhook_url: `${supabaseUrl}/functions/v1/agency-whatsapp?webhook=${connection.webhook_secret}`,
       });
     }
     if (body.action === "connect") {
       const callback = `${supabaseUrl}/functions/v1/agency-whatsapp?webhook=${connection.webhook_secret}`;
-      await provider(connection, "PUT", "webhook/update-webhook-received", {
-        url: callback,
-        enabled: true,
-      });
+      if(connection.bridge_url) {
+        const response=await fetch(connection.bridge_url,{method:'POST',headers:{'content-type':'application/json','x-central-secret':connection.webhook_secret},body:JSON.stringify({action:'activate',instance_id:connection.instance_id}),signal:AbortSignal.timeout(20000)});
+        if(!response.ok) return respond({error:'Não foi possível ativar o webhook compartilhado. Tente novamente.'},502);
+      } else {
+        const info=await provider(connection,'GET','instance/fetch-instance');
+        const current=String(info.webhookReceivedUrl || '');
+        if(current && current!==callback) return respond({error:'Esta instância já usa outro webhook. Configure o compartilhamento antes de alterar o recebimento.'},409);
+        await provider(connection, "PUT", "webhook/update-webhook-received", {value: callback, enabled:true});
+      }
       const { error } = await db
         .from("agency_whatsapp_connections")
         .update({ receiving_enabled: true })
         .eq("user_id", user.id);
       if (error) throw error;
+      const connected=await provider(connection,"GET","instance/fetch-instance");
+      if(connected.connected) return respond({connected:true,qrcode:null});
       const data = await provider(connection, "GET", "instance/qr-code");
       const rawQr = data.qrcode || data.qrCode || data.value || "";
       const qrcode =
@@ -246,27 +269,15 @@ Deno.serve(async (request) => {
         )
       )
         return respond({ error: "Escreva uma mensagem válida." }, 400);
-      const { data: card, error } = await db
-        .from("agency_pipeline_cards")
-        .select("id,phone,pipeline_id")
-        .eq("id", body.card_id)
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (error) throw error;
-      if (!card) return respond({ error: "Card não encontrado." }, 404);
-      const { data: pipeline } = await db
-        .from("agency_pipelines")
-        .select("id")
-        .eq("id", card.pipeline_id)
-        .eq("area", "comercial")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (!pipeline)
-        return respond(
-          { error: "A conversa deve estar vinculada a um card comercial." },
-          400,
-        );
-      const phone = whatsappPhone(card.phone);
+      let phone=whatsappPhone(body.phone);
+      if(body.card_id) {
+        const {data:card,error}=await db.from('agency_pipeline_cards').select('id,phone,pipeline_id').eq('id',body.card_id).eq('user_id',user.id).maybeSingle();
+        if(error)throw error;
+        if(!card)return respond({error:'Card não encontrado.'},404);
+        const {data:pipeline}=await db.from('agency_pipelines').select('id').eq('id',card.pipeline_id).eq('area','comercial').eq('user_id',user.id).maybeSingle();
+        if(!pipeline)return respond({error:'A conversa deve estar vinculada a um card comercial.'},400);
+        phone=whatsappPhone(card.phone);
+      }
       if (!/^\d{10,15}$/.test(phone))
         return respond({ error: "Cadastre um telefone válido no card." }, 400);
       const { data: existing, error: existingError } = await db
@@ -314,14 +325,7 @@ Deno.serve(async (request) => {
           phone,
           message: body.text.trim(),
         });
-        const { error: updateError } = await db
-          .from("agency_whatsapp_messages")
-          .update({
-            status: "enviado",
-            provider_message_id: result.messageId || null,
-          })
-          .eq("id", info.id)
-          .eq("user_id", user.id);
+        const { error: updateError } = await db.rpc('agency_confirm_whatsapp_send',{p_user_id:user.id,p_id:info.id,p_provider_id:result.messageId || null});
         if (updateError)
           return respond(
             {

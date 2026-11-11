@@ -76,8 +76,8 @@ Deno.test(
         "connection status rendered",
       );
       check(
-        !text.includes("provider-secret-fixture") && !text.includes(secret),
-        "tokens never returned to browser",
+        !text.includes("provider-secret-fixture") && text.includes("webhook_url"),
+        "provider token never returned; authenticated owner can configure their webhook",
       );
     } finally {
       globalThis.fetch = originalFetch;
@@ -254,7 +254,7 @@ Deno.test(
         if (url.pathname.endsWith("/webhook/update-webhook-received")) {
           const body = JSON.parse(String(init?.body));
           check(
-            body.url ===
+            body.value ===
               `https://fixture.invalid/functions/v1/agency-whatsapp?webhook=${secret}`,
             "callback uses server-generated capability",
           );

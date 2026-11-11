@@ -1455,6 +1455,7 @@ export type Database = {
       agency_client_progress_view: { Row: { [K in keyof ClientProgress]: ClientProgress[K] }; Relationships: [] }
     }
     Functions: {
+      agency_whatsapp_inbox: { Args: {p_search?: string; p_offset?:number}; Returns: Json; }
       save_agency_client: { Args: { p_id: string | null; p_client: Json; p_operation?: Json }; Returns: string; }
       save_agency_pipeline: {
         Args: { p_id: string | null; p_area: string; p_name: string; p_revision: number; p_stages: Json; p_moves: Json };

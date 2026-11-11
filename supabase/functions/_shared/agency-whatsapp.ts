@@ -20,16 +20,16 @@ export function normalizeWhatsappEvent(payload: Record<string, unknown>) {
     payload.data && typeof payload.data === "object"
       ? record(payload.data)
       : payload;
-  const message = record(data.msgContent || data.message);
+  const content = record(data.msgContent || data.message);
+  const message = record(content.message || content);
   const chat = record(data.chat);
-  const sender = String(
-    record(data.sender).id || data.phone || chat.id || data.from || "",
-  );
-  const event = String(payload.event || data.event || "");
   const sentByUs = data.fromMe ?? record(data.key).fromMe;
   const fromMe = sentByUs === true || sentByUs === "true";
+  const sender = String(fromMe ? (chat.id || data.phone || data.to || record(data.key).remoteJid || "") : (
+    record(data.sender).id || data.phone || chat.id || data.from || ""),
+  );
+  const event = String(payload.event || data.event || "");
   if (
-    fromMe ||
     data.isGroup === true ||
     data.isGroup === "true" ||
     String(chat.id || "").includes("@g.us") ||
@@ -74,6 +74,9 @@ export function normalizeWhatsappEvent(payload: Record<string, unknown>) {
   return {
     phone,
     providerId,
+    direction: fromMe ? "saida" : "entrada",
+    contactName: !fromMe ? String(record(data.sender).pushName || data.pushName || "").slice(0,160) || null : null,
+    createdAt: (() => { const n=Number(data.moment || data.timestamp); const date=new Date(n*(n>1e12?1:1000)); return n && Number.isFinite(date.getTime()) && date.getTime() < Date.now()+300000 ? date.toISOString() : new Date().toISOString(); })(),
     body: String(text).slice(0, 10000) || `[${kind}]`,
     kind,
   };

@@ -17,6 +17,9 @@ interface Status {
   phone?: string;
   instance_id?: string;
   receiving_enabled?: boolean;
+  shared?: boolean;
+  last_webhook_at?: string;
+  webhook_url?: string;
 }
 export default function AgencyWhatsApp() {
   const [status, setStatus] = useState<Status | null>(null);
@@ -67,7 +70,8 @@ export default function AgencyWhatsApp() {
       setSettings(false);
       if (!current.connected || !current.receiving_enabled) {
         const data = await whatsappRequest<{ qrcode: string }>("connect");
-        setQr(data.qrcode);
+        setQr(data.qrcode || "");
+        await refresh();
       }
     } catch (e) {
       setError((e as Error).message);
@@ -134,6 +138,7 @@ export default function AgencyWhatsApp() {
           </Button>
         </div>
       </div>
+      {status?.configured && <div className="rounded-lg border p-3 space-y-2 text-sm"><p>{status.shared ? 'Webhook compartilhado com Vértice. O encaminhamento existente da automação é preservado.' : 'Recebimento pela instância configurada.'}</p><p className="text-muted-foreground">{status.last_webhook_at ? `Última mensagem recebida pelo webhook: ${new Date(status.last_webhook_at).toLocaleString('pt-BR')}` : 'Nenhuma mensagem confirmada pelo webhook ainda.'}</p><Button variant="outline" disabled={busy} onClick={async()=>{setBusy(true);try{await whatsappRequest('connect');await refresh();}catch(e){setError((e as Error).message)}finally{setBusy(false)}}}>Ativar recebimento de mensagens</Button>{status.webhook_url && <><Label htmlFor="whatsapp-webhook">Webhook da Central (link privado)</Label><Input id="whatsapp-webhook" type="password" readOnly value={status.webhook_url}/><Button variant="ghost" onClick={()=>navigator.clipboard.writeText(status.webhook_url!)}>Copiar webhook</Button></>}</div>}
       {error && !open && (
         <p role="alert" className="text-sm text-destructive">
           {error}
@@ -211,9 +216,7 @@ export default function AgencyWhatsApp() {
             <form className="space-y-3" onSubmit={configure}>
               <h3 className="font-medium">Configuração inicial da conexão</h3>
               <p className="text-sm text-muted-foreground">
-                A agência configura uma instância W-API dedicada à Central uma
-                vez. Depois, qualquer número pode ser conectado pelo QR Code. O
-                token fica somente no servidor.
+                Configure a instância W-API e o token. A mesma instância pode compartilhar mensagens com o Vértice. O token fica somente no servidor.
               </p>
               <Label htmlFor="whatsapp-instance">ID da instância</Label>
               <Input
@@ -235,18 +238,6 @@ export default function AgencyWhatsApp() {
                 onChange={(e) => setForm({ ...form, token: e.target.value })}
                 maxLength={4000}
               />
-              <label className="flex items-start gap-2 text-sm">
-                <input
-                  required
-                  type="checkbox"
-                  checked={form.dedicated}
-                  onChange={(e) =>
-                    setForm({ ...form, dedicated: e.target.checked })
-                  }
-                />
-                Esta instância é dedicada à Central. Conectar direciona o
-                recebimento dela para este CRM.
-              </label>
               <Button type="submit" disabled={busy}>
                 Salvar configuração
               </Button>

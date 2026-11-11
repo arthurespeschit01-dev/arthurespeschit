@@ -12,7 +12,7 @@ describe("WhatsApp contacts and inbound events", () => {
       whatsappPhoneKey("1199990000"),
     );
   });
-  it("accepts inbound contact messages and ignores echoes and groups", () => {
+  it("accepts inbound and outgoing phone messages and ignores groups and receipts", () => {
     const data = {
       messageId: "fixture-1",
       sender: { id: "5511999990000@s.whatsapp.net" },
@@ -21,9 +21,7 @@ describe("WhatsApp contacts and inbound events", () => {
     expect(
       normalizeWhatsappEvent({ event: "webhookReceived", data })?.body,
     ).toBe("Olá");
-    expect(
-      normalizeWhatsappEvent({ data: { ...data, fromMe: true } }),
-    ).toBeNull();
+    expect(normalizeWhatsappEvent({data:{...data,fromMe:true,chat:{id:'5511888880000'}}})).toMatchObject({direction:'saida',phone:'5511888880000'});
     expect(
       normalizeWhatsappEvent({ data: { ...data, chat: { id: "group@g.us" } } }),
     ).toBeNull();

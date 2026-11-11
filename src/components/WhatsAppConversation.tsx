@@ -16,12 +16,14 @@ export default function WhatsAppConversation({
   phone,
   onChanged,
 }: {
-  cardId: string;
+  cardId?: string;
   phone: string;
   onChanged: () => void;
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
+  const [hasMore,setHasMore]=useState(false);
+  const [olderBusy,setOlderBusy]=useState(false);
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
   const requestId = useRef<string | null>(null);
@@ -29,10 +31,12 @@ export default function WhatsAppConversation({
   const initialized = useRef(false);
   const load = useCallback(async () => {
     try {
-      const data = await whatsappRequest<{ messages: Message[] }>("messages", {
+      const data = await whatsappRequest<{ messages: Message[]; has_more?:boolean }>("messages", {
         card_id: cardId,
+        phone,
       });
-      setMessages(data.messages);
+      setMessages(current=>{const latestIds=new Set(data.messages.map(m=>m.id));return [...current.filter(m=>!latestIds.has(m.id) && new Date(m.created_at)<new Date(data.messages[0]?.created_at || 0)),...data.messages]});
+      setHasMore(data.has_more || false);
       setError("");
       const latest = data.messages[data.messages.length - 1]?.id || null;
       if (initialized.current && lastId.current !== latest) onChanged();
@@ -41,7 +45,7 @@ export default function WhatsAppConversation({
     } catch (e) {
       setError((e as Error).message);
     }
-  }, [cardId, onChanged]);
+  }, [cardId, phone, onChanged]);
   useEffect(() => {
     if (!phone.trim()) return;
     void load();
@@ -50,6 +54,7 @@ export default function WhatsAppConversation({
     }, 5000);
     return () => window.clearInterval(interval);
   }, [load, phone]);
+  const loadOlder=async()=>{setOlderBusy(true);try{const data=await whatsappRequest<{messages:Message[];has_more:boolean}>('messages',{card_id:cardId,phone,offset:messages.length});setMessages(current=>[...data.messages.filter(m=>!current.some(c=>c.id===m.id)),...current]);setHasMore(data.has_more);}catch(e){setError((e as Error).message)}finally{setOlderBusy(false)}};
   const send = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!text.trim() || sending) return;
@@ -59,6 +64,7 @@ export default function WhatsAppConversation({
     try {
       await whatsappRequest("send", {
         card_id: cardId,
+        phone,
         text: text.trim(),
         request_id: requestId.current,
       });
@@ -84,10 +90,10 @@ export default function WhatsAppConversation({
       className="space-y-3 border-t pt-4"
       aria-label="Conversa WhatsApp do card"
     >
+      {hasMore && <Button variant="outline" disabled={olderBusy} onClick={()=>void loadOlder()}>Carregar mensagens anteriores</Button>}
       <h3 className="font-semibold">WhatsApp · {phone}</h3>
       <p className="text-xs text-muted-foreground">
-        Últimas 100 mensagens recebidas após a conexão e enviadas por esta
-        Central.
+        Mensagens recebidas e enviadas por este número, inclusive fora do CRM.
       </p>
       <div className="max-h-72 overflow-y-auto space-y-2 rounded-lg bg-muted/20 p-3">
         {messages.map((message) => (
