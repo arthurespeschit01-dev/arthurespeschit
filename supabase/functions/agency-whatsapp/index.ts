@@ -1,7 +1,9 @@
+import {ingestWhatsapp,reconcileWhatsapp} from '../_shared/agency-whatsapp-sync.ts';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.103.2";
 import {
   normalizeWhatsappEvent,
   whatsappPhone,
+  validWhatsappAddress,
 } from "../_shared/agency-whatsapp.ts";
 
 const headers = {
@@ -67,39 +69,24 @@ Deno.serve(async (request) => {
     if (raw.length > 256000)
       return respond({ error: "Solicitação muito grande" }, 413);
     const body = JSON.parse(raw);
-    if (url.searchParams.has("webhook")) {
-      const secret = url.searchParams.get("webhook") || "";
+    if (url.searchParams.has("webhook") || url.searchParams.has("reconcile")) {
+      const secret = url.searchParams.get("webhook") || url.searchParams.get("reconcile") || "";
       if (!/^[a-f0-9]{64}$/.test(secret))
         return respond({ error: "Não autorizado" }, 401);
       const { data: connection, error } = await db
         .from("agency_whatsapp_connections")
-        .select("user_id,instance_id")
+        .select("*")
         .eq("webhook_secret", secret)
         .eq("receiving_enabled", true)
         .maybeSingle();
       if (error) throw error;
       if (!connection) return respond({ error: "Não autorizado" }, 401);
-      const instanceId = body.instanceId || body.data?.instanceId;
-      if (instanceId && instanceId !== connection.instance_id)
-        return respond({ error: "Instância inválida" }, 403);
-      const event = normalizeWhatsappEvent(body);
-      if (!event) return respond({ ignored: true });
-      const { error: insertError } = await db
-        .from("agency_whatsapp_messages")
-        .insert({
-          user_id: connection.user_id,
-          phone: event.phone,
-          provider_message_id: event.providerId,
-          body: event.body,
-          kind: event.kind,
-          direction: event.direction,
-          status: event.direction === "saida" ? "enviado" : "recebido",
-          contact_name: event.contactName,
-          created_at: event.createdAt,
-        });
-      if (insertError && insertError.code !== "23505") throw insertError;
+      if(url.searchParams.has('reconcile'))return respond(await reconcileWhatsapp(db,connection));
+      const instanceId=body.instanceId||body.data?.instanceId;
+      if(instanceId&&instanceId!==connection.instance_id)return respond({error:'Instância inválida'},403);
+      const result=await ingestWhatsapp(db,connection,body);
       await db.from("agency_whatsapp_connections").update({last_webhook_at:new Date().toISOString()}).eq('user_id',connection.user_id);
-      return respond({ ok: true });
+      return respond(result);
     }
     const auth = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: {
@@ -173,11 +160,11 @@ Deno.serve(async (request) => {
         if(!card) return respond({error:'Card não encontrado.'},404);
         phone=whatsappPhone(card.phone);
       }
-      if (!/^\d{10,15}$/.test(phone)) return respond({error:'Informe um telefone válido.'},400);
+      if (!validWhatsappAddress(phone)) return respond({error:'Informe um telefone válido.'},400);
       const {whatsappPhoneKey}=await import('../_shared/agency-whatsapp.ts');
       const { data, error: messageError } = await db
         .from("agency_whatsapp_messages")
-        .select("id,direction,status,body,kind,created_at")
+        .select("id,direction,status,body,kind,created_at,sender_name")
         .eq("user_id", user.id)
         .eq("phone_key", whatsappPhoneKey(phone))
         .is("duplicate_of",null)
@@ -196,6 +183,7 @@ Deno.serve(async (request) => {
             },
             409,
           );
+    if(body.action === 'reconcile') return respond(connection.bridge_url ? await reconcileWhatsapp(db,connection) : {ok:true});
     if(body.action === 'sync_history') {
       if(!connection.bridge_url)return respond({error:'O histórico do Vértice ainda não está vinculado a esta instância.'},409);
       const offset=Math.max(0,Math.min(Number(body.offset)||0,100000));
@@ -216,6 +204,8 @@ Deno.serve(async (request) => {
         receiving_enabled: connection.receiving_enabled,
         shared: !!connection.bridge_url,
         last_webhook_at: connection.last_webhook_at || null,
+        reconciled_at:connection.reconciled_at || null,
+        sync_error:connection.sync_error || null,
         webhook_url: `${supabaseUrl}/functions/v1/agency-whatsapp?webhook=${connection.webhook_secret}`,
       });
     }
@@ -278,7 +268,7 @@ Deno.serve(async (request) => {
         if(!pipeline)return respond({error:'A conversa deve estar vinculada a um card comercial.'},400);
         phone=whatsappPhone(card.phone);
       }
-      if (!/^\d{10,15}$/.test(phone))
+      if (!validWhatsappAddress(phone))
         return respond({ error: "Cadastre um telefone válido no card." }, 400);
       const { data: existing, error: existingError } = await db
         .from("agency_whatsapp_messages")

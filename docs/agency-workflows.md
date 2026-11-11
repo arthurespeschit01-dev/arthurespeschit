@@ -68,3 +68,13 @@ A publicação deve manter o mesmo projeto Supabase e as mesmas configurações 
 - Configurações mostra se o recebimento é compartilhado e o último webhook confirmado. Ativar recebimento usa o campo `value` documentado pela W-API. No modo compartilhado, a Central não substitui o destino pelo próprio endpoint.
 - Sincronizar histórico importa páginas do histórico já registrado no Vértice. IDs do provedor evitam duplicação; registros sem ID recebem uma chave estável do Vértice. Não equivale a acessar mensagens antigas que nunca foram registradas pelo provedor ou pelo Vértice. Anexos são identificados pelo tipo nesta versão.
 - Uma confirmação de envio concorrente com seu eco preserva ambos os registros e oculta a duplicata, sem apagar mensagens. Importar registros antigos não regride o status atual da conversa no CRM.
+
+## Atualização contínua e identidade das conversas
+
+A tela de Conversas usa lista lateral, cabeçalho do contato/grupo, mensagens com rolagem própria e compositor fixo. No celular, alterna entre lista e conversa. Não depende de botões de atualização.
+
+Mensagens e metadados têm assinatura Postgres Changes com RLS por usuário. Há consulta automática de segurança a cada seis segundos e retomada ao voltar para a janela. Mensagens lidas são registradas por conversa. O carregamento de páginas antigas não é descartado pelo recebimento de mensagens novas.
+
+O Vértice encaminha diretamente os próprios envios aceitos pelo provedor. Webhooks e envios são guardados também em uma fila privada de eventos; falhas de entrega não interrompem n8n. A reconciliação agendada no servidor recupera a fila, os envios recentes do Vértice e, quando o plano do provedor permite, seus logs de webhook. A rotina usa um bloqueio temporário por instância para evitar execuções simultâneas e roda mesmo sem navegador aberto.
+
+A agenda do provedor e os metadados dos grupos alimentam uma tabela de identidades. Nomes salvos têm prioridade sobre apelidos de remetentes. Grupos preservam o JID completo `@g.us`, não viram telefones nem oportunidades individuais. Participantes são mostrados no balão da mensagem. O nome de um grupo nunca é deduzido apenas pelo nome de um contato.

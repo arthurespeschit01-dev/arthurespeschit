@@ -23,6 +23,7 @@ assert.deepEqual((await db.query('select to_jsonb(c) as data from clients c')).r
 
 await db.exec(await readFile(new URL('../supabase/migrations/20261111152507_agency_whatsapp.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../supabase/migrations/20261111183242_whatsapp_inbox_shared.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../supabase/migrations/20261111185241_whatsapp_live_conversations.sql',import.meta.url),'utf8'));
 const login=async(id)=>{await db.exec('reset role');await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id||'']);await db.exec(`set role ${id?'authenticated':'anon'}`)};
 await login(owner);
 const pipeline=randomUUID(),stage=randomUUID(),card=randomUUID();
@@ -46,5 +47,19 @@ const echo=(await db.query("insert into agency_whatsapp_messages(user_id,provide
 await db.query("select agency_confirm_whatsapp_send($1,$2,'echo')",[owner,pending]);
 assert.equal((await db.query('select duplicate_of from agency_whatsapp_messages where id=$1',[pending])).rows[0].duplicate_of,echo);
 assert.equal((await db.query('select count(*)::int n from agency_whatsapp_messages')).rows[0].n,5,'deduplication retains every record');
+
+await db.exec('reset role');
+await db.query("select agency_whatsapp_chat_metadata($1,'5511888880000','Nome salvo no WhatsApp','contact',false)",[owner]);
+await db.query("select agency_whatsapp_chat_metadata($1,'5511888880000','Apelido do remetente','push',false)",[owner]);
+await db.query("select agency_whatsapp_chat_metadata($1,'120363123456789@g.us','Renata Guedes','group',true)",[owner]);
+await db.query("insert into agency_whatsapp_messages(user_id,provider_message_id,phone,body,direction,status,sender_name) values($1,'group-event','120363123456789@g.us','Mensagem no grupo','entrada','recebido','Participante')",[owner]);
+await login(owner);
+let results=(await db.query("select agency_whatsapp_inbox('',0) result")).rows[0].result;
+assert(results.some(c=>c.name==='Nome salvo no WhatsApp'),'push name must not overwrite saved contact name');
+assert(results.some(c=>c.name==='Renata Guedes' && c.is_group && c.phone==='120363123456789@g.us'),'group must retain its own identity');
+await db.query("select agency_whatsapp_mark_read('120363123456789@g.us')");
+results=(await db.query("select agency_whatsapp_inbox('Renata',0) result")).rows[0].result;
+assert.equal(results[0].unread_count,0);
+await login(other);assert.equal((await db.query("select agency_whatsapp_inbox('Renata',0) result")).rows[0].result.length,0);
 await login(null);await assert.rejects(db.query("select agency_whatsapp_inbox('',0)"));
 await db.close();console.log('PASS: inbox includes outside conversations and CRM cards; search and RLS isolate owners; historical messages preserve current status; send echo deduplicated without deleting records');

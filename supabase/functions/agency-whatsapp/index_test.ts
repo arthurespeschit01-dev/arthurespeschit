@@ -100,6 +100,7 @@ Deno.test(
               : [],
           ),
         );
+      if(url.pathname.endsWith('/rpc/agency_whatsapp_chat_metadata'))return Promise.resolve(json(null));
       if (
         url.pathname.endsWith("/agency_whatsapp_messages") &&
         init?.method === "POST"

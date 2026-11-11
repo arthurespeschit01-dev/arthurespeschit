@@ -34,6 +34,7 @@ for (const name of [
   "20261111152507_agency_whatsapp.sql",
   "20261111171948_commercial_dashboard_client_operations.sql",
   "20261111183242_whatsapp_inbox_shared.sql",
+  "20261111185241_whatsapp_live_conversations.sql",
 ])
   await db.exec(
     await readFile(
@@ -108,6 +109,7 @@ await context.route("https://*.supabase.co/**", async (route) => {
       return response(route, url.pathname.endsWith("/user") ? user : session);
     if (url.pathname.includes("/functions/v1/")) {
       if (url.pathname.endsWith("agency-whatsapp")) {
+        if (body.action === 'reconcile')return response(route,{ok:true});
         if (body.action === "status")
           return response(route, {
             configured: true,
@@ -153,6 +155,7 @@ await context.route("https://*.supabase.co/**", async (route) => {
         503,
       );
     }
+    if (url.pathname.endsWith('/rpc/agency_whatsapp_mark_read')) {await db.query('select agency_whatsapp_mark_read($1)',[body.p_address]);return response(route,null);}
     if (url.pathname.endsWith('/rpc/agency_whatsapp_inbox')) { const result=await db.query("select set_config('request.jwt.claim.sub',$1,false)",[owner]); const inbox=await db.query('select agency_whatsapp_inbox($1,$2) result',[body.p_search,body.p_offset]); return response(route,inbox.rows[0].result); }
     if (url.pathname.endsWith('/rpc/save_agency_client')) {
       const result = await db.query('select public.save_agency_client($1,$2::jsonb,$3::jsonb) id',[body.p_id,JSON.stringify(body.p_client),JSON.stringify(body.p_operation)]);
@@ -345,6 +348,23 @@ try {
   await page.getByRole('button',{name:'Enviar pelo WhatsApp',exact:true}).click();
   await page.getByText('Resposta sem card',{exact:true}).filter({visible:true}).last().waitFor();
   assert.equal((await db.query("select count(*)::int n from agency_pipeline_cards where phone='5511888880000'")).rows[0].n,0);
+  assert.equal(await page.getByRole('button',{name:'Atualizar conversas',exact:true}).count(),0);
+  await db.query("insert into agency_whatsapp_messages(user_id,provider_message_id,phone,body,direction,status) values($1,'automatic-reply','5511888880000','Chegou sem atualizar a página','entrada','recebido')",[owner]);
+  await page.getByLabel('Mensagens da conversa').getByText('Chegou sem atualizar a página',{exact:true}).waitFor({timeout:12000});
+  await db.query("select agency_whatsapp_chat_metadata($1,'120363123456789@g.us','Renata Guedes','group',true)",[owner]);
+  await db.query("insert into agency_whatsapp_messages(user_id,provider_message_id,phone,body,direction,status,sender_name) values($1,'group-reply','120363123456789@g.us','Mensagem no grupo','entrada','recebido','Participante')",[owner]);
+  await page.getByRole('button').filter({hasText:'Renata Guedes'}).waitFor({timeout:12000});
+  await page.getByRole('button').filter({hasText:'Renata Guedes'}).click();
+  await page.getByText('Grupo do WhatsApp',{exact:true}).waitFor();
+  await page.getByLabel('Mensagens da conversa').getByText('Participante',{exact:true}).waitFor();
+  if(process.env.TEST_SCREENSHOT_DIR) await page.screenshot({path:`${process.env.TEST_SCREENSHOT_DIR}/conversations-desktop.png`,fullPage:true});
+  assert(await page.getByLabel('Mensagens da conversa').evaluate(el=>el.getBoundingClientRect().height>500));
+  await page.setViewportSize({width:390,height:844});
+  if(process.env.TEST_SCREENSHOT_DIR) await page.screenshot({path:`${process.env.TEST_SCREENSHOT_DIR}/conversations-mobile.png`,fullPage:true,animations:'disabled'});
+  await page.getByRole('button',{name:'Voltar às conversas',exact:true}).click();
+  await page.getByRole('heading',{name:'Conversas',exact:true}).waitFor();
+  await page.setViewportSize({width:1440,height:1000});
+
   await page.goto(`${base}/operacao`);
   await page
     .getByRole("button", { name: "Nova pipeline", exact: true })

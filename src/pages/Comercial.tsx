@@ -9,6 +9,7 @@ export default function Comercial() {
  const {pathname}=useLocation();const navigate=useNavigate();
  const suffix=pathname.split('/')[2];
  const section=['crm','conversas','formularios','agendamentos'].includes(suffix) ? suffix : 'dashboard';
+ if(section==='conversas')return <WhatsAppInbox/>;
  return <div className="space-y-6">
   {section!=='dashboard' && <div><h1 className="text-2xl font-bold">Comercial</h1><p className="text-sm text-muted-foreground mt-1">CRM, formulários e agendamentos da sua agência.</p></div>}
   <Tabs value={section} onValueChange={value=>navigate(value==='dashboard'?'/comercial':`/comercial/${value}`)}>

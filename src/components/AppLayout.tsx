@@ -270,7 +270,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </main>
         </div>
 
-        <SupportFAB />
+        {pathname !== '/comercial/conversas' && <SupportFAB />}
       </div>
     </TooltipProvider>
   );
