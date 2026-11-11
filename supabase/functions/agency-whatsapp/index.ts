@@ -1,3 +1,4 @@
+import {resolveWhatsappAccount,mirrorToVertice} from '../_shared/agency-whatsapp-accounts.ts';
 import {ingestWhatsapp,reconcileWhatsapp} from '../_shared/agency-whatsapp-sync.ts';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.103.2";
 import {
@@ -134,6 +135,9 @@ Deno.serve(async (request) => {
             ? {
                 receiving_enabled: false,
                 bridge_url: null,
+                active_account_id:null,
+                reconciled_at:null,
+                directory_synced_at:null,
                 webhook_secret:
                   crypto.randomUUID().replace(/-/g, "") +
                   crypto.randomUUID().replace(/-/g, ""),
@@ -150,7 +154,14 @@ Deno.serve(async (request) => {
           },
           400,
         );
+      if(!sameInstance)await db.from('agency_whatsapp_account_state').upsert({user_id:user.id,account_id:null,connected:false,checked_at:new Date().toISOString()});
       return respond({ ok: true });
+    }
+    if(body.action==='messages'||body.action==='send'||body.action==='status'){
+      if(connection){const active=await resolveWhatsappAccount(db,connection,body.action==='send'||body.action==='status');
+       connection.active_number=active.phone;connection.active_account_id=active.account_id;
+       if(body.action!=='status'&&(!active.connected || body.account_id && body.account_id!==active.account_id))return respond({error:'O número conectado mudou ou foi desconectado. Abra a conversa no número correto.'},409);
+      }else if(body.action!=='status')return respond({error:'Conecte o WhatsApp para abrir as conversas.'},409);
     }
     if (body.action === "messages") {
       let phone = whatsappPhone(body.phone);
@@ -167,6 +178,7 @@ Deno.serve(async (request) => {
         .select("id,direction,status,body,kind,created_at,sender_name")
         .eq("user_id", user.id)
         .eq("phone_key", whatsappPhoneKey(phone))
+        .eq("account_id",connection.active_account_id)
         .is("duplicate_of",null)
         .order("created_at", { ascending: false })
         .order("id")
@@ -184,23 +196,17 @@ Deno.serve(async (request) => {
             409,
           );
     if(body.action === 'reconcile') return respond(connection.bridge_url ? await reconcileWhatsapp(db,connection) : {ok:true});
-    if(body.action === 'sync_history') {
-      if(!connection.bridge_url)return respond({error:'O histórico do Vértice ainda não está vinculado a esta instância.'},409);
-      const offset=Math.max(0,Math.min(Number(body.offset)||0,100000));
-      const response=await fetch(connection.bridge_url,{method:'POST',headers:{'content-type':'application/json','x-central-secret':connection.webhook_secret},body:JSON.stringify({action:'history',instance_id:connection.instance_id,offset}),signal:AbortSignal.timeout(20000)});
-      if(!response.ok)return respond({error:'Não foi possível consultar o histórico do Vértice.'},502);
-      const result=await response.json();
-      const rows=result.messages.map((m:any)=>({user_id:user.id,provider_message_id:m.provider_id,phone:whatsappPhone(m.phone),body:String(m.body || `[${m.kind}]`).slice(0,10000),kind:m.kind,direction:m.direction,status:m.status,created_at:m.created_at})).filter((m:any)=>/^\d{10,15}$/.test(m.phone));
-      if(rows.length){const {error}=await db.from('agency_whatsapp_messages').upsert(rows,{onConflict:'user_id,provider_message_id',ignoreDuplicates:true});if(error)throw error;}
-      return respond({count:rows.length,has_more:result.has_more,next_offset:offset+result.messages.length});
-    }
+    if(body.action === 'sync_history') return respond({error:'O histórico é recuperado automaticamente por número conectado.'},409);
     if (body.action === "status") {
-      const info = await provider(connection, "GET", "instance/fetch-instance");
+      const {count:legacyCount}=await db.from('agency_whatsapp_messages').select('id',{count:'exact',head:true}).eq('user_id',user.id).is('account_id',null);
+      const info = {connected:!!connection.active_account_id,connectedPhone:connection.active_number};
       return respond({
         configured: true,
+        legacy_count:legacyCount||0,
         connected: !!info.connected,
         phone: info.connectedPhone || null,
         instance_id: connection.instance_id,
+        account_id:connection.active_account_id,
         receiving_enabled: connection.receiving_enabled,
         shared: !!connection.bridge_url,
         last_webhook_at: connection.last_webhook_at || null,
@@ -248,6 +254,7 @@ Deno.serve(async (request) => {
     }
     if (body.action === "disconnect") {
       await provider(connection, "GET", "instance/disconnect");
+      await db.from('agency_whatsapp_account_state').upsert({user_id:user.id,account_id:null,connected:false,checked_at:new Date().toISOString()});
       return respond({ ok: true });
     }
     if (body.action === "send") {
@@ -276,6 +283,7 @@ Deno.serve(async (request) => {
         .select("id,status,phone,body")
         .eq("user_id", user.id)
         .eq("request_id", body.request_id)
+        .eq("account_id",connection.active_account_id)
         .maybeSingle();
       if (existingError) throw existingError;
       if (
@@ -296,6 +304,7 @@ Deno.serve(async (request) => {
         .insert({
           user_id: user.id,
           request_id: body.request_id,
+          account_id:connection.active_account_id,
           phone,
           body: body.text.trim(),
           direction: "saida",
@@ -325,7 +334,10 @@ Deno.serve(async (request) => {
             },
             502,
           );
-        return respond({ ok: true });
+        const {data:sent}=await db.from('agency_whatsapp_messages').select('*').eq('id',info.id).eq('user_id',user.id).single();
+        if(sent?.duplicate_of){const {data:canonical}=await db.from('agency_whatsapp_messages').select('provider_message_id').eq('id',sent.duplicate_of).eq('user_id',user.id).eq('account_id',sent.account_id).single();if(canonical)sent.provider_message_id=canonical.provider_message_id;}
+        let synced=false;try{if(sent)synced=(await mirrorToVertice(db,connection,sent,connection.active_number)).delivered;}catch{/* durable recovery retries without resending WhatsApp */}
+        return respond({ ok: true,sync_pending:!!connection.bridge_url&&!synced });
       } catch {
         await db
           .from("agency_whatsapp_messages")

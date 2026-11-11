@@ -1,3 +1,5 @@
+import {useWhatsAppAccount} from '@/hooks/useWhatsAppAccount';
+import {useWhatsAppLive} from '@/hooks/useWhatsAppLive';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import WhatsAppConversation from "@/components/WhatsAppConversation";
@@ -38,6 +40,7 @@ type CardDraft = Omit<PipelineCard, "id" | "updated_at"> & { id?: string };
 
 export default function PipelineBoard({ area }: { area: PipelineArea }) {
   const { user } = useAuth();
+  const account=useWhatsAppAccount();
   const queryClient = useQueryClient();
   const [params] = useSearchParams();
   const [contactFilter, setContactFilter] = useState(params.get("resposta") || "all");
@@ -63,6 +66,7 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
   } | null>(null);
   const [draft, setDraft] = useState<CardDraft | null>(null);
   const [contactStatusDirty, setContactStatusDirty] = useState(false);
+  useEffect(()=>{setDraft(null)},[account.data?.account_id]);
   const activePipeline = pipelines.find((p) => p.id === selected);
   const boardStages = stages
     .filter((s) => s.pipeline_id === selected)
@@ -70,6 +74,7 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
   const boardCards = cards.filter(
     (c) =>
       c.pipeline_id === selected &&
+      (area!=="comercial" || !c.whatsapp_account_id || c.whatsapp_account_id===account.data?.account_id && account.data?.connected) &&
       (area !== "comercial" || contactFilter === "all" || c.contact_status === contactFilter) &&
       (showInactive || !c.client_id || activeClientIds.has(c.client_id)) &&
       `${c.title} ${c.phone}`.toLowerCase().includes(search.toLowerCase()),
@@ -138,6 +143,7 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
   useEffect(() => {
     void load();
   }, [load]);
+  useWhatsAppLive(()=>{if(area==="comercial")void load()});
   const refreshConversation = useCallback(async () => {
     const updated = await load();
     if (updated)
@@ -399,13 +405,14 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
           {[
             [
               "Contatos nesta pipeline",
-              cards.filter((c) => c.pipeline_id === selected).length,
+              cards.filter((c) => c.pipeline_id === selected && (!c.whatsapp_account_id || c.whatsapp_account_id===account.data?.account_id && account.data?.connected)).length,
             ],
             [
               "Aguardando nossa resposta",
               cards.filter(
                 (c) =>
                   c.pipeline_id === selected &&
+      (area!=="comercial" || !c.whatsapp_account_id || c.whatsapp_account_id===account.data?.account_id && account.data?.connected) &&
                   c.contact_status === "aguardando_agencia",
               ).length,
             ],
@@ -414,6 +421,7 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
               cards.filter(
                 (c) =>
                   c.pipeline_id === selected &&
+      (area!=="comercial" || !c.whatsapp_account_id || c.whatsapp_account_id===account.data?.account_id && account.data?.connected) &&
                   c.contact_status === "aguardando_cliente",
               ).length,
             ],
@@ -421,7 +429,7 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
               "Valor das oportunidades",
               money(
                 cards
-                  .filter((c) => c.pipeline_id === selected)
+                  .filter((c) => c.pipeline_id === selected && (!c.whatsapp_account_id || c.whatsapp_account_id===account.data?.account_id && account.data?.connected))
                   .reduce((sum, c) => sum + Number(c.value), 0),
               ),
             ],

@@ -10,6 +10,8 @@ export function useWhatsAppLive(onUpdate:()=>void){
   const channel=supabase.channel(`whatsapp-${user.id}-${crypto.randomUUID()}`)
    .on('postgres_changes',{event:'*',schema:'public',table:'agency_whatsapp_messages',filter:`user_id=eq.${user.id}`},refresh)
    .on('postgres_changes',{event:'*',schema:'public',table:'agency_whatsapp_chats',filter:`user_id=eq.${user.id}`},refresh)
+   .on('postgres_changes',{event:'*',schema:'public',table:'agency_pipeline_cards',filter:`user_id=eq.${user.id}`},refresh)
+   .on('postgres_changes',{event:'*',schema:'public',table:'agency_whatsapp_account_state',filter:`user_id=eq.${user.id}`},refresh)
    .subscribe(status=>{if(active){setConnected(status==='SUBSCRIBED');if(status==='SUBSCRIBED')refresh()}});
   const visible=()=>{if(!document.hidden)refresh()};
   const timer=setInterval(visible,6000);

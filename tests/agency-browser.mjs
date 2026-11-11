@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 // All remote API calls are intercepted. No production credentials/data are used.
 const db = new PGlite();
 const owner = randomUUID();
+const mailboxA=randomUUID(),mailboxB=randomUUID();let activeMailbox=mailboxA,fixtureConnected=true;let statusCalls=0;
 const activeClient = randomUUID();
 await db.exec(`
   create role authenticated;
@@ -36,6 +37,7 @@ for (const name of [
   "20261111183242_whatsapp_inbox_shared.sql",
   "20261111185241_whatsapp_live_conversations.sql",
   "20261111190630_whatsapp_directory_availability.sql",
+  "20261111192108_whatsapp_number_mailboxes_crm.sql",
 ])
   await db.exec(
     await readFile(
@@ -43,6 +45,9 @@ for (const name of [
       "utf8",
     ),
   );
+await db.query("insert into agency_whatsapp_accounts(id,user_id,phone) values($1,$2,'553171789803'),($3,$2,'5531999991111')",[mailboxA,owner,mailboxB]);
+await db.query('insert into agency_whatsapp_account_state(user_id,account_id,connected) values($1,$2,true)',[owner,mailboxA]);
+await db.exec(`alter table agency_whatsapp_messages alter column account_id set default '${mailboxA}'::uuid`);
 const browser = await chromium.launch({
   headless: true,
   ...(process.env.CHROMIUM_PATH
@@ -111,13 +116,18 @@ await context.route("https://*.supabase.co/**", async (route) => {
     if (url.pathname.includes("/functions/v1/")) {
       if (url.pathname.endsWith("agency-whatsapp")) {
         if (body.action === 'reconcile')return response(route,{ok:true});
-        if (body.action === "status")
+        if (body.action === "status") {
+          statusCalls++;
+          await db.query('update agency_whatsapp_account_state set account_id=$1,connected=$2,checked_at=now() where user_id=$3',[activeMailbox,fixtureConnected,owner]);
           return response(route, {
             configured: true,
-            connected: false,
+            connected: fixtureConnected,
+            account_id:fixtureConnected?activeMailbox:null,
+            phone:activeMailbox===mailboxA?"553171789803":"5531999991111",
             instance_id: "fixture",
             receiving_enabled: true,
           });
+        }
         if (body.action === "connect")
           return response(route, {
             qrcode:
@@ -134,8 +144,8 @@ await context.route("https://*.supabase.co/**", async (route) => {
           return response(route, {
             messages: (
               await db.query(
-                "select * from agency_whatsapp_messages where user_id=$1 and phone_key=$2 order by created_at",
-                [owner, card.whatsapp_phone_key],
+                "select * from agency_whatsapp_messages where user_id=$1 and phone_key=$2 and account_id=$3 order by created_at",
+                [owner, card.whatsapp_phone_key,activeMailbox],
               )
             ).rows,
           });
@@ -157,7 +167,7 @@ await context.route("https://*.supabase.co/**", async (route) => {
       );
     }
     if (url.pathname.endsWith('/rpc/agency_whatsapp_mark_read')) {await db.query('select agency_whatsapp_mark_read($1)',[body.p_address]);return response(route,null);}
-    if (url.pathname.endsWith('/rpc/agency_whatsapp_inbox') || url.pathname.endsWith('/rpc/agency_whatsapp_inbox_v2')) { const result=await db.query("select set_config('request.jwt.claim.sub',$1,false)",[owner]); const inbox=await db.query('select agency_whatsapp_inbox($1,$2) result',[body.p_search,body.p_offset]); return response(route,inbox.rows[0].result); }
+    if (url.pathname.endsWith('/rpc/agency_whatsapp_inbox') || url.pathname.endsWith('/rpc/agency_whatsapp_inbox_v2')) { const result=await db.query("select set_config('request.jwt.claim.sub',$1,false)",[owner]); const inbox=await db.query('select agency_whatsapp_inbox_v2($1,$2,$3) result',[body.p_search,body.p_offset,body.p_filter||'all']); return response(route,inbox.rows[0].result); }
     if (url.pathname.endsWith('/rpc/save_agency_client')) {
       const result = await db.query('select public.save_agency_client($1,$2::jsonb,$3::jsonb) id',[body.p_id,JSON.stringify(body.p_client),JSON.stringify(body.p_operation)]);
       return response(route,result.rows[0].id);
@@ -252,6 +262,7 @@ try {
     .waitFor();
   assert.equal(await page.getByRole('button', { name: 'Conectar WhatsApp', exact: true }).count(), 0);
   assert.equal(await page.getByRole('navigation').getByRole('link', { name: 'Clientes', exact: true }).evaluate(link => link.nextElementSibling?.querySelector('button')?.getAttribute('aria-label')), 'Operações');
+  fixtureConnected=false;
   await page.goto(`${base}/configuracoes`);
   await page.getByRole('button', { name: 'Configurar instância e token', exact: true }).click();
   await page.getByLabel('ID da instância', { exact: true }).waitFor();
@@ -270,6 +281,7 @@ try {
     .getByRole("dialog")
     .getByRole("button", { name: "Close", exact: true })
     .click();
+  fixtureConnected=true;
   await page.goto(`${base}/comercial/crm`);
   await page.getByRole("button", { name: "Novo card", exact: true }).click();
   await page
@@ -348,11 +360,11 @@ try {
   await page.getByLabel('Mensagem WhatsApp',{exact:true}).fill('Resposta sem card');
   await page.getByRole('button',{name:'Enviar pelo WhatsApp',exact:true}).click();
   await page.getByText('Resposta sem card',{exact:true}).filter({visible:true}).last().waitFor();
-  assert.equal((await db.query("select count(*)::int n from agency_pipeline_cards where phone='5511888880000'")).rows[0].n,0);
+  assert.equal((await db.query("select count(*)::int n from agency_pipeline_cards where phone='5511888880000'")).rows[0].n,1);
   assert.equal(await page.getByRole('button',{name:'Atualizar conversas',exact:true}).count(),0);
   await db.query("insert into agency_whatsapp_messages(user_id,provider_message_id,phone,body,direction,status) values($1,'automatic-reply','5511888880000','Chegou sem atualizar a página','entrada','recebido')",[owner]);
   await page.getByLabel('Mensagens da conversa').getByText('Chegou sem atualizar a página',{exact:true}).waitFor({timeout:12000});
-  await db.query("select agency_whatsapp_chat_metadata($1,'120363123456789@g.us','Renata Guedes','group',true)",[owner]);
+  await db.query("select agency_whatsapp_account_metadata($1,$2,'120363123456789@g.us','Renata Guedes','group',true)",[owner,mailboxA]);
   await db.query("insert into agency_whatsapp_messages(user_id,provider_message_id,phone,body,direction,status,sender_name) values($1,'group-reply','120363123456789@g.us','Mensagem no grupo','entrada','recebido','Participante')",[owner]);
   await page.getByRole('button').filter({hasText:'Renata Guedes'}).waitFor({timeout:12000});
   await page.getByRole('button').filter({hasText:'Renata Guedes'}).click();
@@ -363,7 +375,26 @@ try {
   await page.setViewportSize({width:390,height:844});
   if(process.env.TEST_SCREENSHOT_DIR) await page.screenshot({path:`${process.env.TEST_SCREENSHOT_DIR}/conversations-mobile.png`,fullPage:true,animations:'disabled'});
   await page.getByRole('button',{name:'Voltar às conversas',exact:true}).click();
-  await page.getByRole('heading',{name:'Conversas',exact:true}).waitFor();
+  await page.getByRole('heading',{name:/^Conversas/}).waitFor();
+  await page.getByRole('button').filter({hasText:'Renata Guedes'}).click();
+  await page.setViewportSize({width:390,height:430});
+  await page.getByLabel('Mensagem WhatsApp',{exact:true}).focus();
+  await page.waitForFunction(()=>document.querySelector('textarea[aria-label="Mensagem WhatsApp"]').getBoundingClientRect().bottom<=innerHeight);
+  assert(await page.getByRole('button',{name:'Enviar pelo WhatsApp',exact:true}).evaluate(el=>el.getBoundingClientRect().height>=44));
+  await page.setViewportSize({width:390,height:844});
+  await page.bringToFront();
+  activeMailbox=mailboxB;
+  await page.getByText('Conectado · 5531999991111',{exact:true}).waitFor({timeout:12000});
+  assert.equal(await page.getByLabel('Mensagens da conversa').count(),0,'switching sender must close the old conversation');
+  await db.query("insert into agency_whatsapp_messages(user_id,account_id,provider_message_id,phone,body,direction,status,contact_name) values($1,$2,'other-account','5511888880000','Conversa exclusiva da Vanessa','entrada','recebido','Contato no outro número')",[owner,mailboxB]);
+  await page.getByRole('button').filter({hasText:'Contato no outro número'}).waitFor({timeout:12000});
+  assert.equal(await page.getByRole('button').filter({hasText:'Renata Guedes'}).count(),0);
+  fixtureConnected=false;
+  await page.getByText('WhatsApp desconectado',{exact:true}).waitFor({timeout:12000});
+  fixtureConnected=true;activeMailbox=mailboxA;
+  await page.getByText('Conectado · 553171789803',{exact:true}).waitFor({timeout:12000});
+  await page.getByRole('button').filter({hasText:'Renata Guedes'}).waitFor({timeout:12000});
+
   await page.setViewportSize({width:1440,height:1000});
 
   await page.goto(`${base}/operacao`);
@@ -468,6 +499,7 @@ try {
     0,
   );
   await page.goto(`${base}/comercial/crm`);
+  await page.setViewportSize({width:390,height:844});
   await page.getByRole("tab", { name: "Formulários", exact: true }).click();
   await page
     .getByRole("button", { name: "Novo formulário", exact: true })
@@ -476,6 +508,7 @@ try {
     .getByLabel("Título", { exact: true })
     .fill("Briefing de onboarding");
   await page.getByLabel("Campo 1", { exact: true }).fill("Objetivo do projeto");
+  assert(await page.getByRole('dialog').evaluate(el=>el.getBoundingClientRect().right<=innerWidth&&el.getBoundingClientRect().left>=0),'form editor fits mobile width');
   await page
     .getByRole("button", { name: "Salvar formulário", exact: true })
     .click();
@@ -496,10 +529,11 @@ try {
   await page.getByLabel('Mostrar histórico e cancelados',{exact:true}).check();
   await page.getByRole('heading',{name:'Reunião manual de onboarding',exact:true}).waitFor();
   assert.equal((await db.query('select status from agency_appointments')).rows[0].status,'cancelado');
+  await page.setViewportSize({width:1440,height:1000});
   await page.goto(`${base}/comercial`);
   await page.getByRole('heading',{name:'Dashboard Comercial',exact:true}).waitFor();
   await page.getByLabel('Indicadores por etapa').getByText('Diagnóstico',{exact:true}).waitFor();
-  await page.getByLabel('Indicadores por etapa').locator('article').filter({hasText:'Diagnóstico'}).getByText('1',{exact:true}).waitFor();
+  await page.getByLabel('Indicadores por etapa').locator('article').filter({hasText:'Diagnóstico'}).getByText('2',{exact:true}).waitFor();
   if (process.env.TEST_SCREENSHOT_DIR) await page.screenshot({path:`${process.env.TEST_SCREENSHOT_DIR}/commercial-desktop.png`,fullPage:true});
   await page.setViewportSize({width:390,height:844});
   assert.equal(await page.evaluate(()=>[...document.querySelectorAll('main h1, main article')].every(e=>e.getBoundingClientRect().right<=innerWidth+1)),true,'Dashboard headings and metric cards must fit a mobile screen');
@@ -596,9 +630,10 @@ try {
     "PASS: browser → RPC → PostgreSQL, pipeline editing, preserving cards, client onboarding creation/completion sync, manual appointment persistence/cancellation, dynamic commercial dashboard, active/paused filtering, form creation, client portal creation",
   );
 } catch (error) {
+  console.error("Original browser failure:", error, {statusCalls,activeMailbox,fixtureConnected,visibility:await page.evaluate(()=>({visibility:document.visibilityState,account:document.querySelector('[data-account-id]')?.getAttribute('data-account-id')})).catch(()=>null)});
   console.error(
     "Browser evidence:",
-    await page.locator("body").innerText(),
+    await page.locator("body").innerText({timeout:2000}).catch(()=>"Page unavailable"),
     apiErrors,
     errors,
   );

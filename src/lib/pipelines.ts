@@ -14,6 +14,7 @@ export interface Stage {
   pipeline_id: string;
 }
 export interface PipelineCard {
+  whatsapp_account_id?:string|null;
   id: string;
   pipeline_id: string;
   stage_id: string;

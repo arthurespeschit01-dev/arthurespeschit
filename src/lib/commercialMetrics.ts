@@ -1,5 +1,5 @@
 import { stageOutcome, type PipelineCard, type Stage } from '@/lib/pipelines';
-export interface CommercialMessage { id:string; user_id:string; phone_key:string; direction:'entrada'|'saida'; status:string; created_at:string }
+export interface CommercialMessage { account_id?:string|null; id:string; user_id:string; phone_key:string; direction:'entrada'|'saida'; status:string; created_at:string }
 export function phoneKey(value:string) {
  let n=value.replace(/\D/g,''); if(n.length===10 || n.length===11)n='55'+n;
  return /^55\d{10,11}$/.test(n) ? n.slice(2,4)+n.slice(-8) : n;

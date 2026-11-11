@@ -25,12 +25,21 @@ const request = (body: unknown, query = "") =>
   });
 const secret = "a".repeat(64);
 
+const accountFixtures=(next:typeof fetch):typeof fetch => ((input:RequestInfo|URL,init?:RequestInit)=>{
+ const url=new URL(String(input));
+ if(url.pathname.endsWith('/agency_whatsapp_messages') && init?.method==='HEAD')return Promise.resolve(new Response(null,{headers:{'content-range':'*/0'}}));
+ if(url.pathname.endsWith('/agency_whatsapp_account_state'))return Promise.resolve(json(init?.method&&init.method!=='GET'?null:[{user_id:'owner-a',account_id:'account-a',connected:true,checked_at:new Date().toISOString()}]));
+ if(url.pathname.endsWith('/agency_whatsapp_accounts'))return Promise.resolve(json({id:'account-a',phone:'5511999990000'}));
+ return next(input,init);
+}) as typeof fetch;
+
+
 Deno.test(
   "WhatsApp requires login and keeps provider credentials server-side",
   async () => {
     const originalFetch = globalThis.fetch;
     let loggedIn = false;
-    globalThis.fetch = ((input: RequestInfo | URL) => {
+    globalThis.fetch = accountFixtures(((input: RequestInfo | URL) => {
       const url = new URL(String(input));
       if (url.pathname.includes("/auth/"))
         return Promise.resolve(
@@ -60,7 +69,7 @@ Deno.test(
           json({ connected: true, connectedPhone: "5511999990000" }),
         );
       throw new Error("Unexpected fixture call");
-    }) as typeof fetch;
+    }) as typeof fetch);
     try {
       check(
         (await handler(request({ action: "status" }))).status === 401,
@@ -90,7 +99,7 @@ Deno.test(
   async () => {
     const originalFetch = globalThis.fetch;
     const inserted: { value?: Record<string, unknown> } = {};
-    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    globalThis.fetch = accountFixtures(((input: RequestInfo | URL, init?: RequestInit) => {
       const url = new URL(String(input));
       if (url.pathname.endsWith("/agency_whatsapp_connections"))
         return Promise.resolve(
@@ -100,7 +109,7 @@ Deno.test(
               : [],
           ),
         );
-      if(url.pathname.endsWith('/rpc/agency_whatsapp_chat_metadata'))return Promise.resolve(json(null));
+      if(url.pathname.endsWith('/rpc/agency_whatsapp_account_metadata'))return Promise.resolve(json(null));
       if (
         url.pathname.endsWith("/agency_whatsapp_messages") &&
         init?.method === "POST"
@@ -109,10 +118,11 @@ Deno.test(
         return Promise.resolve(json(null, 201));
       }
       throw new Error("Unexpected fixture call");
-    }) as typeof fetch;
+    }) as typeof fetch);
     try {
       const payload = {
         instanceId: "dedicated",
+        connectedPhone:"5511999990000",
         user_id: "attacker",
         data: {
           messageId: "received-1",
@@ -156,7 +166,7 @@ Deno.test(
   async () => {
     const originalFetch = globalThis.fetch;
     let foreignCard = false;
-    globalThis.fetch = ((input: RequestInfo | URL) => {
+    globalThis.fetch = accountFixtures(((input: RequestInfo | URL) => {
       const url = new URL(String(input));
       if (url.pathname.includes("/auth/"))
         return Promise.resolve(json({ id: "owner-a" }));
@@ -196,8 +206,9 @@ Deno.test(
             },
           ]),
         );
-      throw new Error("Provider must not be called for a duplicate request");
-    }) as typeof fetch;
+      if(url.hostname==='api.w-api.app' && url.pathname.endsWith('/instance/fetch-instance'))return Promise.resolve(json({connected:true,connectedPhone:'5511999990000'}));
+      throw new Error("Provider send must not be called for a duplicate request");
+    }) as typeof fetch);
     try {
       const payload = {
         action: "send",
@@ -226,7 +237,7 @@ Deno.test(
     const originalFetch = globalThis.fetch;
     let externalQr = false;
     let callbackConfigured = false;
-    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    globalThis.fetch = accountFixtures(((input: RequestInfo | URL, init?: RequestInit) => {
       const url = new URL(String(input));
       if (url.pathname.includes("/auth/"))
         return Promise.resolve(json({ id: "owner-a" }));
@@ -271,7 +282,7 @@ Deno.test(
         );
       }
       throw new Error("Unexpected fixture call");
-    }) as typeof fetch;
+    }) as typeof fetch);
     try {
       const qr = await handler(request({ action: "connect" }));
       const body = await qr.json();
@@ -293,3 +304,17 @@ Deno.test(
     }
   },
 );
+
+Deno.test('Central mirrors confirmed sends to Vértice without sending WhatsApp twice; failures stay queued',async()=>{
+ const {mirrorToVertice,flushMirrors}=await import('../_shared/agency-whatsapp-accounts.ts');
+ const originalFetch=globalThis.fetch;let deliveries=0;let accepted=false;let pending:any=null;
+ const db:any={from(table:string){check(table==='agency_whatsapp_mirror_events','only private delivery outbox is used');return {async upsert(value:any){pending=value;return {error:null}},select(){return this},eq(){return this},is(){return this},order(){return this},limit(){return Promise.resolve({data:pending&&!accepted?[{message_id:pending.message_id,payload:pending.payload}]:[],error:null})},update(){accepted=true;return this},then(resolve:any){return Promise.resolve({error:null}).then(resolve)}}}};
+ globalThis.fetch=((input:RequestInfo|URL,init?:RequestInit)=>{const url=new URL(String(input));check(url.hostname==='vertice-gmn.vercel.app','mirror never calls W-API send endpoint');deliveries++;const body=JSON.parse(String(init?.body));check(body.action==='receive'&&body.message.source_number==='553171789803','captured sender number accompanies the mirror');return Promise.resolve(json({},deliveries===1?503:200))}) as typeof fetch;
+ try{
+  const conn={user_id:'owner-a',instance_id:'same',bridge_url:'https://vertice-gmn.vercel.app/api/central-whatsapp',webhook_secret:secret};
+  const message={id:'message-a',account_id:'account-a',provider_message_id:'provider-a',phone:'5511999990000',body:'Confirmada',created_at:new Date().toISOString()};
+  check(!(await mirrorToVertice(db,conn,message,'553171789803')).delivered,'failed mirror does not pretend success');
+  check(!!pending,'confirmed message remains in durable outbox');
+  await flushMirrors(db,conn);check(accepted&&deliveries===2,'retry delivers the history record without another WhatsApp send');
+ }finally{globalThis.fetch=originalFetch}
+});

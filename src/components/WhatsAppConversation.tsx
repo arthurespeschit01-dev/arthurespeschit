@@ -1,3 +1,4 @@
+import {useWhatsAppAccount} from '@/hooks/useWhatsAppAccount';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {Textarea} from '@/components/ui/textarea';
@@ -6,25 +7,29 @@ import {supabase} from '@/integrations/supabase/client';
 import {useWhatsAppLive} from '@/hooks/useWhatsAppLive';
 import {Check,CheckCheck,Send} from 'lucide-react';
 interface Message{id:string;direction:'entrada'|'saida';body:string;status:string;created_at:string;kind:string;sender_name?:string|null}
-export default function WhatsAppConversation({cardId,phone,onChanged,fullHeight=false,isGroup=false}:{cardId?:string;phone:string;onChanged:()=>void;fullHeight?:boolean;isGroup?:boolean}){
+export default function WhatsAppConversation({cardId,phone,onChanged,fullHeight=false,isGroup=false,accountId:providedAccount}:{cardId?:string;phone:string;onChanged:()=>void;fullHeight?:boolean;isGroup?:boolean;accountId?:string}){
+ const active=useWhatsAppAccount();const accountId=providedAccount||active.data?.account_id;
  const [messages,setMessages]=useState<Message[]>([]),[text,setText]=useState(''),[hasMore,setHasMore]=useState(false),[olderBusy,setOlderBusy]=useState(false),[error,setError]=useState(''),[sending,setSending]=useState(false),[loading,setLoading]=useState(true);
+ const currentAccount=useRef(accountId);currentAccount.current=accountId;
  const requestId=useRef<string|null>(null),lastId=useRef<string|null>(null),olderLoaded=useRef(false),loadingRef=useRef(false),viewport=useRef<HTMLDivElement>(null),follow=useRef(true),onChangedRef=useRef(onChanged),alive=useRef(true);onChangedRef.current=onChanged;
  useEffect(()=>{alive.current=true;return()=>{alive.current=false}},[]);
  const load=useCallback(async()=>{
-  if(!phone.trim()||loadingRef.current)return;loadingRef.current=true;
+  if(!phone.trim()||loadingRef.current)return;
+  if(!active.data?.connected||active.isError||!accountId){setMessages([]);setLoading(false);return;}loadingRef.current=true;
   try{
-   const data=await whatsappRequest<{messages:Message[];has_more?:boolean}>('messages',{card_id:cardId,phone});if(!alive.current)return;
+   const data=await whatsappRequest<{messages:Message[];has_more?:boolean}>('messages',{card_id:cardId,phone,account_id:accountId});if(!alive.current||currentAccount.current!==accountId)return;
    setMessages(current=>{const ids=new Set(data.messages.map(m=>m.id));return [...current.filter(m=>!ids.has(m.id)&&new Date(m.created_at)<new Date(data.messages[0]?.created_at||0)),...data.messages]});
    if(!olderLoaded.current)setHasMore(!!data.has_more);setError('');setLoading(false);
    const latest=data.messages.at(-1)?.id||null;
    if(lastId.current!==latest){lastId.current=latest;onChangedRef.current();if(!document.hidden){await supabase.rpc('agency_whatsapp_mark_read',{p_address:phone});window.dispatchEvent(new Event('agency-whatsapp-update'))}}
   }catch(e){if(alive.current){setError((e as Error).message);setLoading(false)}}finally{loadingRef.current=false}
- },[cardId,phone]);
+ },[cardId,phone,accountId,active.data?.connected]);
  useWhatsAppLive(()=>void load());
+ useEffect(()=>{setMessages([]);setText('');lastId.current=null;olderLoaded.current=false;void load()},[accountId]);
  useEffect(()=>{void load()},[load]);
  useEffect(()=>{if(follow.current&&viewport.current)viewport.current.scrollTop=viewport.current.scrollHeight},[messages]);
- const loadOlder=async()=>{if(olderBusy)return;setOlderBusy(true);const height=viewport.current?.scrollHeight||0;try{const data=await whatsappRequest<{messages:Message[];has_more:boolean}>('messages',{card_id:cardId,phone,offset:messages.length});olderLoaded.current=true;follow.current=false;setMessages(current=>[...data.messages.filter(m=>!current.some(c=>c.id===m.id)),...current]);setHasMore(data.has_more);requestAnimationFrame(()=>{if(viewport.current)viewport.current.scrollTop=viewport.current.scrollHeight-height})}catch(e){setError((e as Error).message)}finally{setOlderBusy(false)}};
- const send=async(event:React.FormEvent)=>{event.preventDefault();if(!text.trim()||sending)return;setSending(true);setError('');requestId.current||=crypto.randomUUID();try{await whatsappRequest('send',{card_id:cardId,phone,text:text.trim(),request_id:requestId.current});setText('');requestId.current=null;follow.current=true;await load();onChangedRef.current()}catch(e){setError((e as Error).message)}finally{setSending(false)}};
+ const loadOlder=async()=>{if(olderBusy)return;setOlderBusy(true);const height=viewport.current?.scrollHeight||0;try{const data=await whatsappRequest<{messages:Message[];has_more:boolean}>('messages',{card_id:cardId,phone,account_id:accountId,offset:messages.length});if(currentAccount.current!==accountId)return;olderLoaded.current=true;follow.current=false;setMessages(current=>[...data.messages.filter(m=>!current.some(c=>c.id===m.id)),...current]);setHasMore(data.has_more);requestAnimationFrame(()=>{if(viewport.current)viewport.current.scrollTop=viewport.current.scrollHeight-height})}catch(e){setError((e as Error).message)}finally{setOlderBusy(false)}};
+ const send=async(event:React.FormEvent)=>{event.preventDefault();if(!text.trim()||sending)return;setSending(true);setError('');requestId.current||=crypto.randomUUID();try{await whatsappRequest('send',{card_id:cardId,phone,account_id:accountId,text:text.trim(),request_id:requestId.current});setText('');requestId.current=null;follow.current=true;await load();onChangedRef.current()}catch(e){setError((e as Error).message)}finally{setSending(false)}};
  const day=(value:string)=>new Date(value).toLocaleDateString('pt-BR');
  return <section className={fullHeight?'flex flex-col flex-1 min-h-0 overflow-hidden':'flex flex-col h-[28rem] border-t mt-3'} aria-label="Conversa WhatsApp do card">
   <div ref={viewport} onScroll={e=>{const el=e.currentTarget;follow.current=el.scrollHeight-el.scrollTop-el.clientHeight<100}} className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 py-5 bg-muted/20" aria-live="polite" aria-label="Mensagens da conversa">
@@ -37,9 +42,9 @@ export default function WhatsAppConversation({cardId,phone,onChanged,fullHeight=
    {!loading&&!messages.length&&<p className="text-center text-sm text-muted-foreground py-12">Nenhuma mensagem registrada nesta conversa.</p>}
   </div>
   {error&&<p role="alert" className="text-sm text-destructive border-t px-4 py-2">{error}</p>}
-  <form onSubmit={send} className="shrink-0 border-t bg-background px-3 sm:px-5 py-3 flex items-end gap-3">
-   <Textarea aria-label="Mensagem WhatsApp" maxLength={10000} value={text} onChange={e=>{setText(e.target.value);requestId.current=null}} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();void send(e)}}} disabled={sending} placeholder="Escreva uma mensagem" rows={1} className="min-h-11 max-h-36 resize-none rounded-xl flex-1"/>
-   <Button type="submit" disabled={sending||!text.trim()} aria-label="Enviar pelo WhatsApp" className="h-11 gap-2"><Send size={17}/><span className="hidden sm:inline">{sending?'Enviando…':'Enviar'}</span></Button>
+  <form onSubmit={send} style={{paddingBottom:'calc(0.75rem + env(safe-area-inset-bottom))'}} className="shrink-0 border-t bg-background px-3 sm:px-5 py-3 flex items-end gap-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+   <Textarea aria-label="Mensagem WhatsApp" maxLength={10000} value={text} onChange={e=>{setText(e.target.value);requestId.current=null}} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing&&!window.matchMedia('(pointer: coarse)').matches){e.preventDefault();void send(e)}}} disabled={sending} placeholder="Escreva uma mensagem" rows={1} className="min-h-11 max-h-36 resize-none rounded-xl flex-1"/>
+   <Button type="submit" disabled={sending||!text.trim()||!active.data?.connected||active.isError} aria-label="Enviar pelo WhatsApp" className="h-11 gap-2"><Send size={17}/><span className="hidden sm:inline">{sending?'Enviando…':'Enviar'}</span></Button>
   </form>
  </section>;
 }

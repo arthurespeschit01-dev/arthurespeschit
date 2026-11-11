@@ -1,3 +1,5 @@
+import {useWhatsAppAccount} from '@/hooks/useWhatsAppAccount';
+import {useWhatsAppLive} from '@/hooks/useWhatsAppLive';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,7 +20,9 @@ function Metric({label,value,note,color}:{label:string;value:React.ReactNode;not
 }
 export default function CommercialDashboard() {
  const {user}=useAuth();
+ const account=useWhatsAppAccount();
  const [pipelines,setPipelines]=useState<Pipeline[]>([]),[stages,setStages]=useState<Stage[]>([]),[cards,setCards]=useState<PipelineCard[]>([]),[messages,setMessages]=useState<CommercialMessage[]>([]);
+ const [messageAccount,setMessageAccount]=useState<string|null>(null);
  const [clients,setClients]=useState<{id:string;status:string}[]>([]);
  const [selected,setSelected]=useState('all');
  const [start,setStart]=useState(()=>dateValue(new Date(new Date().getFullYear(),new Date().getMonth(),1)));
@@ -30,20 +34,21 @@ export default function CommercialDashboard() {
    readAllRows<Pipeline>((a,b)=>supabase.from('agency_pipelines').select('*').eq('user_id',user.id).eq('area','comercial').order('created_at').order('id').range(a,b)),
    readAllRows<Stage>((a,b)=>supabase.from('agency_pipeline_stages').select('*').eq('user_id',user.id).order('position').order('id').range(a,b)),
    readAllRows<PipelineCard>((a,b)=>supabase.from('agency_pipeline_cards').select('*').eq('user_id',user.id).order('created_at').order('id').range(a,b)),
-   readAllRows<CommercialMessage>((a,b)=>supabase.from('agency_whatsapp_messages').select('id,user_id,phone_key,direction,status,created_at').is('duplicate_of',null).eq('user_id',user.id).order('created_at').order('id').range(a,b)),
+   readAllRows<CommercialMessage>((a,b)=>supabase.from('agency_whatsapp_messages').select('id,user_id,phone_key,direction,status,created_at').is('duplicate_of',null).eq('account_id',account.data?.account_id||'00000000-0000-0000-0000-000000000000').eq('user_id',user.id).order('created_at').order('id').range(a,b)),
    readAllRows<{id:string;status:string}>((a,b)=>supabase.from('clients').select('id,status').eq('user_id',user.id).order('id').range(a,b)),
   ]);
   setBusy(false);if(p.error||s.error||c.error||m.error||cl.error){setError('Não foi possível carregar os indicadores. Tente atualizar.');return;}
-  setError('');setPipelines(p.data);setStages(s.data);setCards(c.data);setMessages(m.data);setClients(cl.data);
- },[user]);
+  setError('');setPipelines(p.data);setStages(s.data);setCards(c.data);setMessages(m.data);setMessageAccount(account.data?.account_id||null);setClients(cl.data);
+ },[user,account.data?.account_id]);
  useEffect(()=>{void load()},[load]);
+ useWhatsAppLive(()=>void load());
  const pipelineIds=useMemo(()=>new Set(pipelines.filter(p=>selected==='all'||p.id===selected).map(p=>p.id)),[pipelines,selected]);
- const scope=cards.filter(c=>pipelineIds.has(c.pipeline_id) && (inactive || !c.client_id || clients.some(cl=>cl.id===c.client_id && cl.status==='Ativo')));
+ const scope=cards.filter(c=>(!c.whatsapp_account_id || c.whatsapp_account_id===account.data?.account_id && account.data?.connected && !account.isError) && pipelineIds.has(c.pipeline_id) && (inactive || !c.client_id || clients.some(cl=>cl.id===c.client_id && cl.status==='Ativo')));
  const periodCards=scope.filter(c=>inPeriod(c.created_at,start,end));
  const boardStages=stages.filter(s=>pipelineIds.has(s.pipeline_id)).sort((a,b)=>a.pipeline_id.localeCompare(b.pipeline_id)||a.position-b.position);
  const metrics=pipelineMetrics(periodCards,boardStages);
  const phones=new Set(scope.map(c=>phoneKey(c.phone)).filter(Boolean));
- const eligibleMessages=messages.filter(m=>selected==='all' ? inactive || !cards.some(c=>phoneKey(c.phone)===m.phone_key && c.client_id && clients.some(cl=>cl.id===c.client_id && cl.status!=='Ativo')) : phones.has(m.phone_key));
+ const eligibleMessages=(account.data?.connected && !account.isError && messageAccount===account.data?.account_id?messages:[]).filter(m=>selected==='all' ? inactive || !cards.some(c=>phoneKey(c.phone)===m.phone_key && c.client_id && clients.some(cl=>cl.id===c.client_id && cl.status!=='Ativo')) : phones.has(m.phone_key));
  const whatsapp=conversationMetrics(eligibleMessages,start,end);
  const invalidDates=!!(start&&end&&start>end);
  return <div className="space-y-6">
