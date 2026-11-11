@@ -1,3 +1,4 @@
+import { isActiveClient } from '@/lib/clientStatus';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -144,7 +145,7 @@ export default function Dashboard() {
   const clientesPausados = clients.filter(c => c.status === 'Pausado').length;
 
   const rentabilidade = useMemo(() => {
-    return clients.map(c => {
+    return clients.filter(isActiveClient).map(c => {
       const recM = mensalidades.filter(m => m.cliente_id === c.id && m.status === 'pago').reduce((s, m) => s + Number(m.valor), 0);
       const recA = transacoes.filter(t => t.tipo === 'entrada' && t.cliente_id === c.id).reduce((s, t) => s + Number(t.valor), 0);
       const receita = recM + recA;

@@ -19,6 +19,9 @@ import logoCentralGestor from '@/assets/logo-central-gestor.png';
 
 const mainNavItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, tourId: 'nav-dashboard' },
+  { to: '/chamados', label: 'Chamados', icon: MessageSquare, tourId: 'nav-chamados' },
+  { to: '/comercial', label: 'Comercial', icon: MessageSquare, tourId: 'nav-comercial' },
+  { to: '/operacao', label: 'Operação', icon: ClipboardList, tourId: 'nav-operacao' },
   { to: '/clientes', label: 'Clientes', icon: Users, tourId: 'nav-clientes' },
   { to: '/relatorios', label: 'Relatórios ', icon: FileText, tourId: 'nav-relatorios' },
   { to: '/tasks', label: 'Tarefas', icon: ListTodo, tourId: 'nav-tarefas' },

@@ -15,6 +15,11 @@ import ScrollToTop from "./components/ScrollToTop";
 import { useAccessCheck } from "@/hooks/useAccessCheck";
 
 // Lazy load pages so a single failing chunk doesn't blank the app
+const Chamados = lazy(() => import("./pages/Chamados"));
+const ClientPortal = lazy(() => import("./pages/ClientPortal"));
+const PublicForm = lazy(() => import("./pages/PublicForm"));
+const Comercial = lazy(() => import("./pages/Comercial"));
+const Operacao = lazy(() => import("./pages/Operacao"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Clientes = lazy(() => import("./pages/Clientes"));
 const ClientDetail = lazy(() => import("./pages/ClientDetail"));
@@ -106,6 +111,9 @@ function ProtectedRoutes() {
             <Suspense fallback={<PageFallback />}>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
+                <Route path="/chamados" element={<Chamados />} />
+                <Route path="/comercial" element={<Comercial />} />
+                <Route path="/operacao" element={<Operacao />} />
                 <Route path="/clientes" element={<Clientes />} />
                 <Route path="/clientes/:id" element={<ClientDetail />} />
                 <Route path="/relatorios" element={<RelatoriosDiarios />} />
@@ -185,12 +193,16 @@ const App = () => (
         <ChunkErrorRecovery />
         <RoutePrefetcher />
         <ScrollToTop />
-        <AuthProvider>
-          <Routes>
+        <Suspense fallback={<PageFallback />}>
+        <Routes>
+          <Route path="/portal/:token" element={<ClientPortal />} />
+          <Route path="/formulario/:token" element={<PublicForm />} />
+          <Route path="/*" element={<AuthProvider><Routes>
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/*" element={<ProtectedRoutes />} />
-          </Routes>
-        </AuthProvider>
+          </Routes></AuthProvider>} />
+        </Routes>
+        </Suspense>
       </BrowserRouter>
       </TooltipProvider>
     </ThemeProvider>

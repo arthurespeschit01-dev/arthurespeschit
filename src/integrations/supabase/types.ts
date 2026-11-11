@@ -1,3 +1,13 @@
+import type { ClientPortal, Ticket, TicketMessage, AgencyForm, FormResponse } from '@/lib/agency';
+import type { Pipeline, Stage, PipelineCard } from '@/lib/pipelines';
+type AgencyRow<T> = { [K in keyof (T & { user_id: string; created_at: string })]: (T & { user_id: string; created_at: string })[K] };
+type AgencyTable<T extends { id: string }> = {
+  Row: AgencyRow<T>;
+  Insert: Omit<AgencyRow<T>, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string };
+  Update: Partial<AgencyRow<T>>;
+  Relationships: [];
+};
+
 export type Json =
   | string
   | number
@@ -14,6 +24,16 @@ export type Database = {
   }
   public: {
     Tables: {
+      agency_client_portals: AgencyTable<ClientPortal>
+      agency_tickets: AgencyTable<Ticket>
+      agency_ticket_messages: AgencyTable<TicketMessage>
+      agency_forms: AgencyTable<AgencyForm>
+      agency_form_responses: AgencyTable<FormResponse>
+
+      agency_pipelines: AgencyTable<Pipeline>
+      agency_pipeline_stages: AgencyTable<Stage>
+      agency_pipeline_cards: AgencyTable<PipelineCard>
+
       ad_sets: {
         Row: {
           bid_strategy: string | null
@@ -1430,7 +1450,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      save_agency_pipeline: {
+        Args: { p_id: string | null; p_area: string; p_name: string; p_revision: number; p_stages: Json; p_moves: Json };
+        Returns: string;
+      }
     }
     Enums: {
       [_ in never]: never

@@ -88,7 +88,7 @@ export default function PlanilhaTeste() {
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const { data, error } = await supabase.from("clients").select("id, name").order("name");
+      const { data, error } = await supabase.from("clients").select("id, name").eq("status", "Ativo").order("name");
       if (error) { toast.error("Erro ao carregar clientes"); return; }
       setClients(data || []);
       if (data && data.length && !clientId) setClientId(data[0].id);
