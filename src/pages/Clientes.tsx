@@ -1,3 +1,5 @@
+import ClientOperationFields from '@/components/ClientOperationFields';
+import { useClientProgress, progressLabel, operationFromProgress, emptyOperation, type OperationSelection } from '@/lib/clientProgress';
 import ClientStatusFilter from '@/components/ClientStatusFilter';
 import { matchesClientStatus, type ClientStatusFilter as StatusFilter } from '@/lib/clientStatus';
 import { useEffect, useState } from 'react';
@@ -41,6 +43,9 @@ interface Client {
 export default function Clientes() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const progress = useClientProgress();
+  const [operation, setOperation] = useState<OperationSelection>({ ...emptyOperation });
+  const [saving, setSaving] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('Ativo');
   const visibleClients = clients.filter(c => matchesClientStatus(c, statusFilter));
@@ -176,6 +181,7 @@ export default function Clientes() {
   const openNew = async () => {
     setMetaPending(false);
     setEditing(null);
+    setOperation({ phase: "execution", pipeline_id: "", stage_id: "" });
     setAdAccounts([]);
     setSelectedAdAccountId('');
     setForm({ name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo', payment_day: '', verba_mensal: 0, niche: '', phone: '', account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '' } });
@@ -220,6 +226,7 @@ export default function Clientes() {
   const openEdit = (c: Client, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditing(c);
+    setOperation(operationFromProgress(progress.data?.[c.id]));
     setForm({
       name: c.name, services: c.services, monthly_fee: c.monthly_fee, contract_duration: c.contract_duration, status: c.status,
       payment_day: c.payment_day ? String(c.payment_day) : '',
@@ -231,7 +238,7 @@ export default function Clientes() {
   };
 
   const save = async () => {
-    if (!user) return;
+    if (!user || saving) return;
     if (!form.name.trim()) { toast.error('Informe o nome do cliente'); return; }
     if (!form.niche.trim()) { toast.error('Informe o nicho do cliente'); return; }
     if (!form.verba_mensal || form.verba_mensal <= 0) { toast.error('Informe a verba mensal'); return; }
@@ -244,14 +251,18 @@ export default function Clientes() {
       niche: form.niche,
       phone: form.phone,
     };
+    setSaving(true);
+    const { data: savedId, error } = await supabase.rpc('save_agency_client', {
+      p_id: editing?.id || null, p_client: payload,
+      p_operation: operation.phase ? { ...operation } : null,
+    });
+    setSaving(false);
+    if (error || !savedId) { toast.error('Não foi possível confirmar o salvamento. Atualize a lista antes de tentar novamente.'); return; }
+    void progress.refetch();
     if (editing) {
-      const { error } = await supabase.from('clients').update(payload).eq('id', editing.id);
-      if (error) { toast.error('Falha ao atualizar cliente'); return; }
       toast.success('Cliente atualizado!');
     } else {
-      const { data: inserted, error: insErr } = await supabase
-        .from('clients').insert({ ...payload, user_id: user.id }).select('id').single();
-      if (insErr || !inserted) { toast.error('Falha ao criar cliente'); return; }
+      const inserted = { id: savedId };
       toast.success('Cliente criado!');
       if (metaPending) {
         const { data: attachData, error: attachErr } = await supabase.functions.invoke('meta-attach-pending', {
@@ -322,7 +333,7 @@ export default function Clientes() {
                   <span className="inline-block mt-2 text-[11px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">{c.niche}</span>
                 )}
               </div>
-              <span className={`text-[11px] px-2 py-1 rounded-full font-medium shrink-0 ${statusColor(c.status)}`}>{c.status}</span>
+              <span className={`text-[11px] px-2 py-1 rounded-full font-medium shrink-0 ${statusColor(c.status)}`}>{c.status}</span><p className="text-xs text-muted-foreground mt-1">{progressLabel(progress.data?.[c.id])}</p>
             </div>
 
             <div className="grid grid-cols-3 gap-2 text-xs">
@@ -385,7 +396,7 @@ export default function Clientes() {
             <div className="text-right text-sm text-primary font-semibold">R$ {(c.verba_mensal || 0).toLocaleString('pt-BR')}</div>
             <div className="text-sm text-foreground text-center">{c.contract_duration ? `${c.contract_duration}/${Number(c.contract_duration) === 1 ? 'Mês' : 'Meses'}` : '—'}</div>
             <div>
-              <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor(c.status)}`}>{c.status}</span>
+              <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor(c.status)}`}>{c.status}</span><p className="text-xs text-muted-foreground mt-1">{progressLabel(progress.data?.[c.id])}</p>
             </div>
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <Button variant="ghost" size="sm" onClick={(e) => openEdit(c, e)}><Edit2 className="w-3 h-3" /></Button>
@@ -476,11 +487,12 @@ export default function Clientes() {
             </div>
           ) : (
           <div className="space-y-4">
-            <div><Label className="text-muted-foreground text-sm">Nome do cliente *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" /></div>
+            <div><Label htmlFor="client-name" className="text-muted-foreground text-sm">Nome do cliente *</Label><Input id="client-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" /></div>
             <div className="grid grid-cols-2 gap-4">
-              <div><Label className="text-muted-foreground text-sm">Nicho *</Label><Input value={form.niche} onChange={(e) => setForm({ ...form, niche: e.target.value })} placeholder="Ex: Estética, E-commerce, SaaS" className="bg-secondary/50 border-border/50 mt-1" /></div>
-              <div><Label className="text-muted-foreground text-sm">Verba mensal (R$) *</Label><Input type="number" value={form.verba_mensal} onChange={(e) => setForm({ ...form, verba_mensal: Number(e.target.value) })} placeholder="Ex: 5000" className="bg-secondary/50 border-border/50 mt-1" /></div>
+              <div><Label htmlFor="client-niche" className="text-muted-foreground text-sm">Nicho *</Label><Input id="client-niche" value={form.niche} onChange={(e) => setForm({ ...form, niche: e.target.value })} placeholder="Ex: Estética, E-commerce, SaaS" className="bg-secondary/50 border-border/50 mt-1" /></div>
+              <div><Label htmlFor="client-budget" className="text-muted-foreground text-sm">Verba mensal (R$) *</Label><Input id="client-budget" type="number" value={form.verba_mensal} onChange={(e) => setForm({ ...form, verba_mensal: Number(e.target.value) })} placeholder="Ex: 5000" className="bg-secondary/50 border-border/50 mt-1" /></div>
             </div>
+            <ClientOperationFields value={operation} onChange={setOperation} />
             <div><Label className="text-muted-foreground text-sm">Serviços</Label><Textarea value={form.services} onChange={(e) => setForm({ ...form, services: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" /></div>
             <div className="grid grid-cols-2 gap-4">
               <div><Label className="text-muted-foreground text-sm">Fee mensal (R$)</Label><Input type="number" value={form.monthly_fee} onChange={(e) => setForm({ ...form, monthly_fee: Number(e.target.value) })} className="bg-secondary/50 border-border/50 mt-1" /></div>
@@ -516,7 +528,7 @@ export default function Clientes() {
               </div>
             </div>
 
-            <Button onClick={save} className="w-full neon-glow">Salvar</Button>
+            <Button disabled={saving} onClick={save} className="w-full neon-glow">Salvar</Button>
           </div>
           )}
         </DialogContent>

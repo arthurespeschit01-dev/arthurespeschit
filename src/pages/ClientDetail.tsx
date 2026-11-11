@@ -1,3 +1,5 @@
+import ClientOperationFields from '@/components/ClientOperationFields';
+import { useClientProgress, progressLabel, operationFromProgress, emptyOperation, type OperationSelection } from '@/lib/clientProgress';
 import ClientTicketLink from '@/components/ClientTicketLink';
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -94,6 +96,8 @@ export default function ClientDetail() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [noteText, setNoteText] = useState('');
   const [editClient, setEditClient] = useState(false);
+  const progress = useClientProgress();
+  const [operation, setOperation] = useState<OperationSelection>({ ...emptyOperation });
   const [clientForm, setClientForm] = useState({ name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo', payment_day: '' as string, verba_mensal: 0, niche: '', account_ids: {} as AccountIds });
   const [attachments, setAttachments] = useState<ClientAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -381,16 +385,16 @@ export default function ClientDetail() {
   }, [id, campaigns.length, dateRange.preset, dateRange.since, dateRange.until]);
 
   const saveClient = async () => {
-    await supabase.from('clients').update({
+    const { error } = await supabase.rpc('save_agency_client', { p_id: id || null, p_client: {
       name: clientForm.name, services: clientForm.services, monthly_fee: clientForm.monthly_fee,
       contract_duration: clientForm.contract_duration, status: clientForm.status,
       payment_day: clientForm.payment_day ? Number(clientForm.payment_day) : null,
-      account_ids: clientForm.account_ids,
-      verba_mensal: clientForm.verba_mensal,
-      niche: clientForm.niche,
-    } as any).eq('id', id);
+      account_ids: clientForm.account_ids, verba_mensal: clientForm.verba_mensal, niche: clientForm.niche,
+    }, p_operation: operation.phase ? { ...operation } : null });
+    if (error) { toast.error('Não foi possível salvar o cliente e o onboarding.'); return; }
     toast.success('Cliente atualizado!');
     setEditClient(false);
+    void progress.refetch();
     loadClient();
   };
 
@@ -540,7 +544,7 @@ export default function ClientDetail() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">{client.name}</h1>
           <div className="flex items-center gap-2 mt-1">
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(client.status)}`}>{client.status}</span>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(client.status)}`}>{client.status}</span><span className="text-xs text-muted-foreground">{progressLabel(progress.data?.[client.id])}</span>
             {client.niche && <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-primary/10 text-primary">{client.niche}</span>}
           </div>
         </div>
@@ -656,7 +660,7 @@ export default function ClientDetail() {
                 </div>
               )}
 
-              <Button variant="outline" onClick={() => setEditClient(true)} className="gap-2"><Edit2 className="w-3 h-3" /> Editar</Button>
+              <Button variant="outline" onClick={() => { setOperation(operationFromProgress(progress.data?.[client.id])); setEditClient(true); }} className="gap-2"><Edit2 className="w-3 h-3" /> Editar</Button>
             </>
           ) : (
             <div className="space-y-3">
@@ -684,6 +688,7 @@ export default function ClientDetail() {
                   </Select>
                 </div>
               </div>
+              <ClientOperationFields value={operation} onChange={setOperation} />
               <div className="space-y-3 pt-2 border-t border-border">
                 <Label className="text-foreground text-sm font-semibold">IDs das Contas</Label>
                 <div className="grid grid-cols-2 gap-3">

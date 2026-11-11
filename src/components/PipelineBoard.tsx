@@ -1,3 +1,5 @@
+import { useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import WhatsAppConversation from "@/components/WhatsAppConversation";
 import { readAllRows } from "@/lib/readAllRows";
 import { useCallback, useEffect, useState } from "react";
@@ -20,6 +22,7 @@ import {
   CONTACT_LABELS,
   DEFAULT_STAGES,
   validateStages,
+  stageOutcome,
   type Pipeline,
   type PipelineArea,
   type PipelineCard,
@@ -35,11 +38,14 @@ type CardDraft = Omit<PipelineCard, "id" | "updated_at"> & { id?: string };
 
 export default function PipelineBoard({ area }: { area: PipelineArea }) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [params] = useSearchParams();
+  const [contactFilter, setContactFilter] = useState(params.get("resposta") || "all");
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [stages, setStages] = useState<Stage[]>([]);
   const [cards, setCards] = useState<PipelineCard[]>([]);
   const [clients, setClients] = useState<ClientOption[]>([]);
-  const [selected, setSelected] = useState("");
+  const [selected, setSelected] = useState(params.get("pipeline") || "");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -64,6 +70,7 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
   const boardCards = cards.filter(
     (c) =>
       c.pipeline_id === selected &&
+      (area !== "comercial" || contactFilter === "all" || c.contact_status === contactFilter) &&
       (showInactive || !c.client_id || activeClientIds.has(c.client_id)) &&
       `${c.title} ${c.phone}`.toLowerCase().includes(search.toLowerCase()),
   );
@@ -118,6 +125,7 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
       return;
     }
     setLoadError("");
+    void queryClient.invalidateQueries({ queryKey: ["agency-client-progress", user.id] });
     setPipelines(p.data);
     setStages(s.data);
     setCards(c.data);
@@ -126,7 +134,7 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
       p.data.some((x) => x.id === current) ? current : p.data[0]?.id || "",
     );
     return c.data;
-  }, [user, area]);
+  }, [user, area, queryClient]);
   useEffect(() => {
     void load();
   }, [load]);
@@ -155,13 +163,14 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
         ? stages
             .filter((s) => s.pipeline_id === id)
             .sort((a, b) => a.position - b.position)
-            .map((s) => ({ ...s }))
+            .map((s) => ({ ...s, outcome: stageOutcome(s) }))
         : DEFAULT_STAGES[area].map((name, position) => ({
             id: crypto.randomUUID(),
             pipeline_id: "",
             name,
             color: "#8b5cf6",
             position,
+            outcome: stageOutcome({ name }),
           })),
     });
   };
@@ -208,6 +217,7 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
         name: s.name.trim(),
         color: s.color,
         position,
+        outcome: s.outcome || null,
       })),
       p_moves: editor.moves,
     });
@@ -367,6 +377,7 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
           onChange={(e) => setSearch(e.target.value)}
         />
       </div>
+      {area === 'comercial' && <label className="block max-w-xs space-y-2 text-sm">Status de resposta<select className={selectClass} value={contactFilter} onChange={e=>setContactFilter(e.target.value)}><option value="all">Todos os status</option>{Object.entries(CONTACT_LABELS).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>}
       <label className="flex gap-2 items-center text-sm">
         <input
           type="checkbox"
@@ -545,7 +556,7 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
                 onChange={(e) => setEditor({ ...editor, name: e.target.value })}
               />
               {editor.stages.map((stage, index) => (
-                <div key={stage.id} className="flex gap-2 items-center">
+                <div key={stage.id} className="flex flex-wrap gap-2 items-center rounded-lg border p-3">
                   <input
                     type="color"
                     aria-label={`Cor da etapa ${index + 1}`}
@@ -563,6 +574,7 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
                     className="w-10 h-10 shrink-0"
                   />
                   <Input
+                    className="flex-1 min-w-32"
                     aria-label={`Nome da etapa ${index + 1}`}
                     maxLength={80}
                     value={stage.name}
@@ -577,6 +589,10 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
                       })
                     }
                   />
+                  <select className={`${selectClass} max-w-40`} aria-label={`Tipo da etapa ${index + 1}`} value={stageOutcome(stage)} onChange={e => setEditor({ ...editor, stages: editor.stages.map(s => s.id === stage.id ? { ...s, outcome: e.target.value as Stage['outcome'] } : s) })}>
+                    <option value="in_progress">Em andamento</option>
+                    {area === 'operacao' ? <option value="completed">Conclui onboarding</option> : <><option value="won">Venda ganha</option><option value="lost">Oportunidade perdida</option></>}
+                  </select>
                   <Button
                     size="icon"
                     variant="ghost"

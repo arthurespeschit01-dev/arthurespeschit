@@ -106,7 +106,7 @@ function ProtectedRoutes() {
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/chamados" element={<Chamados />} />
-                <Route path="/comercial" element={<Comercial />} />
+                <Route path="/comercial/*" element={<Comercial />} />
                 <Route path="/operacao" element={<Operacao />} />
                 <Route path="/clientes" element={<Clientes />} />
                 <Route path="/clientes/:id" element={<ClientDetail />} />

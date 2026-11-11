@@ -5,13 +5,17 @@
 - Clientes abre em **Ativos**, com filtros separados para Pausados, Encerrados e Todos.
 - Financeiro separa as listas por status. Totais, pagamentos e dívidas históricos permanecem íntegros. Novas mensalidades são geradas apenas para clientes explicitamente ativos.
 - Saldo das contas e seletores de tarefas/acompanhamento excluem clientes pausados e encerrados. O filtro também é aplicado na função `meta-account-balances` antes de consultar a Meta.
-- Comercial tem CRM, formulários e agendamentos. CRM e Operação compartilham um quadro com pipelines independentes por usuário e área.
+- Operações fica abaixo de Clientes e contém Relatórios, Tarefas e Onboarding e execução. Chamados permanece acessível no menu principal. Comercial é uma pasta própria com Dashboard, CRM, Formulários e Agendamentos. CRM e Operação compartilham um quadro com pipelines independentes por usuário e área.
 - Criar e editar pipelines acontece dentro do quadro: nome, etapas, cores e ordem. Remover uma etapa com cards exige uma etapa de destino. A alteração inteira é transacional e versões concorrentes são rejeitadas.
 - Cards podem ser movidos por arraste, seletor de etapa ou edição da pipeline de destino. Operação exige vínculo com um cliente. Cards vinculados a clientes pausados/encerrados ficam ocultos por padrão, com opção de exibição.
 - Os indicadores comerciais usam o status registrado nos cards e são atualizados pelas mensagens do WhatsApp conectado. O código do Vértice foi usado como referência; seus leads e credenciais não foram copiados.
 - Chamados permite criar um portal por cliente, copiar, desativar e substituir seu link. O cliente abre chamados e acompanha respostas sem precisar de acesso à conta interna da agência. Categorias: tráfego, design, sugestão, reclamação e outro.
 - Formulários permitem criar, editar, ordenar, adicionar/remover campos, marcar obrigatoriedade, compartilhar links, desativar e consultar respostas. Tipos: texto curto/longo, e-mail, data e número. As respostas guardam os rótulos dos campos no momento do envio.
-- Agenda consulta os próximos 60 dias da agenda principal do Google e cria compromissos nela. Mostra até 100 compromissos e informa quando existem mais. Datas seguem o fuso do dispositivo.
+- No cadastro/edição do cliente, a fase de trabalho é separada do status do contrato. A escolha de onboarding cria ou atualiza seu card na mesma transação do cadastro. O primeiro cadastro em onboarding pode criar uma pipeline padrão automaticamente.
+- O tipo de etapa “Conclui onboarding” muda a fase exibida em Clientes para Em execução. Voltar a uma etapa em andamento retoma Onboarding. Nomes de etapas personalizadas são exibidos no cliente. Nenhum status financeiro é alterado. Cards canônicos permanecem vinculados ao cliente original.
+- O Dashboard Comercial usa cards criados no período e a sua etapa atual. Cada etapa real recebe um indicador de quantidade e valor. Tipos Venda ganha/Oportunidade perdida definem resultado e conversão, independentemente do nome da etapa. Não são inventadas variações percentuais, visualizações de formulário ou atribuições de anúncios.
+- A visão de WhatsApp usa mensagens recebidas/enviadas registradas: novas conversas por primeira entrada, últimas entradas sem resposta e mediana do tempo da primeira resposta. Ao selecionar uma pipeline, os telefones são limitados aos seus cards. Mensagens com erro não contam como respostas.
+- Agendamentos permite cadastrar, editar, concluir e cancelar compromissos manualmente. O histórico permanece salvo; não há exclusão pelo cadastro. Datas seguem o fuso do dispositivo. A tela não chama Google Agenda nem exige OAuth; credenciais antigas do Google permanecem preservadas.
 
 ## Acesso público
 
@@ -21,28 +25,23 @@ As páginas públicas chamam `agency-portal`. Nenhuma tabela é liberada para le
 
 Respostas do formulário não são expostas pelo link público. Credenciais do Google e estados OAuth não podem ser lidos por `anon` ou `authenticated`; apenas pelas funções de servidor.
 
-## Ativação pendente
+## Produção e preservação
 
-O arquivo local do repositório aponta para **ffvmmnzvmjiddqtywkko**, mas o build público de `https://www.centraldogestor.site` foi inspecionado e aponta para **dycyskikaljvokaxsxnh**. Esse é o vínculo de produção observado que deve ser preservado. As consultas administrativas aos dois projetos retornaram `You do not have permission to perform this action`. Nenhuma migração remota foi executada e nenhuma função foi publicada. Os testes usam PostgreSQL isolado e respostas simuladas dos serviços externos.
+A produção em `https://www.centraldogestor.site` usa Supabase **dycyskikaljvokaxsxnh**. O arquivo local aponta para outro projeto e nunca deve substituir as variáveis Production da Vercel. Os testes interceptam chamadas Supabase e usam PostgreSQL isolado, sem credenciais nem alterações reais nos clientes.
 
-Antes de ativar:
+A migração de onboarding/dashboard é aditiva: cria o acompanhamento e os agendamentos, adiciona o tipo de resultado às etapas e atualiza RPCs. Não reclassifica nem preenche registros antigos. A confirmação de preservação compara contagens e resumos criptográficos das tabelas preexistentes antes/depois (ignorando apenas a coluna nova, inicialmente nula).
 
-1. Conectar o Supabase de produção **dycyskikaljvokaxsxnh** e conferir as variáveis Production do projeto Vercel que atende `www.centraldogestor.site`. Preservar a URL e a chave pública desse banco. Não substituir as variáveis Production pelos valores do arquivo local nem publicar um build pré-compilado com o projeto local diferente.
-2. Conferir o histórico de migrações do projeto e aplicar as quatro migrações novas: `agency_pipelines`, `agency_portal_forms`, `agency_calendar` e `agency_whatsapp`. Não reaplicar o histórico inteiro sem comparar com o banco remoto.
-3. Publicar `agency-portal`, `agency-calendar` e a atualização de `meta-account-balances`. As duas funções novas têm `verify_jwt = false` no arquivo de configuração: o portal autentica por token secreto; a agenda valida a sessão em todas as ações privadas e valida o estado de uso único no retorno OAuth.
-4. No Google Cloud, ativar a Calendar API e configurar um cliente OAuth web, tela de consentimento e usuários de teste/publicação conforme o uso. URI autorizada de retorno: `https://dycyskikaljvokaxsxnh.supabase.co/functions/v1/agency-calendar?callback=1`.
-5. Configurar nos segredos das funções, sem colocá-los no código/frontend: `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_CLIENT_SECRET`, `AGENCY_APP_URL=https://www.centraldogestor.site`. Cada usuário conecta sua própria agenda pela aba Comercial → Agendamentos.
-6. Testar em um ambiente de revisão com banco correspondente, executar os advisors do Supabase e revisar o fluxo com contas distintas antes da publicação em produção. O preview do frontend não deve receber credenciais de serviço.
+A autenticação usa a sessão do Supabase. A antiga verificação de assinatura e os redirecionamentos de checkout foram removidos e não podem ser reintroduzidos.
 
 ## Verificação
 
 - `npm test`: regras de status e validação de respostas públicas.
-- `npm run test:db`: aplica as quatro migrações em PostgreSQL isolado (PGlite), testa preservação dos cards, rollback, conflito de revisão, integridade entre pipelines, RLS, portais, chamados, formulários e proteção de credenciais.
+- `npm run test:db`: aplica as migrações em PostgreSQL isolado (PGlite), testa preservação dos cards, rollback, conflito de revisão, integridade entre pipelines, RLS, portais, chamados, formulários e proteção de credenciais.
 - `npm run test:edge`: Deno, exercita os handlers reais com rede simulada. Verifica isolamento do portal, rejeição de IDs de outro cliente, estado OAuth de uso único e autenticação da agenda.
 - `npm run dev` e, em outro terminal, `npm run test:browser`: Chromium/Playwright. Em máquinas com Chromium de sistema, definir `CHROMIUM_PATH`. O teste intercepta todos os acessos Supabase; as mutações das telas internas rodam contra as migrações reais em PostgreSQL isolado. Os envios das páginas públicas usam respostas simuladas, em um contexto sem login.
 - `npx tsc --noEmit -p tsconfig.app.json` e `npm run build`.
 
-A autorização real do Google, as chamadas reais à Meta e o comportamento das migrações no banco remoto ainda dependem dos acessos/configurações acima.
+As chamadas externas reais à Meta e ao provedor de WhatsApp dependem das conexões configuradas pela agência. A agenda manual funciona sem Google.
 
 ## Ajustes de navegação, cliente e WhatsApp
 

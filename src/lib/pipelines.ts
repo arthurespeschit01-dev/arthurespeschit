@@ -10,6 +10,7 @@ export interface Stage {
   name: string;
   color: string;
   position: number;
+  outcome?: "in_progress" | "completed" | "won" | "lost" | null;
   pipeline_id: string;
 }
 export interface PipelineCard {
@@ -28,6 +29,7 @@ export interface PipelineCard {
     | "respondido";
   meeting_at: string | null;
   updated_at: string;
+  created_at?: string;
 }
 export const CONTACT_LABELS = {
   novo: "Sem contato",
@@ -64,4 +66,13 @@ export function validateStages(stages: Pick<Stage, "id" | "name" | "color">[]) {
   if (stages.some((s) => !/^#[\da-f]{6}$/i.test(s.color)))
     return "Escolha uma cor válida para cada etapa.";
   return null;
+}
+
+export function stageOutcome(stage: Pick<Stage, 'name' | 'outcome'>) {
+  if (stage.outcome) return stage.outcome;
+  const name = stage.name.trim().toLocaleLowerCase('pt-BR');
+  if (['concluído','concluido','concluída','concluida','finalizado','finalizada'].includes(name)) return 'completed';
+  if (['ganho','ganha','venda','vendido','fechado'].includes(name)) return 'won';
+  if (['perdido','perdida'].includes(name)) return 'lost';
+  return 'in_progress';
 }

@@ -1,3 +1,6 @@
+import type { CommercialMessage } from '@/lib/commercialMetrics';
+import type { ClientProgress } from '@/lib/clientProgress';
+import type { Appointment } from '@/lib/appointments';
 import type { ClientPortal, Ticket, TicketMessage, AgencyForm, FormResponse } from '@/lib/agency';
 import type { Pipeline, Stage, PipelineCard } from '@/lib/pipelines';
 type AgencyRow<T> = { [K in keyof (T & { user_id: string; created_at: string })]: (T & { user_id: string; created_at: string })[K] };
@@ -30,6 +33,8 @@ export type Database = {
       agency_forms: AgencyTable<AgencyForm>
       agency_form_responses: AgencyTable<FormResponse>
 
+      agency_whatsapp_messages: AgencyTable<CommercialMessage>
+      agency_appointments: AgencyTable<Appointment>
       agency_pipelines: AgencyTable<Pipeline>
       agency_pipeline_stages: AgencyTable<Stage>
       agency_pipeline_cards: AgencyTable<PipelineCard>
@@ -1447,9 +1452,10 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      agency_client_progress_view: { Row: { [K in keyof ClientProgress]: ClientProgress[K] }; Relationships: [] }
     }
     Functions: {
+      save_agency_client: { Args: { p_id: string | null; p_client: Json; p_operation?: Json }; Returns: string; }
       save_agency_pipeline: {
         Args: { p_id: string | null; p_area: string; p_name: string; p_revision: number; p_stages: Json; p_moves: Json };
         Returns: string;

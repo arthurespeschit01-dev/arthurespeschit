@@ -20,6 +20,7 @@ import logoCentralGestor from '@/assets/logo-central-gestor.png';
 const mainNavItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, tourId: 'nav-dashboard' },
   { to: '/clientes', label: 'Clientes', icon: Users, tourId: 'nav-clientes' },
+  { to: '/chamados', label: 'Chamados', icon: MessageSquare, tourId: 'nav-chamados' },
   { to: '/financeiro', label: 'Financeiro', icon: DollarSign, tourId: 'nav-financeiro' },
   // { to: '/planilha', label: 'Planilha', icon: BarChart3 },
   { to: '/planilha-teste', label: 'Planilha de acompanhamento', icon: BarChart3, tourId: 'nav-planilha' },
@@ -29,11 +30,16 @@ const mainNavItems = [
 ];
 
 const operacoesSubItems = [
-  { to: '/chamados', label: 'Chamados', icon: MessageSquare },
-  { to: '/comercial', label: 'Comercial', icon: Users },
   { to: '/relatorios', label: 'Relatórios', icon: FileText },
   { to: '/tasks', label: 'Tarefas', icon: ListTodo },
   { to: '/operacao', label: 'Onboarding e execução', icon: ClipboardList },
+];
+
+const comercialSubItems = [
+  { to: '/comercial', label: 'Dashboard comercial', icon: LayoutDashboard },
+  { to: '/comercial/crm', label: 'CRM', icon: Users },
+  { to: '/comercial/formularios', label: 'Formulários', icon: FileText },
+  { to: '/comercial/agendamentos', label: 'Agendamentos', icon: ClipboardList },
 ];
 
 const processosSubItems = [
@@ -74,8 +80,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1';
   });
   const [processosOpen, setProcessosOpen] = useState(() => processosSubItems.some(item => pathname === item.to));
+  const [comercialOpen, setComercialOpen] = useState(() => pathname.startsWith('/comercial'));
   const [operacoesOpen, setOperacoesOpen] = useState(() => operacoesSubItems.some(item => pathname === item.to));
   useEffect(() => {
+    if (pathname.startsWith('/comercial')) setComercialOpen(true);
     if (operacoesSubItems.some(item => item.to === pathname)) setOperacoesOpen(true);
     if (processosSubItems.some(item => item.to === pathname)) setProcessosOpen(true);
   }, [pathname]);
@@ -84,7 +92,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setCollapsed((prev) => {
       const next = !prev;
       try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? '1' : '0'); } catch {}
-      if (next) { setProcessosOpen(false); setOperacoesOpen(false); }
+      if (next) { setProcessosOpen(false); setOperacoesOpen(false); setComercialOpen(false); }
       return next;
     });
   };
@@ -104,7 +112,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   {!collapsed && <><span className="flex-1 text-left">{group.name}</span><ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${group.open ? 'rotate-180' : ''}`} /></>}
                 </button>
                 {group.open && !collapsed && <div id={`nav-${group.id}-items`} className="ml-3 pl-3 border-l border-sidebar-border space-y-0.5 mt-0.5">
-                  {group.items.map(item => <NavLink key={item.to} to={item.to} onClick={() => setSidebarOpen(false)} className={({isActive}) => `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${isActive ? 'bg-primary/15 text-primary font-medium' : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`}><SidebarIcon icon={item.icon} /><span>{item.label}</span></NavLink>)}
+                  {group.items.map(item => <NavLink key={item.to} to={item.to} end={item.to === '/comercial'} onClick={() => setSidebarOpen(false)} className={({isActive}) => `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${isActive ? 'bg-primary/15 text-primary font-medium' : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`}><SidebarIcon icon={item.icon} /><span>{item.label}</span></NavLink>)}
                 </div>}
               </div>;
 
@@ -172,7 +180,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </div>
                 );
               }
-              return item.to === '/clientes' ? <div key={item.to}>{wrapped}{renderNavGroup({ name: 'Operações', id: 'operacoes', items: operacoesSubItems, open: operacoesOpen, setOpen: setOperacoesOpen })}</div> : wrapped;
+              return item.to === '/clientes' ? <div key={item.to}>{wrapped}{renderNavGroup({ name: 'Operações', id: 'operacoes', items: operacoesSubItems, open: operacoesOpen, setOpen: setOperacoesOpen })}{renderNavGroup({ name: 'Comercial', id: 'comercial', items: comercialSubItems, open: comercialOpen, setOpen: setComercialOpen })}</div> : wrapped;
             })}
 
             {renderNavGroup({ name: 'Processos', id: 'processos', items: processosSubItems, open: processosOpen, setOpen: setProcessosOpen })}

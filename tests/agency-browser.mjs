@@ -16,7 +16,7 @@ await db.exec(`
   create schema auth;
   create table auth.users(id uuid primary key);
   create function auth.uid() returns uuid language sql stable as $$select '${owner}'::uuid$$;
-  create table public.clients(id uuid primary key, user_id uuid, name text, status text,
+  create table public.clients(id uuid primary key default gen_random_uuid(), user_id uuid, name text, status text,
     monthly_fee numeric default 100, payment_day int default 5, phone text default '',
     account_ids jsonb default '{}', niche text default 'Teste', services text default '',
     verba_mensal numeric default 1000, contract_duration text default '', created_at timestamptz default now());
@@ -32,6 +32,7 @@ for (const name of [
   "20261111145150_agency_portal_forms.sql",
   "20261111145643_agency_calendar.sql",
   "20261111152507_agency_whatsapp.sql",
+  "20261111171948_commercial_dashboard_client_operations.sql",
 ])
   await db.exec(
     await readFile(
@@ -150,6 +151,10 @@ await context.route("https://*.supabase.co/**", async (route) => {
         503,
       );
     }
+    if (url.pathname.endsWith('/rpc/save_agency_client')) {
+      const result = await db.query('select public.save_agency_client($1,$2::jsonb,$3::jsonb) id',[body.p_id,JSON.stringify(body.p_client),JSON.stringify(body.p_operation)]);
+      return response(route,result.rows[0].id);
+    }
     if (url.pathname.endsWith("/rpc/save_agency_pipeline")) {
       const result = await db.query(
         "select public.save_agency_pipeline($1,$2,$3,$4,$5::jsonb,$6::jsonb) id",
@@ -225,7 +230,7 @@ await context.route("https://*.supabase.co/**", async (route) => {
 });
 try {
   const base = process.env.TEST_APP_URL || "http://localhost:8080";
-  await page.goto(`${base}/comercial`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${base}/comercial/crm`, { waitUntil: "domcontentloaded" });
   await page
     .getByRole("button", { name: "Nova pipeline", exact: true })
     .click();
@@ -258,7 +263,7 @@ try {
     .getByRole("dialog")
     .getByRole("button", { name: "Close", exact: true })
     .click();
-  await page.goto(`${base}/comercial`);
+  await page.goto(`${base}/comercial/crm`);
   await page.getByRole("button", { name: "Novo card", exact: true }).click();
   await page
     .getByLabel("Título", { exact: true })
@@ -266,7 +271,7 @@ try {
   await page.getByLabel("Telefone", { exact: true }).fill("11999990000");
   await page.getByLabel("Valor da oportunidade (R$)").fill("1500");
   await page
-    .getByLabel("Status de resposta")
+    .getByLabel("Status de resposta", { exact: true })
     .selectOption("aguardando_agencia");
   await page.getByRole("button", { name: "Salvar card", exact: true }).click();
   await page
@@ -343,6 +348,9 @@ try {
   await page
     .getByRole("button", { name: "Cliente ativo de teste", exact: true })
     .waitFor();
+  const finalStage = await db.query("select id from agency_pipeline_stages where pipeline_id=(select id from agency_pipelines where area='operacao') and name='Concluído'");
+  await page.getByLabel('Mover Cliente ativo de teste para etapa').selectOption(finalStage.rows[0].id);
+  await page.getByRole('region',{name:'Concluído',exact:true}).getByRole('button',{name:'Cliente ativo de teste',exact:true}).waitFor();
   await page.goto(`${base}/clientes`);
   await page
     .getByRole("heading", { name: "Cliente ativo de teste", exact: true })
@@ -354,6 +362,23 @@ try {
       .count(),
     0,
   );
+  await page.getByText('Em execução · Concluído',{exact:true}).filter({visible:true}).first().waitFor();
+  await page.getByRole('button',{name:'Novo Cliente',exact:true}).click();
+  await page.getByRole('button',{name:'Pular e continuar',exact:true}).click();
+  await page.getByLabel('Nome do cliente *',{exact:true}).fill('Novo cliente em onboarding');
+  await page.getByLabel('Nicho *',{exact:true}).fill('Serviços');
+  await page.getByLabel('Verba mensal (R$) *',{exact:true}).fill('1500');
+  await page.getByLabel('Fase de trabalho',{exact:true}).selectOption('onboarding');
+  await page.getByRole('dialog').getByRole('button',{name:'Salvar',exact:true}).click();
+  await page.getByRole('heading',{name:'Novo cliente em onboarding',exact:true}).first().waitFor();
+  await page.getByText('Onboarding · Entrada',{exact:true}).filter({visible:true}).first().waitFor();
+  assert.equal((await db.query("select count(*)::int n from agency_pipeline_cards where title='Novo cliente em onboarding'")).rows[0].n,1);
+  await page.goto(`${base}/operacao`);
+  await page.getByLabel('Mover Novo cliente em onboarding para etapa').selectOption(finalStage.rows[0].id);
+  await page.getByRole('region',{name:'Concluído',exact:true}).getByRole('button',{name:'Novo cliente em onboarding',exact:true}).waitFor();
+  await page.goto(`${base}/clientes`);
+  await page.getByRole('heading',{name:'Novo cliente em onboarding',exact:true}).filter({visible:true}).locator('..').locator('..').getByText('Em execução · Concluído',{exact:true}).waitFor();
+
   await page.getByRole("button", { name: "Pausados", exact: true }).click();
   await page
     .getByRole("heading", { name: "Cliente pausado de teste", exact: true })
@@ -389,14 +414,14 @@ try {
     await page.getByLabel("Cliente do portal").inputValue(),
     activeClient,
   );
-  await page.getByRole("button", { name: "Operações", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Operações", exact: true }).click();
   assert.equal(
     await page
       .getByRole("button", { name: "Operações", exact: true })
       .getAttribute("aria-expanded"),
     "true",
   );
-  for (const label of ["Chamados", "Comercial", "Relatórios", "Tarefas"])
+  for (const label of ["Chamados", "Relatórios", "Tarefas"])
     assert.equal(
       await page
         .getByRole("navigation")
@@ -410,7 +435,7 @@ try {
       .count(),
     0,
   );
-  await page.goto(`${base}/comercial`);
+  await page.goto(`${base}/comercial/crm`);
   await page.getByRole("tab", { name: "Formulários", exact: true }).click();
   await page
     .getByRole("button", { name: "Novo formulário", exact: true })
@@ -423,6 +448,36 @@ try {
     .getByRole("button", { name: "Salvar formulário", exact: true })
     .click();
   await page.getByRole("heading", { name: /Briefing de onboarding/ }).waitFor();
+  await page.getByRole('tab',{name:'Agendamentos',exact:true}).click();
+  assert.equal(await page.getByRole('button',{name:'Conectar Google Agenda',exact:true}).count(),0);
+  await page.getByLabel('Título do agendamento',{exact:true}).fill('Reunião manual de onboarding');
+  await page.getByLabel('Início',{exact:true}).fill('2026-12-01T10:00');
+  await page.getByLabel('Término',{exact:true}).fill('2026-12-01T11:00');
+  await page.getByLabel('Cliente (opcional)',{exact:true}).selectOption(activeClient);
+  await page.getByRole('button',{name:'Salvar agendamento',exact:true}).click();
+  await page.getByRole('heading',{name:'Reunião manual de onboarding',exact:true}).waitFor();
+  await page.reload();
+  await page.getByRole('heading',{name:'Reunião manual de onboarding',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Editar agendamento',exact:true}).click();
+  await page.getByLabel('Status do agendamento',{exact:true}).selectOption('cancelado');
+  await page.getByRole('button',{name:'Salvar agendamento',exact:true}).click();
+  await page.getByLabel('Mostrar histórico e cancelados',{exact:true}).check();
+  await page.getByRole('heading',{name:'Reunião manual de onboarding',exact:true}).waitFor();
+  assert.equal((await db.query('select status from agency_appointments')).rows[0].status,'cancelado');
+  await page.goto(`${base}/comercial`);
+  await page.getByRole('heading',{name:'Dashboard Comercial',exact:true}).waitFor();
+  await page.getByLabel('Indicadores por etapa').getByText('Diagnóstico',{exact:true}).waitFor();
+  await page.getByLabel('Indicadores por etapa').locator('article').filter({hasText:'Diagnóstico'}).getByText('1',{exact:true}).waitFor();
+  if (process.env.TEST_SCREENSHOT_DIR) await page.screenshot({path:`${process.env.TEST_SCREENSHOT_DIR}/commercial-desktop.png`,fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  assert.equal(await page.evaluate(()=>[...document.querySelectorAll('main h1, main article')].every(e=>e.getBoundingClientRect().right<=innerWidth+1)),true,'Dashboard headings and metric cards must fit a mobile screen');
+  if (process.env.TEST_SCREENSHOT_DIR) await page.screenshot({path:`${process.env.TEST_SCREENSHOT_DIR}/commercial-mobile.png`,fullPage:true,animations:'disabled'});
+  await page.setViewportSize({width:1440,height:1000});
+  await page.getByRole('tab',{name:'Conversas do WhatsApp',exact:true}).click();
+  await page.getByText('Mensagens recebidas',{exact:true}).waitFor();
+  assert.equal(await page.getByText('Visualizações',{exact:true}).count(),0);
+  await page.getByRole('navigation').getByRole('button',{name:'Comercial',exact:true}).waitFor();
+  assert.equal(await page.locator('#nav-operacoes-items').getByRole('link').count(),0);
   await page.goto(`${base}/chamados`);
   await page.getByLabel("Cliente do portal").selectOption(activeClient);
 
@@ -506,7 +561,7 @@ try {
   assert.equal(apiErrors.length, 0, apiErrors.join("\n"));
   assert.equal(errors.length, 0, errors.join("\n"));
   console.log(
-    "PASS: browser → RPC → PostgreSQL, pipeline editing, preserving cards, operation onboarding, active/paused filtering, form creation, client portal creation",
+    "PASS: browser → RPC → PostgreSQL, pipeline editing, preserving cards, client onboarding creation/completion sync, manual appointment persistence/cancellation, dynamic commercial dashboard, active/paused filtering, form creation, client portal creation",
   );
 } catch (error) {
   console.error(
