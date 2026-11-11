@@ -12,7 +12,6 @@ import AuthCallback from "./pages/AuthCallback";
 import AppLayout from "./components/AppLayout";
 import ErrorBoundary from "./components/ErrorBoundary";
 import ScrollToTop from "./components/ScrollToTop";
-import { useAccessCheck } from "@/hooks/useAccessCheck";
 
 // Lazy load pages so a single failing chunk doesn't blank the app
 const Chamados = lazy(() => import("./pages/Chamados"));
@@ -35,7 +34,6 @@ const Tasks = lazy(() => import("./pages/Tasks"));
 const UTMGenerator = lazy(() => import("./pages/UTMGenerator"));
 const RelatoriosDiarios = lazy(() => import("./pages/RelatoriosDiarios"));
 const Configuracoes = lazy(() => import("./pages/Configuracoes"));
-const Bloqueado = lazy(() => import("./pages/Bloqueado"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 function RoutePrefetcher() {
@@ -53,7 +51,6 @@ function RoutePrefetcher() {
       void import("./pages/Planilha");
       void import("./pages/Tasks");
       void import("./pages/UTMGenerator");
-      void import("./pages/Bloqueado");
       void import("./pages/NotFound");
     }, 1200);
 
@@ -97,12 +94,11 @@ function RouteBoundary({ children }: { children: React.ReactNode }) {
 
 function ProtectedRoutes() {
   const { user, loading } = useAuth();
-  useAccessCheck();
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-background"><div className="text-muted-foreground">Carregando...</div></div>;
   if (!user) return <AuthPage />;
   return (
     <Routes>
-      <Route path="/bloqueado" element={<Bloqueado />} />
+      <Route path="/bloqueado" element={<Navigate to="/" replace />} />
       <Route path="*" element={
         <AppLayout>
           <RouteBoundary>

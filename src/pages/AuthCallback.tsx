@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { isAlwaysAllowed, setCachedAccess, clearAccessCache } from '@/lib/checkAccess';
 
 export default function AuthCallback() {
   useEffect(() => {
@@ -22,33 +21,12 @@ export default function AuthCallback() {
         console.warn('exchangeCodeForSession failed', e);
       }
 
-      const storedEmail = (() => { try { return localStorage.getItem('user_email') || ''; } catch { return ''; } })();
-      if (isAlwaysAllowed(storedEmail)) {
-        clearAccessCache(storedEmail);
-        setCachedAccess(storedEmail, true);
-        window.location.replace('/');
-        return;
-      }
-
       // Retry getting the session for up to ~8s.
       let session = (await supabase.auth.getSession()).data.session;
       for (let i = 0; i < 16 && !session; i++) {
         await new Promise((r) => setTimeout(r, 500));
         session = (await supabase.auth.getSession()).data.session;
         if (cancelled) return;
-      }
-
-      const email =
-        session?.user?.email ||
-        (() => { try { return localStorage.getItem('user_email') || ''; } catch { return ''; } })();
-
-      // Whitelist: bypass total — sem checagem de assinatura
-      if (isAlwaysAllowed(email)) {
-        if (email) { try { localStorage.setItem('user_email', email); } catch { /* ignore */ } }
-        clearAccessCache(email);
-        setCachedAccess(email, true);
-        window.location.replace('/');
-        return;
       }
 
       if (!session?.user?.email) {

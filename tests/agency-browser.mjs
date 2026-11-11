@@ -82,6 +82,7 @@ await context.addInitScript((session) => {
     JSON.stringify(session),
   );
   localStorage.setItem("onboarding-tour-completed", "true");
+  sessionStorage.setItem(`access-check:${session.user.email}`, JSON.stringify({ access: false, checkedAt: Date.now() }));
 }, session);
 const response = (route, data, status = 200) =>
   route.fulfill({
@@ -90,9 +91,11 @@ const response = (route, data, status = 200) =>
     headers: { "access-control-allow-origin": "*" },
     body: JSON.stringify(data),
   });
-await context.route("https://backend-centraldogestor.vercel.app/**", (route) =>
-  response(route, { access: true }),
-);
+let subscriptionChecks = 0;
+await context.route("https://backend-centraldogestor.vercel.app/**", (route) => {
+  subscriptionChecks++;
+  return response(route, { access: false });
+});
 const apiErrors = [];
 await context.route("https://*.supabase.co/**", async (route) => {
   const request = route.request();
@@ -499,6 +502,7 @@ try {
   assert.equal(ticketSent, true);
   assert.equal(publicAuthRequests, 0);
   await publicContext.close();
+  assert.equal(subscriptionChecks, 0, "Login must never consult the retired purchase gate");
   assert.equal(apiErrors.length, 0, apiErrors.join("\n"));
   assert.equal(errors.length, 0, errors.join("\n"));
   console.log(
