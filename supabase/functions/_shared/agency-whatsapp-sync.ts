@@ -46,24 +46,27 @@ export async function reconcileWhatsapp(db:any,connection:any){
   await db.from('agency_whatsapp_connections').update({reconciled_at:now.toISOString(),sync_error:null}).eq('user_id',connection.user_id);
   if(!connection.directory_synced_at||Date.now()-new Date(connection.directory_synced_at).getTime()>900000){
    let directoryError=false;
-   for(const kind of ['groups','contacts','chats']){
+   for(const kind of ['groups','known','contacts','chats']){
     try{
      for(let page=1;page<=50;page++){
       const {data}=await bridge(connection,'directory',{kind,page});
       const list=Array.isArray(data)?data:data[kind]||data.data?.[kind]||data.data||[];
       if(!Array.isArray(list))break;
+      const {data:groups}=await db.from('agency_whatsapp_chats').select('address').eq('user_id',connection.user_id).eq('is_group',true);
+      const groupAddresses=new Set((groups||[]).map((g:any)=>g.address));
       for(const item of list){
-       let id=String(item.id||item.jid||item.groupId||item.phoneNumber||item.phone||'');const group=kind==='groups'||id.endsWith('@g.us')||item.isGroup===true;
+       let id=String(item.id||item.jid||item.groupId||item.phoneNumber||item.phone||'');const group=kind==='groups'||id.endsWith('@g.us')||item.isGroup===true||groupAddresses.has(id+'@g.us');
        if(group&&!id.includes('@'))id+='@g.us';const address=whatsappPhone(id);if(!validWhatsappAddress(address))continue;
        const name=String(group?(item.subject||item.name||item.groupName||''):(item.name||item.shortName||item.displayName||item.contact?.name||item.notify||item.pushName||item.verifiedName||'')).trim();
        if(!name)continue;
-       const {error}=await db.rpc('agency_whatsapp_chat_metadata',{p_user_id:connection.user_id,p_address:address,p_name:name,p_source:group?'group':item.name||item.shortName||item.displayName||item.contact?.name?'contact':'push',p_group:group});if(error)throw error;
+       const {error}=await db.rpc('agency_whatsapp_chat_metadata',{p_user_id:connection.user_id,p_address:address,p_name:name,p_source:kind==='known'?'push':group?'group':item.name||item.shortName||item.displayName||item.contact?.name?'contact':'push',p_group:group});if(error)throw error;
+       if(group && kind==='groups'){const {error:fix}=await db.from('agency_whatsapp_messages').update({phone:address,contact_name:name}).eq('user_id',connection.user_id).eq('phone',address.split('@')[0]);if(fix)throw fix;}
       }
       if(kind==='groups'||page>=Number(data.totalPages||data.pagination?.totalPages||1))break;
      }
     }catch{directoryError=true;}
    }
-   if(!directoryError)await db.from('agency_whatsapp_connections').update({directory_synced_at:now.toISOString()}).eq('user_id',connection.user_id);
+   await db.from('agency_whatsapp_connections').update({directory_synced_at:now.toISOString(),directory_warning:directoryError?'A agenda de contatos não foi disponibilizada pelo provedor. Nomes conhecidos e grupos continuam disponíveis.':null}).eq('user_id',connection.user_id);
   }
   return {ok:true,imported};
  }catch(error){await db.from('agency_whatsapp_connections').update({sync_error:'A sincronização automática será tentada novamente.'}).eq('user_id',connection.user_id);throw error;}

@@ -19,13 +19,13 @@ export default function WhatsAppInbox(){
   const version=++sequence.current;setBusy(true);const pages=append?1:Math.ceil(count.current/50);let rows:Contact[]=[];let hasMore=false;
   for(let page=0;page<pages;page++){
    const offset=append?contactsRef.current.length:page*50;
-   const {data,error}=await supabase.rpc('agency_whatsapp_inbox',{p_search:search,p_offset:offset});if(version!==sequence.current)return;
+   const {data,error}=await supabase.rpc('agency_whatsapp_inbox_v2',{p_search:search,p_offset:offset,p_filter:filter});if(version!==sequence.current)return;
    if(error){setError('A conexão foi interrompida. Tentando restabelecer as atualizações…');setBusy(false);return;}
    const items=data as unknown as Contact[];rows.push(...items.slice(0,50));hasMore=items.length>50;if(!hasMore)break;
   }
   setContacts(current=>append?[...current,...rows.filter(r=>!current.some(c=>c.phone_key===r.phone_key))]:rows);setMore(hasMore);setBusy(false);setError('');if(append)count.current+=50;
   setSelected(current=>current?rows.find(c=>c.phone_key===current.phone_key)||current:null);
- },[search]);
+ },[search,filter]);
  const realtime=useWhatsAppLive(()=>void load());
  useEffect(()=>{count.current=50;const timer=setTimeout(()=>void load(),200);return()=>clearTimeout(timer)},[load]);
  useEffect(()=>{
@@ -46,7 +46,7 @@ export default function WhatsAppInbox(){
    </header>
    {(error||status?.sync_error)&&<p role="alert" className="text-xs text-destructive px-4 py-2 border-b">{error||status?.sync_error}</p>}
    <div className="overflow-y-auto flex-1 min-h-0" aria-label="Contatos do WhatsApp">{visible.map(c=><button key={c.phone_key} onClick={()=>setSelected(c)} className={`flex gap-3 px-4 py-4 text-left w-full border-b transition-colors ${selected?.phone_key===c.phone_key?'bg-primary/10':'hover:bg-muted/50'}`}>
-    <span className="rounded-full bg-primary/10 text-primary w-10 h-10 flex items-center justify-center shrink-0 text-xs font-semibold">{c.is_group?<Users size={19}/>:initials(c.name)}</span><span className="min-w-0 flex-1"><span className="flex items-center gap-2 justify-between"><strong className="text-sm truncate">{c.name}</strong><time className="text-[10px] text-muted-foreground shrink-0">{new Date(c.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</time></span><span className="flex items-center gap-1 mt-1 text-xs text-muted-foreground"><span>{c.is_group?'Grupo':c.card_id?'No CRM':'Contato'}</span></span><span className="flex gap-2 items-center justify-between mt-1"><span className="text-xs text-muted-foreground truncate flex items-center gap-1">{c.direction==='saida'&&<CheckCheck className="shrink-0" size={13}/>}<span className="truncate">{c.body}</span></span>{!!c.unread_count&&<span className="shrink-0 rounded-full bg-primary text-primary-foreground text-[10px] min-w-5 h-5 px-1 inline-flex items-center justify-center">{c.unread_count}</span>}</span></span>
+    <span className="rounded-full bg-primary/10 text-primary w-10 h-10 flex items-center justify-center shrink-0 text-xs font-semibold">{c.is_group?<Users size={19}/>:initials(c.name)}</span><span className="min-w-0 flex-1"><span className="flex items-center gap-2 justify-between"><strong className="text-sm truncate">{c.name}</strong><time className="text-[10px] text-muted-foreground shrink-0">{c.created_at?new Date(c.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):''}</time></span><span className="flex items-center gap-1 mt-1 text-xs text-muted-foreground"><span>{c.is_group?'Grupo':c.card_id?'No CRM':'Contato'}</span></span><span className="flex gap-2 items-center justify-between mt-1"><span className="text-xs text-muted-foreground truncate flex items-center gap-1">{c.direction==='saida'&&<CheckCheck className="shrink-0" size={13}/>}<span className="truncate">{c.body}</span></span>{!!c.unread_count&&<span className="shrink-0 rounded-full bg-primary text-primary-foreground text-[10px] min-w-5 h-5 px-1 inline-flex items-center justify-center">{c.unread_count}</span>}</span></span>
    </button>)}{!visible.length&&!busy&&<p className="text-center text-sm text-muted-foreground p-8">Nenhuma conversa {filter==='all'?'encontrada':'neste filtro'}.</p>}{busy&&!contacts.length&&<p role="status" className="p-6 text-sm text-muted-foreground">Carregando conversas…</p>}{more&&<Button variant="ghost" className="w-full" disabled={busy} onClick={()=>void load(true)}>Mais conversas</Button>}</div>
    <p className="text-[10px] text-muted-foreground px-4 py-2 border-t">{realtime?'Atualizações em tempo real':'Atualização automática ativa'}</p>
   </section>

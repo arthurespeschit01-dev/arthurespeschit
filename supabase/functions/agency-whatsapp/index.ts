@@ -206,6 +206,7 @@ Deno.serve(async (request) => {
         last_webhook_at: connection.last_webhook_at || null,
         reconciled_at:connection.reconciled_at || null,
         sync_error:connection.sync_error || null,
+        directory_warning:connection.directory_warning || null,
         webhook_url: `${supabaseUrl}/functions/v1/agency-whatsapp?webhook=${connection.webhook_secret}`,
       });
     }

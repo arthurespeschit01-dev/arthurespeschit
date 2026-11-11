@@ -35,6 +35,7 @@ for (const name of [
   "20261111171948_commercial_dashboard_client_operations.sql",
   "20261111183242_whatsapp_inbox_shared.sql",
   "20261111185241_whatsapp_live_conversations.sql",
+  "20261111190630_whatsapp_directory_availability.sql",
 ])
   await db.exec(
     await readFile(
@@ -156,7 +157,7 @@ await context.route("https://*.supabase.co/**", async (route) => {
       );
     }
     if (url.pathname.endsWith('/rpc/agency_whatsapp_mark_read')) {await db.query('select agency_whatsapp_mark_read($1)',[body.p_address]);return response(route,null);}
-    if (url.pathname.endsWith('/rpc/agency_whatsapp_inbox')) { const result=await db.query("select set_config('request.jwt.claim.sub',$1,false)",[owner]); const inbox=await db.query('select agency_whatsapp_inbox($1,$2) result',[body.p_search,body.p_offset]); return response(route,inbox.rows[0].result); }
+    if (url.pathname.endsWith('/rpc/agency_whatsapp_inbox') || url.pathname.endsWith('/rpc/agency_whatsapp_inbox_v2')) { const result=await db.query("select set_config('request.jwt.claim.sub',$1,false)",[owner]); const inbox=await db.query('select agency_whatsapp_inbox($1,$2) result',[body.p_search,body.p_offset]); return response(route,inbox.rows[0].result); }
     if (url.pathname.endsWith('/rpc/save_agency_client')) {
       const result = await db.query('select public.save_agency_client($1,$2::jsonb,$3::jsonb) id',[body.p_id,JSON.stringify(body.p_client),JSON.stringify(body.p_operation)]);
       return response(route,result.rows[0].id);

@@ -24,6 +24,7 @@ assert.deepEqual((await db.query('select to_jsonb(c) as data from clients c')).r
 await db.exec(await readFile(new URL('../supabase/migrations/20261111152507_agency_whatsapp.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../supabase/migrations/20261111183242_whatsapp_inbox_shared.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../supabase/migrations/20261111185241_whatsapp_live_conversations.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../supabase/migrations/20261111190630_whatsapp_directory_availability.sql',import.meta.url),'utf8'));
 const login=async(id)=>{await db.exec('reset role');await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id||'']);await db.exec(`set role ${id?'authenticated':'anon'}`)};
 await login(owner);
 const pipeline=randomUUID(),stage=randomUUID(),card=randomUUID();
@@ -60,6 +61,11 @@ assert(results.some(c=>c.name==='Renata Guedes' && c.is_group && c.phone==='1203
 await db.query("select agency_whatsapp_mark_read('120363123456789@g.us')");
 results=(await db.query("select agency_whatsapp_inbox('Renata',0) result")).rows[0].result;
 assert.equal(results[0].unread_count,0);
+await db.exec('reset role');
+await db.query("select agency_whatsapp_chat_metadata($1,'120363987654321@g.us','Grupo sem mensagens','group',true)",[owner]);
+await login(owner);
+const groups=(await db.query("select agency_whatsapp_inbox_v2('',0,'groups') result")).rows[0].result;
+assert.equal(groups.length,2);assert(groups.some(c=>c.name==='Grupo sem mensagens' && c.is_group));
 await login(other);assert.equal((await db.query("select agency_whatsapp_inbox('Renata',0) result")).rows[0].result.length,0);
 await login(null);await assert.rejects(db.query("select agency_whatsapp_inbox('',0)"));
 await db.close();console.log('PASS: inbox includes outside conversations and CRM cards; search and RLS isolate owners; historical messages preserve current status; send echo deduplicated without deleting records');
