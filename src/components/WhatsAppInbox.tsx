@@ -22,7 +22,7 @@ export default function WhatsAppInbox(){
  const load=useCallback(async(append=false)=>{
   const version=++sequence.current;
   if(!accountId){setContacts([]);setSelected(null);setMore(false);setBusy(false);return;}
-  setBusy(true);const pages=append?1:Math.ceil(count.current/50);let rows:Contact[]=[];let hasMore=false;
+  setBusy(true);const pages=append?1:Math.ceil(count.current/50);const rows:Contact[]=[];let hasMore=false;
   for(let page=0;page<pages;page++){
    const offset=append?contactsRef.current.length:page*50;
    const {data,error}=await supabase.rpc('agency_whatsapp_inbox_v2',{p_search:search,p_offset:offset,p_filter:filter});if(version!==sequence.current)return;
