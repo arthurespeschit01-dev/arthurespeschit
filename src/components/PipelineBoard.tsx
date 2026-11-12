@@ -1,11 +1,11 @@
 import DeleteItemButton from '@/components/DeleteItemButton';
-import {useWhatsAppAccount} from '@/hooks/useWhatsAppAccount';
-import {useWhatsAppLive} from '@/hooks/useWhatsAppLive';
+import {useCommercialLive} from '@/hooks/useCommercialLive';
+import FormSubmissionDetails from '@/components/FormSubmissionDetails';
+import type {AgencyForm,FormResponse} from '@/lib/agency';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import WhatsAppConversation from "@/components/WhatsAppConversation";
 import { readAllRows } from "@/lib/readAllRows";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,6 @@ import {
 import { Plus, Settings2, ArrowUp, ArrowDown, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  CONTACT_LABELS,
   DEFAULT_STAGES,
   validateStages,
   stageOutcome,
@@ -34,17 +33,16 @@ import {
 
 const selectClass =
   "h-10 rounded-md border border-input bg-background px-3 text-sm w-full";
-const money = (value: number) =>
-  value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 type ClientOption = { id: string; name: string; status: string | null };
 type CardDraft = Omit<PipelineCard, "id" | "updated_at"> & { id?: string };
 
 export default function PipelineBoard({ area }: { area: PipelineArea }) {
-  const { user } = useAuth();
-  const account=useWhatsAppAccount();
+  const { user } = useAuth();const sequence=useRef(0);
   const queryClient = useQueryClient();
   const [params] = useSearchParams();
-  const [contactFilter, setContactFilter] = useState(params.get("resposta") || "all");
+  const [filterForm,setFilterForm]=useState(params.get("form")||"all");
+  const [showLegacy,setShowLegacy]=useState(false);
+  const [forms,setForms]=useState<AgencyForm[]>([]),[responses,setResponses]=useState<FormResponse[]>([]);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [stages, setStages] = useState<Stage[]>([]);
   const [cards, setCards] = useState<PipelineCard[]>([]);
@@ -66,25 +64,17 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
     moves: Record<string, string>;
   } | null>(null);
   const [draft, setDraft] = useState<CardDraft | null>(null);
-  const [contactStatusDirty, setContactStatusDirty] = useState(false);
-  useEffect(()=>{setDraft(null)},[account.data?.account_id]);
   const activePipeline = pipelines.find((p) => p.id === selected);
   const boardStages = stages
     .filter((s) => s.pipeline_id === selected)
     .sort((a, b) => a.position - b.position);
-  const boardCards = cards.filter(
-    (c) =>
-      c.pipeline_id === selected &&
-      (area!=="comercial" || !c.whatsapp_account_id || c.whatsapp_account_id===account.data?.account_id && account.data?.connected) &&
-      (area !== "comercial" || contactFilter === "all" || c.contact_status === contactFilter) &&
-      (showInactive || !c.client_id || activeClientIds.has(c.client_id)) &&
-      `${c.title} ${c.phone}`.toLowerCase().includes(search.toLowerCase()),
-  );
+  const boardCards=cards.filter(c=>c.pipeline_id===selected&&(area!=='comercial'||c.source_type==='form'||showLegacy)&&(area!=='comercial'||filterForm==='all'||c.source_form_id===filterForm)&&(area==='comercial'||showInactive||!c.client_id||activeClientIds.has(c.client_id))&&`${c.title} ${c.phone}`.toLowerCase().includes(search.toLowerCase()));
+  const currentResponses=responses.filter(r=>boardCards.some(c=>c.source_type==='form'&&c.form_response_id===r.id));
 
   const load = useCallback(async () => {
     if (!user) return;
-    setLoading(true);
-    const [p, s, c, cl] = await Promise.all([
+    const version=++sequence.current;setLoading(true);
+    const [p, s, c, cl, f, r] = await Promise.all([
       readAllRows<Pipeline>((from, to) =>
         supabase
           .from("agency_pipelines")
@@ -121,8 +111,11 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
           .order("id")
           .range(from, to),
       ),
+      readAllRows<AgencyForm>((from,to)=>supabase.from('agency_forms').select('*').eq('user_id',user.id).order('created_at').order('id').range(from,to)),
+      readAllRows<FormResponse>((from,to)=>supabase.from('agency_form_responses').select('*').eq('user_id',user.id).order('created_at').order('id').range(from,to)),
     ]);
-    const error = p.error || s.error || c.error || cl.error;
+    if(version!==sequence.current)return;
+    const error = p.error || s.error || c.error || cl.error || f.error || r.error;
     setLoading(false);
     if (error) {
       setLoadError(
@@ -135,7 +128,7 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
     setPipelines(p.data);
     setStages(s.data);
     setCards(c.data);
-    setClients(cl.data);
+    setClients(cl.data);setForms(f.data);setResponses(r.data);
     setSelected((current) =>
       p.data.some((x) => x.id === current) ? current : p.data[0]?.id || "",
     );
@@ -144,21 +137,7 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
   useEffect(() => {
     void load();
   }, [load]);
-  useWhatsAppLive(()=>{if(area==="comercial")void load()});
-  const refreshConversation = useCallback(async () => {
-    const updated = await load();
-    if (updated)
-      setDraft((current) =>
-        current
-          ? {
-              ...current,
-              contact_status:
-                updated.find((card) => card.id === current.id)
-                  ?.contact_status || current.contact_status,
-            }
-          : current,
-      );
-  }, [load]);
+  useCommercialLive(()=>void load());
 
   const openEditor = (pipeline: Pipeline | null) => {
     const id = pipeline?.id || "";
@@ -244,7 +223,6 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
   };
   const newCard = () => {
     if (!boardStages[0]) return;
-    setContactStatusDirty(false);
     setDraft({
       title: "",
       phone: "",
@@ -287,12 +265,7 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
     const result = id
       ? await supabase
           .from("agency_pipeline_cards")
-          .update({
-            ...payload,
-            ...(contactStatusDirty
-              ? { contact_status: draft.contact_status }
-              : {}),
-          })
+          .update(payload)
           .eq("id", id)
           .select("id")
           .single()
@@ -366,9 +339,8 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
           <Settings2 className="w-4 h-4 mr-2" />
           Editar pipeline
         </Button>
-        <Button disabled={!boardStages.length || busy} onClick={newCard}>
-          Novo card
-        </Button>
+      {selected&&<DeleteItemButton kind="pipeline" id={selected} title={pipelines.find(p=>p.id===selected)?.name||'pipeline'} description="A pipeline, suas etapas e seus cards serão excluídos. Clientes e conversas permanecem na base." onDeleted={async()=>{setSelected('');await load()}}/>}
+        {area==='operacao'&&<Button disabled={!boardStages.length || busy} onClick={newCard}>Novo card</Button>}
         <Button
           variant="ghost"
           disabled={loading || busy}
@@ -384,16 +356,15 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
           onChange={(e) => setSearch(e.target.value)}
         />
       </div>
-      {selected&&<DeleteItemButton kind="pipeline" id={selected} title={pipelines.find(p=>p.id===selected)?.name||'pipeline'} description="A pipeline, suas etapas e seus cards serão excluídos. Clientes e conversas permanecem na base." onDeleted={async()=>{setSelected('');await load()}}/>}
-      {area === 'comercial' && <label className="block max-w-xs space-y-2 text-sm">Status de resposta<select className={selectClass} value={contactFilter} onChange={e=>setContactFilter(e.target.value)}><option value="all">Todos os status</option>{Object.entries(CONTACT_LABELS).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>}
-      <label className="flex gap-2 items-center text-sm">
+      {area==='comercial'&&<div className="space-y-3"><label className="block max-w-sm text-sm space-y-1">Formulário<select className={selectClass} value={filterForm} onChange={e=>setFilterForm(e.target.value)}><option value="all">Todos os formulários</option>{forms.map(f=><option key={f.id} value={f.id}>{f.title}</option>)}</select></label><label className="flex gap-2 text-sm items-center"><input type="checkbox" checked={showLegacy} onChange={e=>setShowLegacy(e.target.checked)}/>Mostrar cards anteriores (WhatsApp e manuais)</label></div>}
+      {area==='operacao'&&<label className="flex gap-2 items-center text-sm">
         <input
           type="checkbox"
           checked={showInactive}
           onChange={(e) => setShowInactive(e.target.checked)}
         />
         Mostrar cards de clientes pausados e encerrados
-      </label>
+      </label>}
       {!pipelines.length && (
         <div className="rounded-xl border border-dashed p-10 text-center">
           <h2 className="font-semibold">Monte seu primeiro fluxo</h2>
@@ -402,53 +373,7 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
           </p>
         </div>
       )}
-      {area === "comercial" && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {[
-            [
-              "Contatos nesta pipeline",
-              cards.filter((c) => c.pipeline_id === selected && (!c.whatsapp_account_id || c.whatsapp_account_id===account.data?.account_id && account.data?.connected)).length,
-            ],
-            [
-              "Aguardando nossa resposta",
-              cards.filter(
-                (c) =>
-                  c.pipeline_id === selected &&
-      (area!=="comercial" || !c.whatsapp_account_id || c.whatsapp_account_id===account.data?.account_id && account.data?.connected) &&
-                  c.contact_status === "aguardando_agencia",
-              ).length,
-            ],
-            [
-              "Aguardando cliente",
-              cards.filter(
-                (c) =>
-                  c.pipeline_id === selected &&
-      (area!=="comercial" || !c.whatsapp_account_id || c.whatsapp_account_id===account.data?.account_id && account.data?.connected) &&
-                  c.contact_status === "aguardando_cliente",
-              ).length,
-            ],
-            [
-              "Valor das oportunidades",
-              money(
-                cards
-                  .filter((c) => c.pipeline_id === selected && (!c.whatsapp_account_id || c.whatsapp_account_id===account.data?.account_id && account.data?.connected))
-                  .reduce((sum, c) => sum + Number(c.value), 0),
-              ),
-            ],
-          ].map(([label, value]) => (
-            <div className="rounded-xl border p-4" key={label}>
-              <p className="text-sm text-muted-foreground">{label}</p>
-              <p className="text-2xl font-semibold mt-2">{value}</p>
-            </div>
-          ))}
-        </div>
-      )}
-      {area === "comercial" && (
-        <p className="text-xs text-muted-foreground">
-          Os indicadores de resposta refletem o status do card e são atualizados
-          pelas mensagens do WhatsApp conectado.
-        </p>
-      )}
+      {area==='comercial'&&<><div className="grid grid-cols-3 gap-3">{[['Envios neste quadro',currentResponses.length],['Não analisados',currentResponses.filter(r=>!r.reviewed_at).length],['Analisados',currentResponses.filter(r=>r.reviewed_at).length]].map(([label,value])=><div key={label} className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="text-2xl font-semibold mt-2">{value}</p></div>)}</div><p className="text-xs text-muted-foreground">Novos cards são criados pelos formulários. Mover uma etapa marca a resposta como analisada. Cards anteriores ficam preservados na opção acima e não entram nos indicadores.</p></>}
       <div
         className="flex gap-4 overflow-x-auto pb-5"
         aria-label="Quadro de pipelines"
@@ -486,37 +411,28 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
                     onDragEnd={() => setDragged(null)}
                     className="rounded-lg border bg-background p-3 space-y-3"
                   >
-                    <button
-                      className="text-left w-full font-semibold hover:text-primary"
+                    <div className="flex items-start gap-2"><button
+                      className="text-left flex-1 min-w-0 font-semibold hover:text-primary"
                       onClick={() => {
-                        setContactStatusDirty(false);
-                        setDraft({ ...card });
+                                            setDraft({ ...card });
                       }}
                     >
                       {card.title}
                     </button>
+                    <DeleteItemButton kind="card" id={card.id} title={card.title} description="Este card e seu vínculo com a pipeline serão removidos. O cliente e as conversas permanecem na base." onDeleted={load}/>
+                    </div>
                     {card.client_id && (
                       <p className="text-xs text-muted-foreground">
                         {clients.find((c) => c.id === card.client_id)?.name ||
                           "Cliente indisponível"}
                       </p>
                     )}
-                    {area === "comercial" && (
-                      <>
-                        <p className="text-xs">
-                          {CONTACT_LABELS[card.contact_status]}
-                        </p>
-                        {Number(card.value) > 0 && (
-                          <p className="text-sm">{money(Number(card.value))}</p>
-                        )}
-                      </>
-                    )}
+                    {area==='comercial'&&<div className="space-y-1"><p className="text-xs text-muted-foreground">{card.source_type==='form'?(forms.find(f=>f.id===card.source_form_id)?.title||'Formulário excluído'):'Card anterior'}</p><p className="text-xs">{card.source_type==='form'?(card.form_response_id?(responses.find(r=>r.id===card.form_response_id)?.reviewed_at?'Analisado':'Não analisado'):'Resposta original excluída'):'Origem anterior preservada'}</p></div>}
                     {card.meeting_at && (
                       <p className="text-xs">
                         {new Date(card.meeting_at).toLocaleString("pt-BR")}
                       </p>
                     )}
-                    <DeleteItemButton kind="card" id={card.id} title={card.title} description="Este card e seu vínculo com a pipeline serão removidos. O cliente e as conversas permanecem na base." onDeleted={load}/>
                     <select
                       className={selectClass}
                       aria-label={`Mover ${card.title} para etapa`}
@@ -720,6 +636,7 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
           </DialogHeader>
           {draft && (
             <div className="space-y-3">
+              {area==='comercial'&&draft.form_response_id&&<FormSubmissionDetails key={draft.form_response_id} responseId={draft.form_response_id}/>}
               <Label htmlFor="card-title">Título</Label>
               <Input
                 id="card-title"
@@ -806,37 +723,6 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
                       setDraft({ ...draft, phone: e.target.value })
                     }
                   />
-                  <Label htmlFor="card-value">Valor da oportunidade (R$)</Label>
-                  <Input
-                    id="card-value"
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={draft.value}
-                    onChange={(e) =>
-                      setDraft({ ...draft, value: Number(e.target.value) })
-                    }
-                  />
-                  <Label htmlFor="card-contact">Status de resposta</Label>
-                  <select
-                    id="card-contact"
-                    className={selectClass}
-                    value={draft.contact_status}
-                    onChange={(e) => {
-                      setContactStatusDirty(true);
-                      setDraft({
-                        ...draft,
-                        contact_status: e.target
-                          .value as PipelineCard["contact_status"],
-                      });
-                    }}
-                  >
-                    {Object.entries(CONTACT_LABELS).map(([key, label]) => (
-                      <option key={key} value={key}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
                 </>
               )}
               <Label htmlFor="card-meeting">
@@ -875,14 +761,7 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
               <Button disabled={busy} onClick={() => void saveCard()}>
                 {busy ? "Salvando…" : "Salvar card"}
               </Button>
-              {area === "comercial" && draft.id && (
-                <WhatsAppConversation
-                  key={draft.id}
-                  cardId={draft.id}
-                  phone={cards.find((c) => c.id === draft.id)?.phone || ""}
-                  onChanged={refreshConversation}
-                />
-              )}
+
             </div>
           )}
         </DialogContent>

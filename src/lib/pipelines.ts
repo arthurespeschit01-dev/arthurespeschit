@@ -14,6 +14,9 @@ export interface Stage {
   pipeline_id: string;
 }
 export interface PipelineCard {
+  source_type?:"legacy"|"manual"|"whatsapp"|"form";
+  source_form_id?:string|null;
+  form_response_id?:string|null;
   whatsapp_account_id?:string|null;
   id: string;
   pipeline_id: string;
@@ -40,9 +43,9 @@ export const CONTACT_LABELS = {
 };
 export const DEFAULT_STAGES = {
   comercial: [
-    "Novo contato",
-    "Em conversa",
-    "Reunião",
+    "Novo formulário preenchido",
+    "Em análise",
+    "Em contato",
     "Proposta",
     "Ganho",
     "Perdido",

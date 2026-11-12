@@ -48,6 +48,8 @@ export interface FormField {
   required: boolean;
 }
 export interface AgencyForm {
+  pipeline_id?:string|null;
+  lead_name_field_id?:string|null;
   id: string;
   user_id: string;
   title: string;
@@ -58,6 +60,7 @@ export interface AgencyForm {
   created_at: string;
 }
 export interface FormResponse {
+  reviewed_at?:string|null;
   id: string;
   user_id: string;
   form_id: string;

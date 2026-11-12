@@ -48,6 +48,7 @@ for (const name of [
   "20261112194308_client_billing_schedule.sql",
   "20261112195910_task_closure_history.sql",
   "20261112201959_forms_deletion_finance_alignment.sql",
+  "20261112214328_commercial_form_intake.sql",
 ])
   await db.exec(
     await readFile(
@@ -60,6 +61,8 @@ await db.query('insert into agency_whatsapp_account_state(user_id,account_id,con
 await db.exec(`alter table agency_whatsapp_messages alter column account_id set default '${mailboxA}'::uuid`);
 await db.query("update clients set monthly_fee=case when status='Ativo' then 550 when status='Pausado' then 600 else monthly_fee end where user_id=$1",[owner]);
 await db.query("insert into mensalidades(user_id,cliente_id,valor,vencimento,status) select user_id,id,case when status='Ativo' then 650 else 700 end,date_trunc('month',now())::date+14,'pendente' from clients where user_id=$1 and status in('Ativo','Pausado')",[owner]);
+const seedForm=(await db.query("insert into agency_forms(user_id,title,fields) values($1,'Formulário de teste','[{\"id\":\"name\",\"label\":\"Nome completo\",\"type\":\"text\",\"required\":false}]') returning id",[owner])).rows[0].id;
+await db.query("insert into agency_form_responses(user_id,form_id,answers) values($1,$2,'{\"name\":{\"label\":\"Nome completo\",\"value\":\"Contato de formulário de teste\"}}')",[owner,seedForm]);
 const browser = await chromium.launch({
   headless: true,
   ...(process.env.CHROMIUM_PATH
@@ -262,156 +265,10 @@ await context.route("https://*.supabase.co/**", async (route) => {
 try {
   const base = process.env.TEST_APP_URL || "http://localhost:8080";
   if(!process.env.TEST_TASKS_ONLY){
-  await page.goto(`${base}/comercial/crm`, { waitUntil: "domcontentloaded" });
-  await page
-    .getByRole("button", { name: "Nova pipeline", exact: true })
-    .click();
-  await page
-    .getByLabel("Nome da pipeline", { exact: true })
-    .fill("Vendas da agência");
-  await page
-    .getByRole("button", { name: "Salvar pipeline", exact: true })
-    .click();
-  await page
-    .getByRole("button", { name: "Editar pipeline", exact: true })
-    .waitFor();
-  assert.equal(await page.getByRole('button', { name: 'Conectar WhatsApp', exact: true }).count(), 0);
-  assert.equal(await page.getByRole('navigation').getByRole('link', { name: 'Clientes', exact: true }).evaluate(link => link.nextElementSibling?.textContent), 'Tarefas');
-  fixtureConnected=false;
-  await page.goto(`${base}/configuracoes`);
-  await page.getByRole('button', { name: 'Configurar instância e token', exact: true }).click();
-  await page.getByLabel('ID da instância', { exact: true }).waitFor();
-  assert.equal(await page.getByLabel('Token da instância', { exact: true }).getAttribute('type'), 'password');
-  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
-  await page
-    .getByRole("button", { name: "Conectar WhatsApp", exact: true })
-    .click();
-  await page
-    .getByRole("img", {
-      name: "QR Code para conectar seu WhatsApp à Central",
-      exact: true,
-    })
-    .waitFor();
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Close", exact: true })
-    .click();
-  fixtureConnected=true;
-  await page.goto(`${base}/comercial/crm`);
-  await page.getByRole("button", { name: "Novo card", exact: true }).click();
-  await page
-    .getByLabel("Título", { exact: true })
-    .fill("Oportunidade de teste");
-  await page.getByLabel("Telefone", { exact: true }).fill("11999990000");
-  await page.getByLabel("Valor da oportunidade (R$)").fill("1500");
-  await page
-    .getByLabel("Status de resposta", { exact: true })
-    .selectOption("aguardando_agencia");
-  await page.getByRole("button", { name: "Salvar card", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Oportunidade de teste", exact: true })
-    .waitFor();
-  await page
-    .getByRole("button", { name: "Editar pipeline", exact: true })
-    .click();
-  await page
-    .getByLabel("Nome da pipeline", { exact: true })
-    .fill("Vendas personalizadas");
-  await page.getByLabel("Nome da etapa 2", { exact: true }).fill("Diagnóstico");
-  await page
-    .getByRole("button", { name: "Remover etapa 1", exact: true })
-    .click();
-  await page
-    .getByRole("button", { name: "Salvar pipeline", exact: true })
-    .click();
-  await page
-    .getByText("Escolha o destino dos cards das etapas removidas.", {
-      exact: true,
-    })
-    .waitFor();
-  const destination = await page
-    .getByLabel("Destino dos cards de “Novo contato”")
-    .locator("option")
-    .nth(1)
-    .getAttribute("value");
-  await page
-    .getByLabel("Destino dos cards de “Novo contato”")
-    .selectOption(destination);
-  await page
-    .getByRole("button", { name: "Salvar pipeline", exact: true })
-    .click();
-  await page
-    .getByRole("region", { name: "Diagnóstico", exact: true })
-    .getByRole("button", { name: "Oportunidade de teste", exact: true })
-    .waitFor();
-  assert.equal(
-    (await db.query("select count(*)::int n from agency_pipeline_cards"))
-      .rows[0].n,
-    1,
-  );
-  await page
-    .getByRole("button", { name: "Oportunidade de teste", exact: true })
-    .click();
-  await page
-    .getByLabel("Mensagem WhatsApp", { exact: true })
-    .fill("Mensagem simulada de teste");
-  await page
-    .getByRole("button", { name: "Enviar pelo WhatsApp", exact: true })
-    .click();
-  await page.getByText("Mensagem simulada de teste", { exact: true }).waitFor();
-  await page.getByRole("button", { name: "Salvar card", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Oportunidade de teste", exact: true })
-    .waitFor();
-  assert.equal(
-    (await db.query("select contact_status from agency_pipeline_cards")).rows[0]
-      .contact_status,
-    "aguardando_cliente",
-  );
-  await db.query("insert into agency_whatsapp_messages(user_id,phone,body,direction,status,contact_name) values($1,'5511888880000','Mensagem recebida fora do CRM','entrada','recebido','Contato externo')",[owner]);
-  await page.goto(`${base}/comercial/conversas`);
-  await page.getByRole('button').filter({hasText:'Contato externo'}).click();
-  await page.getByText('Mensagem recebida fora do CRM',{exact:true}).filter({visible:true}).last().waitFor();
-  await page.getByLabel('Mensagem WhatsApp',{exact:true}).fill('Resposta sem card');
-  await page.getByRole('button',{name:'Enviar pelo WhatsApp',exact:true}).click();
-  await page.getByText('Resposta sem card',{exact:true}).filter({visible:true}).last().waitFor();
-  assert.equal((await db.query("select count(*)::int n from agency_pipeline_cards where phone='5511888880000'")).rows[0].n,1);
-  assert.equal(await page.getByRole('button',{name:'Atualizar conversas',exact:true}).count(),0);
-  await db.query("insert into agency_whatsapp_messages(user_id,provider_message_id,phone,body,direction,status) values($1,'automatic-reply','5511888880000','Chegou sem atualizar a página','entrada','recebido')",[owner]);
-  await page.getByLabel('Mensagens da conversa').getByText('Chegou sem atualizar a página',{exact:true}).waitFor({timeout:12000});
-  await db.query("select agency_whatsapp_account_metadata($1,$2,'120363123456789@g.us','Renata Guedes','group',true)",[owner,mailboxA]);
-  await db.query("insert into agency_whatsapp_messages(user_id,provider_message_id,phone,body,direction,status,sender_name) values($1,'group-reply','120363123456789@g.us','Mensagem no grupo','entrada','recebido','Participante')",[owner]);
-  await page.getByRole('button').filter({hasText:'Renata Guedes'}).waitFor({timeout:12000});
-  await page.getByRole('button').filter({hasText:'Renata Guedes'}).click();
-  await page.getByText('Grupo do WhatsApp',{exact:true}).waitFor();
-  await page.getByLabel('Mensagens da conversa').getByText('Participante',{exact:true}).waitFor();
-  if(process.env.TEST_SCREENSHOT_DIR) await page.screenshot({path:`${process.env.TEST_SCREENSHOT_DIR}/conversations-desktop.png`,fullPage:true});
-  assert(await page.getByLabel('Mensagens da conversa').evaluate(el=>el.getBoundingClientRect().height>500));
-  await page.setViewportSize({width:390,height:844});
-  if(process.env.TEST_SCREENSHOT_DIR) await page.screenshot({path:`${process.env.TEST_SCREENSHOT_DIR}/conversations-mobile.png`,fullPage:true,animations:'disabled'});
-  await page.getByRole('button',{name:'Voltar às conversas',exact:true}).click();
-  await page.getByRole('heading',{name:/^Conversas/}).waitFor();
-  await page.getByRole('button').filter({hasText:'Renata Guedes'}).click();
-  await page.setViewportSize({width:390,height:430});
-  await page.getByLabel('Mensagem WhatsApp',{exact:true}).focus();
-  await page.waitForFunction(()=>document.querySelector('textarea[aria-label="Mensagem WhatsApp"]').getBoundingClientRect().bottom<=innerHeight);
-  assert(await page.getByRole('button',{name:'Enviar pelo WhatsApp',exact:true}).evaluate(el=>el.getBoundingClientRect().height>=44));
-  await page.setViewportSize({width:390,height:844});
-  await page.bringToFront();
-  activeMailbox=mailboxB;
-  await page.getByText('Conectado · 5531999991111',{exact:true}).waitFor({timeout:12000});
-  assert.equal(await page.getByLabel('Mensagens da conversa').count(),0,'switching sender must close the old conversation');
-  await db.query("insert into agency_whatsapp_messages(user_id,account_id,provider_message_id,phone,body,direction,status,contact_name) values($1,$2,'other-account','5511888880000','Conversa exclusiva da Vanessa','entrada','recebido','Contato no outro número')",[owner,mailboxB]);
-  await page.getByRole('button').filter({hasText:'Contato no outro número'}).waitFor({timeout:12000});
-  assert.equal(await page.getByRole('button').filter({hasText:'Renata Guedes'}).count(),0);
-  fixtureConnected=false;
-  await page.getByText('WhatsApp desconectado',{exact:true}).waitFor({timeout:12000});
-  fixtureConnected=true;activeMailbox=mailboxA;
-  await page.getByText('Conectado · 553171789803',{exact:true}).waitFor({timeout:12000});
-  await page.getByRole('button').filter({hasText:'Renata Guedes'}).waitFor({timeout:12000});
-
-  await page.setViewportSize({width:1440,height:1000});
-
+  await page.goto(`${base}/comercial/crm`, {waitUntil:'domcontentloaded'});
+  await page.getByRole('button',{name:'Contato de formulário de teste',exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Novo card',exact:true}).count(),0);
+  assert.equal(await page.getByText('Excluir',{exact:true}).count(),0);
   await page.goto(`${base}/operacao`);
   await page
     .getByRole("button", { name: "Nova pipeline", exact: true })
@@ -567,13 +424,15 @@ try {
   await page.getByRole("heading", { name: /Briefing de onboarding/ }).waitFor();
   const createdForm=(await db.query("select id from agency_forms where title='Briefing de onboarding'")).rows[0].id;
   await db.query("insert into agency_form_responses(user_id,form_id,answers) values($1,$2,'{}')",[owner,createdForm]);
-  await page.getByRole('button',{name:'Excluir Briefing de onboarding',exact:true}).click();
+  await page.getByRole('button',{name:'Ações de Briefing de onboarding',exact:true}).click();
+  await page.getByRole('menuitem',{name:'Excluir',exact:true}).click();
   await page.getByRole('alertdialog').getByRole('button',{name:'Cancelar',exact:true}).click();
-  assert.equal((await db.query('select count(*)::int n from agency_forms')).rows[0].n,1);
-  await page.getByRole('button',{name:'Excluir Briefing de onboarding',exact:true}).click();
+  assert.equal((await db.query('select count(*)::int n from agency_forms where id=$1',[createdForm])).rows[0].n,1);
+  await page.getByRole('button',{name:'Ações de Briefing de onboarding',exact:true}).click();
+  await page.getByRole('menuitem',{name:'Excluir',exact:true}).click();
   await page.getByRole('button',{name:'Confirmar exclusão',exact:true}).click();
-  await page.getByText('Nenhum formulário criado.',{exact:true}).waitFor();
-  assert.equal((await db.query('select count(*)::int n from agency_form_responses')).rows[0].n,0);
+  await page.getByRole('heading',{name:/Briefing de onboarding/}).waitFor({state:'hidden'});
+  assert.equal((await db.query('select count(*)::int n from agency_form_responses where form_id=$1',[createdForm])).rows[0].n,0);
 
   await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
   await page.getByRole('navigation').getByRole('link',{name:'Agendamentos',exact:true}).click();
@@ -595,15 +454,14 @@ try {
   await page.setViewportSize({width:1440,height:1000});
   await page.goto(`${base}/comercial`);
   await page.getByRole('heading',{name:'Dashboard Comercial',exact:true}).waitFor();
-  await page.getByLabel('Indicadores por etapa').getByText('Diagnóstico',{exact:true}).waitFor();
-  await page.getByLabel('Indicadores por etapa').locator('article').filter({hasText:'Diagnóstico'}).getByText('2',{exact:true}).waitFor();
+  await page.getByLabel('Indicadores por etapa').getByText('Novo formulário preenchido',{exact:true}).waitFor();
+  await page.getByText('Formulários preenchidos',{exact:true}).locator('..').getByText('1',{exact:true}).waitFor();
   if (process.env.TEST_SCREENSHOT_DIR) await page.screenshot({path:`${process.env.TEST_SCREENSHOT_DIR}/commercial-desktop.png`,fullPage:true});
   await page.setViewportSize({width:390,height:844});
   assert.equal(await page.evaluate(()=>[...document.querySelectorAll('main h1, main article')].every(e=>e.getBoundingClientRect().right<=innerWidth+1)),true,'Dashboard headings and metric cards must fit a mobile screen');
   if (process.env.TEST_SCREENSHOT_DIR) await page.screenshot({path:`${process.env.TEST_SCREENSHOT_DIR}/commercial-mobile.png`,fullPage:true,animations:'disabled'});
   await page.setViewportSize({width:1440,height:1000});
-  await page.getByRole('tab',{name:'Conversas do WhatsApp',exact:true}).click();
-  await page.getByText('Mensagens recebidas',{exact:true}).waitFor();
+  assert.equal(await page.getByRole('tab',{name:'Conversas do WhatsApp',exact:true}).count(),0);
   assert.equal(await page.getByText('Visualizações',{exact:true}).count(),0);
   await page.getByRole('navigation').getByRole('button',{name:'Comercial',exact:true}).waitFor();
   assert.equal(await page.locator('#nav-operacoes-items').getByRole('link').count(),0);

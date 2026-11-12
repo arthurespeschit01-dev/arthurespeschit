@@ -1,3 +1,4 @@
+import type {Pipeline} from '@/lib/pipelines';
 import DeleteItemButton from '@/components/DeleteItemButton';
 import AgencyFormFields from '@/components/AgencyFormFields';
 import {formDefinitionError} from '@/lib/formConditions';
@@ -42,12 +43,15 @@ type Draft = {
   title: string;
   description: string;
   fields: FormField[];
+  pipeline_id:string;
+  lead_name_field_id:string;
 };
 
 export default function AgencyForms() {
   const { user } = useAuth();
   const [preview,setPreview]=useState(false);
   const [previewAnswers,setPreviewAnswers]=useState<Record<string,string>>({});
+  const [pipelines,setPipelines]=useState<Pipeline[]>([]);
   const [forms, setForms] = useState<AgencyForm[]>([]);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [selected, setSelected] = useState<AgencyForm | null>(null);
@@ -69,6 +73,7 @@ export default function AgencyForms() {
     }
     setError("");
     setForms(data);
+    const {data:boards}=await supabase.from('agency_pipelines').select('*').eq('user_id',user.id).eq('area','comercial').order('created_at');if(boards)setPipelines(boards);
   }, [user]);
   useEffect(() => {
     void load();
@@ -109,6 +114,7 @@ export default function AgencyForms() {
       title: draft.title.trim(),
       description: draft.description,
       fields,
+      pipeline_id:draft.pipeline_id||null,lead_name_field_id:draft.lead_name_field_id||null,
     };
     const { error } = draft.id
       ? await supabase
@@ -153,6 +159,7 @@ export default function AgencyForms() {
     }
     await load();
   };
+  const reviewResponse=async(response:FormResponse)=>{if(busy)return;setBusy(true);const reviewed=!response.reviewed_at;const {error}=await supabase.rpc('agency_review_form',{p_response_id:response.id,p_reviewed:reviewed});setBusy(false);if(error){toast.error('Não foi possível atualizar a análise.');return;}setResponses(current=>current.map(r=>r.id===response.id?{...r,reviewed_at:reviewed?new Date().toISOString():null}:r));toast.success('Análise atualizada.');};
   const patchField = (id: string, patch: Partial<FormField>) =>
     draft &&
     setDraft({
@@ -171,7 +178,7 @@ export default function AgencyForms() {
         </div>
         <Button
           onClick={() =>
-            setDraft({ title: "", description: "", fields: [newField()] })
+            setDraft({ title: "", description: "", fields: [newField()],pipeline_id:"",lead_name_field_id:"" })
           }
         >
           Novo formulário
@@ -197,6 +204,7 @@ export default function AgencyForms() {
                   title: form.title,
                   description: form.description,
                   fields: form.fields.map((f) => ({ ...f })),
+                  pipeline_id:form.pipeline_id||"",lead_name_field_id:form.lead_name_field_id||"",
                 })
               }
             >
@@ -270,6 +278,7 @@ export default function AgencyForms() {
                   setDraft({ ...draft, description: e.target.value })
                 }
               />
+              <fieldset className="rounded-lg border p-3 space-y-3"><legend className="px-1 text-sm font-medium">Entrada no CRM</legend><Label htmlFor="form-pipeline">Pipeline dos novos envios</Label><select id="form-pipeline" className={agencySelectClass} value={draft.pipeline_id} onChange={e=>setDraft({...draft,pipeline_id:e.target.value})}><option value="">Primeira pipeline comercial (automático)</option>{pipelines.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select><Label htmlFor="form-lead-name">Campo usado como nome no CRM</Label><select id="form-lead-name" className={agencySelectClass} value={draft.lead_name_field_id} onChange={e=>setDraft({...draft,lead_name_field_id:e.target.value})}><option value="">Identificar automaticamente</option>{draft.fields.filter(f=>f.label.trim()).map(f=><option key={f.id} value={f.id}>{f.label}</option>)}</select><p className="text-xs text-muted-foreground">Cada resposta gera um card na primeira etapa da pipeline. Os envios anteriores mantêm a organização já feita.</p></fieldset>
               {draft.fields.map((field, i) => (
                 <div key={field.id} className="border rounded-lg p-3 space-y-3">
                   <Label htmlFor={`field-${field.id}`}>Campo {i + 1}</Label>
@@ -330,7 +339,7 @@ export default function AgencyForms() {
                       size="sm"
                       variant="ghost"
                       disabled={draft.fields.length === 1}
-                      onClick={() => {if(draft.fields.some(f=>f.condition?.fieldId===field.id)){toast.error('Remova as condições que usam este campo antes de excluí-lo.');return;}setDraft({...draft,fields:draft.fields.filter(f=>f.id!==field.id)})}}
+                      onClick={() => {if(draft.fields.some(f=>f.condition?.fieldId===field.id)){toast.error('Remova as condições que usam este campo antes de excluí-lo.');return;}setDraft({...draft,lead_name_field_id:draft.lead_name_field_id===field.id?'':draft.lead_name_field_id,fields:draft.fields.filter(f=>f.id!==field.id)})}}
                     >
                       Remover
                     </Button>
@@ -374,7 +383,7 @@ export default function AgencyForms() {
               key={response.id}
               className="border rounded-lg p-4 space-y-3"
             >
-              <DeleteItemButton kind="response" id={response.id} title="resposta" description="Esta resposta será excluída do formulário." onDeleted={()=>setResponses(current=>current.filter(r=>r.id!==response.id))}/>
+              <div className="flex gap-2 items-center flex-wrap"><Button variant="outline" disabled={busy} onClick={()=>void reviewResponse(response)}>{response.reviewed_at?'Marcar como não analisado':'Marcar como analisado'}</Button><DeleteItemButton kind="response" id={response.id} title="resposta" description="Esta resposta será excluída do formulário." onDeleted={()=>setResponses(current=>current.filter(r=>r.id!==response.id))}/></div>
               <p className="text-xs text-muted-foreground">
                 {new Date(response.created_at).toLocaleString("pt-BR")}
               </p>

@@ -1470,6 +1470,8 @@ export type Database = {
       agency_client_progress_view: { Row: { [K in keyof ClientProgress]: ClientProgress[K] }; Relationships: [] }
     }
     Functions: {
+      agency_review_form: {Args:{p_response_id:string;p_reviewed:boolean};Returns:undefined};
+      agency_import_form_lead: {Args:{p_response_id:string};Returns:string};
       agency_delete_item: {Args:{p_kind:string;p_id:string};Returns:undefined};
       ensure_agency_monthly_invoices: {Args:{p_month:string};Returns:Database["public"]["Tables"]["mensalidades"]["Row"][]};
       agency_whatsapp_inbox_v2: {Args:{p_search?:string;p_offset?:number;p_filter?:string};Returns:Json};
