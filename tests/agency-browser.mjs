@@ -49,6 +49,7 @@ for (const name of [
   "20261112195910_task_closure_history.sql",
   "20261112201959_forms_deletion_finance_alignment.sql",
   "20261112214328_commercial_form_intake.sql",
+  "20261112222942_task_workspace.sql",
 ])
   await db.exec(
     await readFile(
@@ -183,6 +184,7 @@ await context.route("https://*.supabase.co/**", async (route) => {
     }
     if (url.pathname.endsWith('/rpc/agency_whatsapp_mark_read')) {await db.query('select agency_whatsapp_mark_read($1)',[body.p_address]);return response(route,null);}
     if (url.pathname.endsWith('/rpc/agency_whatsapp_inbox') || url.pathname.endsWith('/rpc/agency_whatsapp_inbox_v2')) { const result=await db.query("select set_config('request.jwt.claim.sub',$1,false)",[owner]); const inbox=await db.query('select agency_whatsapp_inbox_v2($1,$2,$3) result',[body.p_search,body.p_offset,body.p_filter||'all']); return response(route,inbox.rows[0].result); }
+    if(url.pathname.endsWith('/rpc/agency_tasks_update')){const r=await db.query('select * from agency_tasks_update($1,$2)',[body.p_ids,JSON.stringify(body.p_patch)]);return response(route,r.rows);}
     if(url.pathname.endsWith('/rpc/agency_delete_item')){await db.query('select agency_delete_item($1,$2)',[body.p_kind,body.p_id]);return response(route,null);}
     if(url.pathname.endsWith('/rpc/ensure_agency_monthly_invoices')){const r=await db.query('select * from ensure_agency_monthly_invoices($1)',[body.p_month]);return response(route,r.rows);}
     if (url.pathname.endsWith('/rpc/save_agency_client')) {
@@ -558,6 +560,7 @@ try {
   assert(directLinks.indexOf('Conversas')===directLinks.indexOf('Tarefas')+1);
   assert.equal(await page.locator('#nav-operacoes-items').getByRole('link',{name:'Tarefas',exact:true}).count(),0);
 
+  await page.getByRole('tab',{name:'Quadro de trabalho',exact:true}).click();
   await page.getByRole('heading',{name:'Entrega em aberto',exact:true}).waitFor();
   assert.equal(await page.getByRole('heading',{name:'Concluída antiga',exact:true}).count(),0);
   await page.getByText('Filtros e ordenação',{exact:true}).click();

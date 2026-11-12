@@ -1,0 +1,6 @@
+import {Button} from '@/components/ui/button';
+import {DropdownMenu,DropdownMenuTrigger,DropdownMenuContent,DropdownMenuItem,DropdownMenuSeparator} from '@/components/ui/dropdown-menu';
+import {MoreHorizontal,Copy,Eye,Edit2,Trash2} from 'lucide-react';
+export function TaskActions({title,onOpen,onEdit,onDuplicate,onDelete,disabled=false}:{title:string;onOpen?:()=>void;onEdit:()=>void;onDuplicate:()=>void;onDelete:()=>void;disabled?:boolean}){
+ return <DropdownMenu><DropdownMenuTrigger asChild><Button disabled={disabled} variant="ghost" size="icon" className="h-11 w-11 shrink-0 text-muted-foreground" aria-label={`Ações de ${title}`}><MoreHorizontal size={18}/></Button></DropdownMenuTrigger><DropdownMenuContent align="end">{onOpen&&<DropdownMenuItem onSelect={onOpen}><Eye className="mr-2 h-4 w-4"/>Abrir detalhes</DropdownMenuItem>}<DropdownMenuItem onSelect={onEdit}><Edit2 className="mr-2 h-4 w-4"/>Editar tarefa</DropdownMenuItem><DropdownMenuItem onSelect={onDuplicate}><Copy className="mr-2 h-4 w-4"/>Duplicar tarefa</DropdownMenuItem><DropdownMenuSeparator/><DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={onDelete}><Trash2 className="mr-2 h-4 w-4"/>Excluir tarefa</DropdownMenuItem></DropdownMenuContent></DropdownMenu>;
+}

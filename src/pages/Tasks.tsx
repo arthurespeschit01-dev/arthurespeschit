@@ -1,6 +1,6 @@
 import {readAllRows} from '@/lib/readAllRows';
-import {isClosedTask,closedInPeriod} from '@/lib/taskViews';
-import { useEffect, useState, useMemo, useRef } from 'react';
+import {isClosedTask,closedInPeriod,taskDay} from '@/lib/taskViews';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -8,16 +8,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import {
-  Plus, Search, Calendar, Paperclip, Trash2, Edit2,
+  Plus, Search, Calendar, Paperclip,
   CheckCircle2, Clock, AlertCircle, Upload, X, FileText, XCircle,
-  MessageSquare, Send, Eye, CalendarIcon, Filter, Repeat
+  MessageSquare, Send, Filter, Repeat, MoreHorizontal, ListTodo, LayoutGrid, CalendarDays, History
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
@@ -27,21 +26,14 @@ import { cn } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 
-interface Task {
-  id: string;
-  title: string;
-  description: string;
-  status: string;
-  priority: string;
-  start_date: string | null;
-  end_date: string | null;
-  client_id: string | null;
-  created_at: string;
-  closed_at: string | null;
-  recurrence: string;
-  recurrence_interval: number;
-  recurrence_days: number[];
-}
+import type {Task,TaskSubtask,TaskPatch} from '@/lib/tasks';
+import {taskDeadline} from '@/lib/tasks';
+import {TaskTable} from '@/components/tasks/TaskTable';
+import {TaskCalendar} from '@/components/tasks/TaskCalendar';
+import {TaskSubtasks} from '@/components/tasks/TaskSubtasks';
+import {TaskActions} from '@/components/tasks/TaskActions';
+import {TaskProgress} from '@/components/tasks/TaskProgress';
+import {TaskBulkActions} from '@/components/tasks/TaskBulkActions';
 
 const recurrenceLabels: Record<string, string> = {
   none: 'Não repetir',
@@ -65,85 +57,6 @@ const monthLabels = [
   'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
   'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez',
 ];
-
-function fmt(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-/**
- * Computes the next occurrence date based on recurrence type and selected days.
- * - weekly with days [1,3]: next selected weekday after current date
- * - monthly with days [1,15]: next selected day-of-month
- * - yearly with days (months) [0,5]: next selected month, same day
- * - daily / no days selected: just advance by interval
- */
-function addRecurrence(
-  dateStr: string,
-  recurrence: string,
-  interval: number,
-  days: number[] = [],
-): string {
-  const d = new Date(dateStr + 'T00:00:00');
-  const n = Math.max(1, interval || 1);
-  const sortedDays = [...days].sort((a, b) => a - b);
-
-  if (recurrence === 'daily') {
-    d.setDate(d.getDate() + n);
-    return fmt(d);
-  }
-
-  if (recurrence === 'weekly') {
-    if (sortedDays.length === 0) {
-      d.setDate(d.getDate() + 7 * n);
-      return fmt(d);
-    }
-    // Find next selected weekday strictly after current date
-    for (let i = 1; i <= 7 * n + 7; i++) {
-      const candidate = new Date(d);
-      candidate.setDate(d.getDate() + i);
-      if (sortedDays.includes(candidate.getDay())) {
-        return fmt(candidate);
-      }
-    }
-    d.setDate(d.getDate() + 7 * n);
-    return fmt(d);
-  }
-
-  if (recurrence === 'monthly') {
-    if (sortedDays.length === 0) {
-      d.setMonth(d.getMonth() + n);
-      return fmt(d);
-    }
-    // Find next selected day-of-month
-    const currentDay = d.getDate();
-    const futureDay = sortedDays.find((day) => day > currentDay);
-    if (futureDay) {
-      const candidate = new Date(d.getFullYear(), d.getMonth(), futureDay);
-      return fmt(candidate);
-    }
-    // Otherwise jump to first selected day in next month (advance by interval)
-    const candidate = new Date(d.getFullYear(), d.getMonth() + n, sortedDays[0]);
-    return fmt(candidate);
-  }
-
-  if (recurrence === 'yearly') {
-    if (sortedDays.length === 0) {
-      d.setFullYear(d.getFullYear() + n);
-      return fmt(d);
-    }
-    // days here are months (0-11). Keep day-of-month from original.
-    const currentMonth = d.getMonth();
-    const futureMonth = sortedDays.find((m) => m > currentMonth);
-    if (futureMonth !== undefined) {
-      const candidate = new Date(d.getFullYear(), futureMonth, d.getDate());
-      return fmt(candidate);
-    }
-    const candidate = new Date(d.getFullYear() + n, sortedDays[0], d.getDate());
-    return fmt(candidate);
-  }
-
-  return dateStr;
-}
 
 interface Client {
   id: string;
@@ -180,6 +93,7 @@ const priorityConfig: Record<string, { label: string; color: string }> = {
 
 export default function Tasks() {
   const { user } = useAuth();
+  const userId=user?.id;const loadSequence=useRef(0);const mutationLock=useRef(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -187,8 +101,13 @@ export default function Tasks() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
   const [search, setSearch] = useState('');
-  const pendingStatus=useRef(new Set<string>());
-  const [view,setView]=useState('quadro');
+  const [subtasks,setSubtasks]=useState<TaskSubtask[]>([]);
+  const [selected,setSelected]=useState<Set<string>>(new Set());
+  const [groupBy,setGroupBy]=useState('status');
+  const [filterAssignee,setFilterAssignee]=useState('todos');
+  const [mutating,setMutating]=useState(false);
+  const [deleting,setDeleting]=useState<{kind:'task'|'comment'|'attachment';id:string;title:string}|null>(null);
+  const [view,setView]=useState('tabela');
   const [historyPeriod,setHistoryPeriod]=useState('semana');
   const [historyFrom,setHistoryFrom]=useState(''),[historyTo,setHistoryTo]=useState('');
   const [closedExpanded,setClosedExpanded]=useState<Record<string,boolean>>({});
@@ -204,45 +123,55 @@ export default function Tasks() {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
   const [form, setForm] = useState({
-    title: '', description: '', status: 'pendente', priority: 'média',
+    title: '', description: '', status: 'pendente', priority: 'média', assignee_name:'',
     start_date: '', end_date: '', client_id: '',
     recurrence: 'none', recurrence_interval: 1,
     recurrence_days: [] as number[],
   });
 
-  const load = async () => {
-    if (!user) return;
-    const [tasksRes, clientsRes, attachRes, commentsRes] = await Promise.all([
-      readAllRows((from,to)=>supabase.from('operational_tasks').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).order('id').range(from,to)),
-      supabase.from('clients').select('id, name, status').eq('user_id', user.id).order('name'),
-      supabase.from('task_attachments').select('*').eq('user_id', user.id),
-      supabase.from('task_comments').select('*').eq('user_id', user.id).order('created_at', { ascending: true }),
+  const load = useCallback(async () => {
+    if (!userId) return;const version=++loadSequence.current;
+    const [tasksRes, clientsRes, attachRes, commentsRes, subtaskRes] = await Promise.all([
+      readAllRows((from,to)=>supabase.from('operational_tasks').select('*').eq('user_id',userId).order('created_at',{ascending:false}).order('id').range(from,to)),
+      supabase.from('clients').select('id, name, status').eq('user_id', userId).order('name'),
+      supabase.from('task_attachments').select('*').eq('user_id', userId),
+      supabase.from('task_comments').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
+      readAllRows<TaskSubtask>((a,b)=>supabase.from('agency_task_subtasks').select('*').eq('user_id',userId).order('position').order('created_at').order('id').range(a,b)),
     ]);
-    if(tasksRes.error){toast.error('Não foi possível carregar as tarefas. Tente novamente.');return;}
+    if(version!==loadSequence.current)return;
+    if(tasksRes.error||clientsRes.error||attachRes.error||commentsRes.error||subtaskRes.error){toast.error('Não foi possível carregar as tarefas. Tente novamente.');return;}
     const normalized: Task[] = (tasksRes.data || []).map((t) => ({
-      ...t,
+      ...t, assignee_name:t.assignee_name||'',recurrence_of:t.recurrence_of||null,
       recurrence_days: Array.isArray(t.recurrence_days)
         ? (t.recurrence_days as unknown[]).map((n) => Number(n)).filter((n) => !Number.isNaN(n))
         : [],
     }));
     setTasks(normalized);
+    setDetailTask(current=>current?normalized.find(t=>t.id===current.id)||null:null);
+    setSubtasks(subtaskRes.data);
     setClients(clientsRes.data || []);
     setAttachments(attachRes.data || []);
     setComments(commentsRes.data || []);
-  };
+  },[userId]);
 
-  useEffect(() => { load(); }, [user]);
+  useEffect(() => {void load();if(!userId)return;const sequence=loadSequence;let timer:ReturnType<typeof setTimeout>;const refresh=()=>{clearTimeout(timer);timer=setTimeout(()=>{if(!mutationLock.current)void load()},250)};
+    let channel=supabase.channel(`tasks-${userId}-${crypto.randomUUID()}`);
+    for(const table of ['operational_tasks','agency_task_subtasks','task_comments','task_attachments'])channel=channel.on('postgres_changes',{event:'*',schema:'public',table,filter:`user_id=eq.${userId}`},refresh);
+    channel.subscribe();const interval=setInterval(()=>{if(!document.hidden)refresh()},15000);window.addEventListener('focus',refresh);
+    return()=>{++sequence.current;clearTimeout(timer);clearInterval(interval);window.removeEventListener('focus',refresh);void supabase.removeChannel(channel)};
+  }, [load,userId]);
+  useEffect(()=>{setSelected(new Set())},[view,search,filterStatus,filterPeriod,filterClient,filterPriority,filterAssignee]);
 
   const openNew = () => {
-    setEditing(null);setView('quadro');setFilterStatus('todos');setFilterPeriod('todos');setSearch('');
-    setForm({ title: '', description: '', status: 'pendente', priority: filterPriority==='todos'?'média':filterPriority, start_date: '', end_date: '', client_id: filterClient==='todos'?'':filterClient, recurrence: 'none', recurrence_interval: 1, recurrence_days: [] });
+    setEditing(null);if(view==='historico')setView('tabela');setFilterStatus('todos');setFilterPeriod('todos');setSearch('');
+    setForm({ title: '', description: '', status: 'pendente', priority: filterPriority==='todos'?'média':filterPriority, start_date: '', end_date: '', client_id: filterClient==='todos'?'':filterClient, recurrence: 'none', recurrence_interval: 1, recurrence_days: [],assignee_name:filterAssignee==='todos'||filterAssignee==='none'?'':filterAssignee });
     setOpen(true);
   };
 
   const openEdit = (t: Task) => {
     setEditing(t);
     setForm({
-      title: t.title, description: t.description || '', status: t.status, priority: t.priority,
+      title: t.title, description: t.description || '', status: t.status, priority: t.priority,assignee_name:t.assignee_name||'',
       start_date: t.start_date || '', end_date: t.end_date || '', client_id: t.client_id || '',
       recurrence: t.recurrence || 'none', recurrence_interval: t.recurrence_interval || 1,
       recurrence_days: t.recurrence_days || [],
@@ -251,19 +180,20 @@ export default function Tasks() {
   };
 
   const save = async () => {
-    if(saving)return;
+    if(saving||mutationLock.current)return;
     if (!user || !form.title.trim()) { toast.error('Título é obrigatório'); return; }
     const payload = {
-      title: form.title.trim(), description: form.description.trim(), status: form.status,
+      title: form.title.trim(), description: form.description.trim(), status: form.status,assignee_name:form.assignee_name.trim(),
       priority: form.priority, start_date: form.start_date || null, end_date: form.end_date || null,
       client_id: form.client_id && form.client_id !== 'none' ? form.client_id : null,
       recurrence: form.recurrence || 'none',
-      recurrence_interval: Math.max(1, Number(form.recurrence_interval) || 1),
+      recurrence_interval: Math.min(1000,Math.max(1, Number(form.recurrence_interval) || 1)),
       recurrence_days: form.recurrence === 'none' ? [] : [...form.recurrence_days].sort((a, b) => a - b),
     };
+    if(form.start_date&&form.end_date&&form.start_date>form.end_date){toast.error('O prazo deve ser igual ou posterior à data de início.');return;}
     setSaving(true);
     if (editing) {
-      const {error}=await supabase.from('operational_tasks').update(payload).eq('id', editing.id).eq('user_id',user.id);
+      const {error}=await supabase.rpc('agency_tasks_update',{p_ids:[editing.id],p_patch:payload});
       if(error){setSaving(false);toast.error('Não foi possível salvar a tarefa.');return;}
       toast.success('Tarefa atualizada!');
     } else {
@@ -275,67 +205,29 @@ export default function Tasks() {
     load();
   };
 
-  const remove = async (id: string) => {
-    await supabase.from('operational_tasks').delete().eq('id', id);
-    toast.success('Tarefa removida!');
-    load();
+  const applyPatch=async(ids:string[],patch:TaskPatch)=>{
+    if(!userId||mutationLock.current||!ids.length)return false;mutationLock.current=true;setMutating(true);++loadSequence.current;
+    const {error}=await supabase.rpc('agency_tasks_update',{p_ids:ids,p_patch:patch});
+    if(error)toast.error('Não foi possível atualizar. Nenhuma tarefa foi alterada.');
+    else await load();
+    mutationLock.current=false;setMutating(false);return !error;
   };
-
-  const changeStatus = async (t: Task, newStatus: string) => {
-    if (t.status === newStatus||pendingStatus.current.has(t.id)) return;
-    pendingStatus.current.add(t.id);
-
-    // Atualização otimista: muda na UI imediatamente (sem aguardar rede)
-    const previousStatus = t.status;
-    setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: newStatus,closed_at:isClosedTask({status:newStatus})?new Date().toISOString():null } : x)));
-
-    const {data:updated,error}=await supabase.from('operational_tasks').update({status:newStatus}).eq('id',t.id).eq('user_id',user!.id).select('*').single();
-    pendingStatus.current.delete(t.id);
-    if(error||!updated){setTasks(prev=>prev.map(x=>x.id===t.id?{...x,status:previousStatus,closed_at:t.closed_at}:x));toast.error('Erro ao atualizar status');return;}
-    setTasks(prev=>prev.map(x=>x.id===t.id?{...x,...updated,recurrence_days:x.recurrence_days}:x));
-    setDetailTask(current=>current?.id===t.id?{...current,...updated,recurrence_days:current.recurrence_days}:current);
+  const changeStatus = async (t:Task,newStatus:string)=>{
+    if(t.status===newStatus)return true;
+    if(!await applyPatch([t.id],{status:newStatus}))return false;
     if(isClosedTask({status:newStatus}))toast.success(newStatus==='concluída'?'Tarefa concluída. Disponível no histórico.':'Tarefa cancelada. Disponível no histórico.');
     else if(isClosedTask(t))toast.success('Tarefa reaberta.',{action:{label:'Ver no quadro',onClick:()=>{setView('quadro');setFilterStatus('todos')}}});
-
-    // Recorrência: cria próxima ocorrência em background, atualizando a lista localmente
-    if (newStatus === 'concluída' && t.recurrence && t.recurrence !== 'none' && user) {
-      const interval = Math.max(1, t.recurrence_interval || 1);
-      const days = t.recurrence_days || [];
-      const nextStart = t.start_date ? addRecurrence(t.start_date, t.recurrence, interval, days) : null;
-      const nextEnd = t.end_date ? addRecurrence(t.end_date, t.recurrence, interval, days) : null;
-      if (nextStart || nextEnd) {
-        const newTask = {
-          user_id: user.id,
-          title: t.title,
-          description: t.description || '',
-          status: 'pendente',
-          priority: t.priority,
-          start_date: nextStart,
-          end_date: nextEnd,
-          client_id: t.client_id,
-          recurrence: t.recurrence,
-          recurrence_interval: interval,
-          recurrence_days: days,
-        };
-        supabase
-          .from('operational_tasks')
-          .insert(newTask)
-          .select('*')
-          .single()
-          .then(({ data }) => {
-            if (data) {
-              const normalized: Task = {
-                ...data,
-                recurrence_days: Array.isArray(data.recurrence_days)
-                  ? (data.recurrence_days as unknown[]).map((n) => Number(n)).filter((n) => !Number.isNaN(n))
-                  : [],
-              };
-              setTasks((prev) => [normalized, ...prev]);
-              toast.success('Próxima recorrência criada!');
-            }
-          });
-      }
-    }
+    return true;
+  };
+  const updateTask=async(t:Task,patch:TaskPatch)=>{if(patch.status)return changeStatus(t,patch.status);const ok=await applyPatch([t.id],patch);if(ok)toast.success('Tarefa atualizada!');return ok};
+  const duplicate=async(t:Task)=>{if(mutationLock.current)return;mutationLock.current=true;setMutating(true);const {error}=await supabase.rpc('agency_task_duplicate',{p_id:t.id});if(error)toast.error('Não foi possível duplicar a tarefa.');else {toast.success('Cópia criada com as subtarefas reiniciadas.');await load()}mutationLock.current=false;setMutating(false)};
+  const requestDelete=(t:Task)=>setDeleting({kind:'task',id:t.id,title:t.title});
+  const executeDelete=async()=>{
+    if(!deleting||!userId||mutationLock.current)return;mutationLock.current=true;setMutating(true);
+    const table=deleting.kind==='task'?'operational_tasks':deleting.kind==='comment'?'task_comments':'task_attachments';
+    const {error}=await supabase.from(table).delete().eq('id',deleting.id).eq('user_id',userId).select('id').single();
+    if(error)toast.error('Não foi possível excluir.');else {setDeleting(null);toast.success('Registro excluído.');await load()}
+    mutationLock.current=false;setMutating(false);
   };
 
   const handleFileUpload = async (taskId: string, file: File) => {
@@ -358,11 +250,7 @@ export default function Tasks() {
     }
   };
 
-  const removeAttachment = async (att: Attachment) => {
-    await supabase.from('task_attachments').delete().eq('id', att.id);
-    toast.success('Anexo removido!');
-    load();
-  };
+  const removeAttachment = (att:Attachment)=>setDeleting({kind:'attachment',id:att.id,title:att.file_name});
 
   const addComment = async (taskId: string) => {
     if (!user || !newComment.trim()) return;
@@ -374,19 +262,15 @@ export default function Tasks() {
     load();
   };
 
-  const removeComment = async (id: string) => {
-    await supabase.from('task_comments').delete().eq('id', id);
-    toast.success('Comentário removido!');
-    load();
-  };
+  const removeComment = (id:string)=>setDeleting({kind:'comment',id,title:'comentário'});
 
   const filtered = useMemo(() => {
     const now = new Date();
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const todayStr = taskDay(now.toISOString());
 
     return tasks.filter(t => {
       const matchSearch = t.title.toLowerCase().includes(search.toLowerCase()) ||
-        (t.description || '').toLowerCase().includes(search.toLowerCase());
+        (t.description || '').toLowerCase().includes(search.toLowerCase()) || t.assignee_name.toLowerCase().includes(search.toLowerCase()) || clients.find(c=>c.id===t.client_id)?.name.toLowerCase().includes(search.toLowerCase());
       const matchStatus = filterStatus === 'todos' || t.status === filterStatus;
 
       // Period filter — compare as plain date strings (YYYY-MM-DD) to avoid timezone issues
@@ -410,23 +294,23 @@ export default function Tasks() {
       } else if (filterPeriod === 'hoje') {
         matchPeriod = endDateStr === todayStr;
       } else if (filterPeriod === 'semana') {
-        const weekEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7);
-        const weekEndStr = `${weekEnd.getFullYear()}-${String(weekEnd.getMonth() + 1).padStart(2, '0')}-${String(weekEnd.getDate()).padStart(2, '0')}`;
+        const weekEnd = new Date(todayStr+'T12:00:00Z');weekEnd.setUTCDate(weekEnd.getUTCDate()+7);
+        const weekEndStr = weekEnd.toISOString().slice(0,10);
         matchPeriod = !!endDateStr && endDateStr >= todayStr && endDateStr <= weekEndStr;
       } else if (filterPeriod === 'sem_data') {
         matchPeriod = !endDateStr;
       }
 
       const closed=isClosedTask(t);
-      const matchView=view==='historico'?closed&&closedInPeriod(t,historyPeriod,historyFrom,historyTo):!closed||closedInPeriod(t,'semana');
-      return matchSearch && matchStatus && (view==='historico'||matchPeriod) && matchView && (filterClient==='todos'||t.client_id===filterClient) && (filterPriority==='todos'||t.priority===filterPriority);
+      const matchView=view==='historico'?closed&&closedInPeriod(t,historyPeriod,historyFrom,historyTo):view==='quadro'?(!closed||closedInPeriod(t,'semana')):!closed;
+      return matchSearch && matchStatus && (view==='historico'||matchPeriod) && matchView && (filterClient==='todos'||t.client_id===filterClient) && (filterPriority==='todos'||t.priority===filterPriority)&&(filterAssignee==='todos'||(filterAssignee==='none'?!t.assignee_name:t.assignee_name===filterAssignee));
     }).sort((a,b)=>{
       if(sort==='titulo')return a.title.localeCompare(b.title,'pt-BR');
       if(sort==='prioridade'){const priority:Record<string,number>={'alta':0,'média':1,'baixa':2};return (priority[a.priority]??3)-(priority[b.priority]??3)||(a.end_date||'9999').localeCompare(b.end_date||'9999');}
       if(view==='historico')return (b.closed_at||'').localeCompare(a.closed_at||'');
       return (a.end_date||'9999').localeCompare(b.end_date||'9999')||a.title.localeCompare(b.title,'pt-BR');
     });
-  }, [tasks, search, filterStatus, filterPeriod, dateFrom, dateTo,view,historyPeriod,historyFrom,historyTo,filterClient,filterPriority,sort]);
+  }, [tasks, search, filterStatus, filterPeriod, dateFrom, dateTo,view,historyPeriod,historyFrom,historyTo,filterClient,filterPriority,filterAssignee,sort,clients]);
 
   const getClientName = (clientId: string | null) => {
     if (!clientId) return null;
@@ -449,7 +333,7 @@ export default function Tasks() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Tarefas Operacionais</h1>
-          <p className="text-muted-foreground text-sm mt-1">Organize suas tarefas e acompanhe o progresso</p>
+          <p className="text-muted-foreground text-sm mt-1">Planeje entregas, distribua responsáveis e acompanhe cada etapa</p>
         </div>
         <Button onClick={openNew} className="neon-glow gap-2 w-full sm:w-auto"><Plus className="w-4 h-4" /> Nova Tarefa</Button>
       </div>
@@ -465,25 +349,25 @@ export default function Tasks() {
               </div>
               <div className="min-w-0">
                 <p className="text-xl sm:text-2xl font-bold text-foreground">{counts[key as keyof typeof counts]}</p>
-                <p className="text-xs text-muted-foreground truncate">{cfg.label}</p>
+                <p className="text-xs text-muted-foreground leading-tight">{cfg.label}</p>
               </div>
             </button>
           );
         })}
       </div>
 
-      <div className="space-y-3"><div role="tablist" aria-label="Visualização de tarefas" className="inline-flex rounded-lg bg-secondary/50 p-1 gap-1"><Button role="tab" aria-selected={view==='quadro'} variant={view==='quadro'?'default':'ghost'} onClick={()=>{setView('quadro');setFilterStatus('todos')}}>Quadro de trabalho</Button><Button role="tab" aria-selected={view==='historico'} variant={view==='historico'?'default':'ghost'} onClick={()=>{setView('historico');setFilterStatus('todos')}}>Histórico</Button></div>
-      <p className="text-xs text-muted-foreground">{view==='quadro'?'Pendentes e em andamento sem limite de semana. Concluídas e canceladas desta semana ficam recolhidas. Consulte os demais períodos no Histórico.':'Filtre pela data real de conclusão ou cancelamento. Tarefas antigas sem essa informação ficam em “Sem data registrada” ou “Todo o histórico”.'}</p>
+      <div className="space-y-3"><div role="tablist" aria-label="Visualização de tarefas" className="grid grid-cols-2 sm:flex w-full sm:w-fit rounded-lg bg-secondary/50 p-1 gap-1">{[{id:'tabela',label:'Tabela',icon:ListTodo},{id:'quadro',label:'Quadro de trabalho',icon:LayoutGrid},{id:'calendario',label:'Calendário',icon:CalendarDays},{id:'historico',label:'Histórico',icon:History}].map(tab=><Button key={tab.id} role="tab" aria-selected={view===tab.id} variant={view===tab.id?'default':'ghost'} className="min-h-11 shrink-0 gap-2" onClick={()=>{setView(tab.id);setFilterStatus('todos')}}><tab.icon size={16}/>{tab.label}</Button>)}</div>
+      <p className="text-xs text-muted-foreground">{view==='quadro'?'Pendentes e em andamento sem limite de semana. Concluídas e canceladas desta semana ficam recolhidas. Consulte os demais períodos no Histórico.':view==='historico'?'Filtre pela data real de conclusão ou cancelamento. Tarefas antigas sem essa informação ficam em “Sem data registrada” ou “Todo o histórico”.':'Tarefas em aberto, com edição rápida. Concluídas e canceladas ficam no Histórico.'}</p>
       {view==='historico'&&<div className="flex gap-3 flex-wrap items-end"><div><Label htmlFor="task-history-period">Período de encerramento</Label><select id="task-history-period" value={historyPeriod} onChange={e=>setHistoryPeriod(e.target.value)} className="block h-10 rounded-md bg-secondary border border-border px-3 text-sm mt-1"><option value="semana">Esta semana</option><option value="anterior">Semana passada</option><option value="mes">Este mês</option><option value="todos">Todo o histórico</option><option value="sem_data">Sem data registrada</option><option value="custom">Período personalizado</option></select></div>{historyPeriod==='custom'&&<><div><Label htmlFor="closed-from">Encerradas a partir de</Label><Input id="closed-from" type="date" value={historyFrom} onChange={e=>setHistoryFrom(e.target.value)}/></div><div><Label htmlFor="closed-to">Encerradas até</Label><Input id="closed-to" type="date" min={historyFrom||undefined} value={historyTo} onChange={e=>setHistoryTo(e.target.value)}/></div></>}</div>}
       </div>
       {/* Search & Filter */}
-      <div className="flex gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
+      <div className="grid grid-cols-2 sm:flex gap-3 sm:flex-wrap">
+        <div className="relative col-span-2 sm:flex-1 min-w-0 sm:min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input aria-label="Buscar tarefas" placeholder="Buscar tarefas..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 bg-secondary/50 border-border/50" />
         </div>
-        <Select value={filterStatus} onValueChange={value=>{setFilterStatus(value);if(isClosedTask({status:value})&&view==='quadro'){setView('historico');setHistoryPeriod('todos')}}}>
-          <SelectTrigger aria-label="Filtrar status das tarefas" className="w-44 bg-secondary/50 border-border/50">
+        <Select value={filterStatus} onValueChange={value=>{setFilterStatus(value);if(isClosedTask({status:value})&&view!=='historico'){setView('historico');setHistoryPeriod('todos')}}}>
+          <SelectTrigger aria-label="Filtrar status das tarefas" className="w-full sm:w-44 bg-secondary/50 border-border/50">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -493,8 +377,8 @@ export default function Tasks() {
             <SelectItem value="cancelada">Cancelada</SelectItem>
           </SelectContent>
         </Select>
-        {view==='quadro'&&<Select value={filterPeriod} onValueChange={(v) => { setFilterPeriod(v); if (v !== 'custom') { setDateFrom(undefined); setDateTo(undefined); } }}>
-          <SelectTrigger className="w-44 bg-secondary/50 border-border/50">
+        {view!=='historico'&&<Select value={filterPeriod} onValueChange={(v) => { setFilterPeriod(v); if (v !== 'custom') { setDateFrom(undefined); setDateTo(undefined); } }}>
+          <SelectTrigger aria-label="Filtrar prazo das tarefas" className="w-full sm:w-44 bg-secondary/50 border-border/50">
             <SelectValue placeholder="Período" />
           </SelectTrigger>
           <SelectContent>
@@ -508,11 +392,12 @@ export default function Tasks() {
         </Select>}
       </div>
 
-      <details className="rounded-lg border border-border/40 bg-secondary/10 p-3"><summary className="cursor-pointer text-sm font-medium flex items-center gap-2 min-h-10"><Filter size={16}/>Filtros e ordenação{(filterClient!=='todos'||filterPriority!=='todos'||sort!=='prazo')&&<Badge variant="outline">Ativos</Badge>}</summary>
-      <div className="flex gap-3 flex-wrap pt-3"><select aria-label="Filtrar tarefas por cliente" value={filterClient} onChange={e=>setFilterClient(e.target.value)} className="h-10 max-w-full rounded-md border border-border bg-secondary px-3 text-sm"><option value="todos">Todos os clientes</option>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><select aria-label="Filtrar prioridade das tarefas" value={filterPriority} onChange={e=>setFilterPriority(e.target.value)} className="h-10 rounded-md border border-border bg-secondary px-3 text-sm"><option value="todos">Todas as prioridades</option><option value="alta">Alta</option><option value="média">Média</option><option value="baixa">Baixa</option></select><select aria-label="Ordenar tarefas" value={sort} onChange={e=>setSort(e.target.value)} className="h-10 rounded-md border border-border bg-secondary px-3 text-sm"><option value="prazo">{view==='historico'?'Encerradas mais recentes':'Prazo mais próximo'}</option><option value="prioridade">Prioridade</option><option value="titulo">Título</option></select><Button variant="ghost" onClick={()=>{setSearch('');setFilterStatus('todos');setFilterPeriod('todos');setFilterClient('todos');setFilterPriority('todos');setDateFrom(undefined);setDateTo(undefined);setSort('prazo');setHistoryPeriod('semana');setHistoryFrom('');setHistoryTo('')}}>Limpar filtros</Button></div>
+      {view==='tabela'&&<div className="flex flex-wrap items-center gap-3"><Label htmlFor="task-group">Agrupar por</Label><select id="task-group" value={groupBy} onChange={e=>setGroupBy(e.target.value)} className="h-11 rounded-md border bg-secondary px-3 text-sm"><option value="status">Status</option><option value="cliente">Cliente</option><option value="responsavel">Responsável</option><option value="prioridade">Prioridade</option><option value="nenhum">Sem agrupamento</option></select></div>}
+      <details className="rounded-lg border border-border/40 bg-secondary/10 p-3"><summary className="cursor-pointer text-sm font-medium flex items-center gap-2 min-h-10"><Filter size={16}/>Filtros e ordenação{(filterClient!=='todos'||filterPriority!=='todos'||filterAssignee!=='todos'||sort!=='prazo')&&<Badge variant="outline">Ativos</Badge>}</summary>
+      <div className="flex gap-3 flex-wrap pt-3"><select aria-label="Filtrar tarefas por cliente" value={filterClient} onChange={e=>setFilterClient(e.target.value)} className="h-10 max-w-full rounded-md border border-border bg-secondary px-3 text-sm"><option value="todos">Todos os clientes</option>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><select aria-label="Filtrar prioridade das tarefas" value={filterPriority} onChange={e=>setFilterPriority(e.target.value)} className="h-10 rounded-md border border-border bg-secondary px-3 text-sm"><option value="todos">Todas as prioridades</option><option value="alta">Alta</option><option value="média">Média</option><option value="baixa">Baixa</option></select><select aria-label="Filtrar tarefas por responsável" value={filterAssignee} onChange={e=>setFilterAssignee(e.target.value)} className="h-11 max-w-full rounded-md border border-border bg-secondary px-3 text-sm"><option value="todos">Todos os responsáveis</option><option value="none">Sem responsável</option>{[...new Set(tasks.map(t=>t.assignee_name).filter(Boolean))].sort().map(name=><option key={name} value={name}>{name}</option>)}</select><select aria-label="Ordenar tarefas" value={sort} onChange={e=>setSort(e.target.value)} className="h-10 rounded-md border border-border bg-secondary px-3 text-sm"><option value="prazo">{view==='historico'?'Encerradas mais recentes':'Prazo mais próximo'}</option><option value="prioridade">Prioridade</option><option value="titulo">Título</option></select><Button variant="ghost" onClick={()=>{setSearch('');setFilterStatus('todos');setFilterPeriod('todos');setFilterClient('todos');setFilterPriority('todos');setFilterAssignee('todos');setDateFrom(undefined);setDateTo(undefined);setSort('prazo');setHistoryPeriod('semana');setHistoryFrom('');setHistoryTo('')}}>Limpar filtros</Button></div>
       </details>
       {/* Custom date range */}
-      {view==='quadro' && filterPeriod === 'custom' && (
+      {view!=='historico' && filterPeriod === 'custom' && (
         <div className="flex gap-3 items-center flex-wrap">
           <Popover>
             <PopoverTrigger asChild>
@@ -545,7 +430,11 @@ export default function Tasks() {
         </div>
       )}
 
+      {view!=='historico'&&<div className="flex gap-2 flex-wrap" aria-label="Atalhos de prazo">{[{key:'todos',label:'Em aberto'},{key:'vencidas',label:'Atrasadas'},{key:'hoje',label:'Hoje'},{key:'semana',label:'Próximos 7 dias'}].map(chip=><Button key={chip.key} variant={filterPeriod===chip.key?'secondary':'ghost'} className="min-h-11 text-xs" onClick={()=>setFilterPeriod(chip.key)}>{chip.label} ({tasks.filter(t=>!isClosedTask(t)&&(chip.key==='todos'||chip.key==='vencidas'&&taskDeadline(t)==='atrasada'||chip.key==='hoje'&&taskDeadline(t)==='hoje'||chip.key==='semana'&&!!t.end_date&&t.end_date>=taskDay(new Date().toISOString())&&t.end_date<=new Date(new Date(taskDay(new Date().toISOString())+'T12:00:00Z').getTime()+7*86400000).toISOString().slice(0,10))).length})</Button>)}</div>}
+      {view==='tabela'&&<><TaskBulkActions count={filtered.filter(t=>selected.has(t.id)).length} busy={mutating||saving} onClear={()=>setSelected(new Set())} onApply={async patch=>{const ok=await applyPatch(filtered.filter(t=>selected.has(t.id)).map(t=>t.id),patch);if(ok)toast.success('Tarefas selecionadas atualizadas.');return ok}}/><TaskTable tasks={filtered} clients={clients} subtasks={subtasks} groupBy={groupBy} selected={selected} busy={mutating||saving} onSelect={id=>setSelected(prev=>{const next=new Set(prev);if(next.has(id))next.delete(id);else next.add(id);return next})} onSelectAll={()=>setSelected(prev=>filtered.every(t=>prev.has(t.id))?new Set():new Set(filtered.map(t=>t.id)))} onUpdate={updateTask} onOpen={setDetailTask} onEdit={openEdit} onDuplicate={t=>void duplicate(t)} onDelete={requestDelete}/></>}
+      {view==='calendario'&&<TaskCalendar tasks={filtered} onOpen={setDetailTask}/>}
       {/* Kanban board */}
+      {(view==='quadro'||view==='historico')&&<>
       {view==='historico'&&filtered.length === 0 ? (
         <div className="text-center py-16">
           <CheckCircle2 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
@@ -622,7 +511,7 @@ export default function Tasks() {
                               <div className="flex flex-col gap-2 mb-2">
                                 <div
                                   className="flex-1 min-w-0 cursor-pointer"
-                                  onClick={() => setDetailTask(t)}
+                                  onClick={() => setDetailTask(t)} role="button" tabIndex={0} onKeyDown={e=>{if(e.key==='Enter')setDetailTask(t)}}
                                 >
                                   <h3 className={`font-medium text-sm text-foreground leading-snug ${t.status === 'concluída' || t.status === 'cancelada' ? 'line-through opacity-60' : ''}`}>
                                     {t.title}
@@ -647,26 +536,7 @@ export default function Tasks() {
                                       })}
                                     </DropdownMenuContent>
                                   </DropdownMenu>
-                                  <button onClick={() => openEdit(t)} className="min-w-11 min-h-11 flex items-center justify-center rounded hover:bg-secondary text-muted-foreground" aria-label={`Editar ${t.title}`} title="Editar">
-                                    <Edit2 className="w-3.5 h-3.5" />
-                                  </button>
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <button className="min-w-11 min-h-11 flex items-center justify-center rounded hover:bg-secondary text-muted-foreground hover:text-destructive" aria-label={`Excluir ${t.title}`} title="Excluir">
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>Excluir tarefa?</AlertDialogTitle>
-                                        <AlertDialogDescription>Essa ação não pode ser desfeita. A tarefa "{t.title}" será removida permanentemente.</AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => remove(t.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Excluir</AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
+                                  <TaskActions title={t.title} disabled={mutating||saving} onOpen={()=>setDetailTask(t)} onEdit={()=>openEdit(t)} onDuplicate={()=>void duplicate(t)} onDelete={()=>requestDelete(t)}/>
                                 </div>
                               </div>
 
@@ -680,6 +550,9 @@ export default function Tasks() {
                                 )}
                               </div>
 
+                              {t.assignee_name&&<p className="mt-2 text-xs text-muted-foreground">Responsável: {t.assignee_name}</p>}
+                              {subtasks.some(item=>item.task_id===t.id)&&<div className="mt-3"><TaskProgress items={subtasks.filter(item=>item.task_id===t.id)}/></div>}
+                              {taskDeadline(t)==='atrasada'&&<Badge variant="outline" className="text-destructive mt-2">Atrasada</Badge>}
                               {isClosedTask(t)&&<Button variant="outline" size="sm" className="min-h-11 w-full mt-2" aria-label={`Reabrir ${t.title}`} onClick={()=>void changeStatus(t,'pendente')}>Reabrir tarefa</Button>}
                               {isClosedTask(t)&&<p className="text-[11px] text-muted-foreground mt-2">{t.closed_at?`${t.status==='concluída'?'Concluída':'Cancelada'} em ${new Date(t.closed_at).toLocaleString('pt-BR')}`:'Data de encerramento não registrada'}</p>}
                               {clientName && (
@@ -723,9 +596,10 @@ export default function Tasks() {
         </div>
       )}
 
+      </>}
       {/* Detail Dialog */}
       <Dialog open={!!detailTask} onOpenChange={(o) => { if (!o) setDetailTask(null); }}>
-        <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="bg-card border-border max-w-2xl max-h-[90dvh] overflow-y-auto flex flex-col">
           {detailTask && (() => {
             const sc = statusConfig[detailTask.status] || statusConfig.pendente;
             const pc = priorityConfig[detailTask.priority] || priorityConfig.média;
@@ -737,10 +611,11 @@ export default function Tasks() {
               <>
                 <DialogHeader>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <DialogTitle className="text-lg">{detailTask.title}</DialogTitle>
+                    <DialogTitle className="text-lg flex-1 min-w-0 break-words">{detailTask.title}</DialogTitle><TaskActions title={detailTask.title} disabled={mutating} onEdit={()=>{setDetailTask(null);openEdit(detailTask)}} onDuplicate={()=>void duplicate(detailTask)} onDelete={()=>requestDelete(detailTask)}/>
                     <Badge variant="outline" className={`text-[10px] ${sc.color}`}>{sc.label}</Badge>
                     <Badge variant="outline" className={`text-[10px] ${pc.color}`}>{pc.label}</Badge>
                   </div>
+                  {detailTask.assignee_name&&<p className="text-xs text-muted-foreground">Responsável: {detailTask.assignee_name}</p>}
                   {clientName && <p className="text-sm text-primary mt-1">{clientName}</p>}
                   {(detailTask.start_date || detailTask.end_date) && (
                     <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
@@ -756,8 +631,9 @@ export default function Tasks() {
                   <p className="text-sm text-muted-foreground mt-2">{detailTask.description}</p>
                 )}
 
-                <Tabs defaultValue="comments" className="flex-1 flex flex-col mt-4 min-h-0">
-                  <TabsList className="w-full">
+                <Tabs defaultValue="subtasks" className="flex-1 flex flex-col mt-4 min-h-0">
+                  <TabsList className="w-full h-auto flex-wrap">
+                    <TabsTrigger value="subtasks" className="flex-1 min-h-11 gap-1.5"><ListTodo size={14}/>Subtarefas ({subtasks.filter(item=>item.task_id===detailTask.id).length})</TabsTrigger>
                     <TabsTrigger value="comments" className="flex-1 gap-1.5">
                       <MessageSquare className="w-3.5 h-3.5" /> Comentários ({taskComments.length})
                     </TabsTrigger>
@@ -766,6 +642,7 @@ export default function Tasks() {
                     </TabsTrigger>
                   </TabsList>
 
+                  <TabsContent value="subtasks" className="mt-3"><TaskSubtasks taskId={detailTask.id} items={subtasks.filter(item=>item.task_id===detailTask.id)} onChange={load}/></TabsContent>
                   <TabsContent value="comments" className="flex-1 flex flex-col min-h-0 mt-3">
                     <ScrollArea className="flex-1 max-h-[300px] pr-2">
                       {taskComments.length === 0 ? (
@@ -776,9 +653,7 @@ export default function Tasks() {
                             <div key={c.id} className="bg-secondary/50 rounded-lg p-3 group/comment">
                               <div className="flex items-start justify-between gap-2">
                                 <p className="text-sm text-foreground whitespace-pre-wrap flex-1">{c.text}</p>
-                                <button onClick={() => removeComment(c.id)} className="opacity-0 group-hover/comment:opacity-100 text-muted-foreground hover:text-destructive shrink-0">
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                                <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" aria-label="Ações do comentário"><MoreHorizontal size={16}/></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem className="text-destructive" onSelect={()=>removeComment(c.id)}>Excluir comentário</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
                               </div>
                               <p className="text-[10px] text-muted-foreground mt-1.5">
                                 {new Date(c.created_at).toLocaleDateString('pt-BR')} às {new Date(c.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
@@ -815,9 +690,7 @@ export default function Tasks() {
                               <a href={att.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-foreground hover:text-primary flex-1 truncate">
                                 {att.file_name}
                               </a>
-                              <button onClick={() => removeAttachment(att)} className="opacity-0 group-hover/att:opacity-100 text-muted-foreground hover:text-destructive shrink-0">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" aria-label={`Ações do anexo ${att.file_name}`}><MoreHorizontal size={16}/></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem className="text-destructive" onSelect={()=>removeAttachment(att)}>Excluir anexo</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
                             </div>
                           ))}
                         </div>
@@ -841,6 +714,7 @@ export default function Tasks() {
         </DialogContent>
       </Dialog>
 
+      <AlertDialog open={!!deleting} onOpenChange={value=>{if(!value&&!mutating)setDeleting(null)}}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Excluir {deleting?.kind==='task'?'tarefa':deleting?.kind==='attachment'?'anexo':'comentário'}?</AlertDialogTitle><AlertDialogDescription>“{deleting?.title}” será removido permanentemente.{deleting?.kind==='task'?' As subtarefas, comentários e vínculos de anexos desta tarefa também serão removidos. Clientes e outras tarefas serão mantidos.':' A tarefa principal será mantida.'}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={mutating}>Cancelar</AlertDialogCancel><AlertDialogAction disabled={mutating} onClick={e=>{e.preventDefault();void executeDelete()}}>Confirmar exclusão</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
       {/* Create/Edit Dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="bg-card border-border max-h-[90vh] overflow-y-auto">
@@ -849,9 +723,10 @@ export default function Tasks() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label className="text-muted-foreground text-sm">Título *</Label>
-              <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" placeholder="Ex: Criar campanha Black Friday" />
+              <Label htmlFor="task-title" className="text-muted-foreground text-sm">Título *</Label>
+              <Input id="task-title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" placeholder="Ex: Criar campanha Black Friday" />
             </div>
+            <div><Label htmlFor="task-assignee">Responsável</Label><Input id="task-assignee" placeholder="Nome do responsável" maxLength={120} list="task-assignees" value={form.assignee_name} onChange={e=>setForm({...form,assignee_name:e.target.value})}/><datalist id="task-assignees">{[...new Set(tasks.map(t=>t.assignee_name).filter(Boolean))].map(name=><option key={name} value={name}/>)}</datalist><p className="text-xs text-muted-foreground mt-1">Identifica quem cuida da entrega. O acesso à conta permanece o mesmo.</p></div>
             <div>
               <Label className="text-muted-foreground text-sm">Descrição</Label>
               <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" rows={3} placeholder="Detalhes da task..." />
@@ -923,6 +798,7 @@ export default function Tasks() {
                   <Input
                     type="number"
                     min={1}
+                    max={1000}
                     value={form.recurrence_interval}
                     onChange={(e) => setForm({ ...form, recurrence_interval: Math.max(1, Number(e.target.value) || 1) })}
                     className="bg-secondary/50 border-border/50 mt-1"

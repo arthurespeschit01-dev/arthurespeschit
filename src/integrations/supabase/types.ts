@@ -27,6 +27,12 @@ export type Database = {
   }
   public: {
     Tables: {
+      agency_task_subtasks: {
+        Row:{id:string;user_id:string;task_id:string;title:string;completed:boolean;position:number;created_at:string;updated_at:string}
+        Insert:{id?:string;user_id:string;task_id:string;title:string;completed?:boolean;position?:number;created_at?:string;updated_at?:string}
+        Update:{title?:string;completed?:boolean;position?:number}
+        Relationships:[]
+      }
       agency_client_portals: AgencyTable<ClientPortal>
       agency_tickets: AgencyTable<Ticket>
       agency_ticket_messages: AgencyTable<TicketMessage>
@@ -1035,6 +1041,8 @@ export type Database = {
       }
       operational_tasks: {
         Row: {
+          assignee_name: string
+          recurrence_of: string | null
           client_id: string | null
           closed_at: string | null
           created_at: string
@@ -1052,6 +1060,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          assignee_name?: string
+          recurrence_of?: string | null
           client_id?: string | null
           closed_at?: string | null
           created_at?: string
@@ -1069,6 +1079,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          assignee_name?: string
+          recurrence_of?: string | null
           client_id?: string | null
           closed_at?: string | null
           created_at?: string
@@ -1470,6 +1482,8 @@ export type Database = {
       agency_client_progress_view: { Row: { [K in keyof ClientProgress]: ClientProgress[K] }; Relationships: [] }
     }
     Functions: {
+      agency_tasks_update: {Args:{p_ids:string[];p_patch:Json};Returns:Database['public']['Tables']['operational_tasks']['Row'][]}
+      agency_task_duplicate: {Args:{p_id:string};Returns:string}
       agency_review_form: {Args:{p_response_id:string;p_reviewed:boolean};Returns:undefined};
       agency_import_form_lead: {Args:{p_response_id:string};Returns:string};
       agency_delete_item: {Args:{p_kind:string;p_id:string};Returns:undefined};
