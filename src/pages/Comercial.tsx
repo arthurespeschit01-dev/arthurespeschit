@@ -13,7 +13,7 @@ export default function Comercial() {
  return <div className="space-y-6">
   {section!=='dashboard' && <div><h1 className="text-2xl font-bold">Comercial</h1><p className="text-sm text-muted-foreground mt-1">CRM, formulários e agendamentos da sua agência.</p></div>}
   <Tabs value={section} onValueChange={value=>navigate(value==='dashboard'?'/comercial':`/comercial/${value}`)}>
-   <TabsList className="flex-wrap h-auto"><TabsTrigger value="dashboard">Dashboard</TabsTrigger><TabsTrigger value="crm">CRM</TabsTrigger><TabsTrigger value="conversas">Conversas</TabsTrigger><TabsTrigger value="formularios">Formulários</TabsTrigger><TabsTrigger value="agendamentos">Agendamentos</TabsTrigger></TabsList>
+   <TabsList className="flex-wrap h-auto"><TabsTrigger value="dashboard">Dashboard</TabsTrigger><TabsTrigger value="crm">CRM</TabsTrigger><TabsTrigger value="formularios">Formulários</TabsTrigger><TabsTrigger value="agendamentos">Agendamentos</TabsTrigger></TabsList>
    <TabsContent value="dashboard"><CommercialDashboard/></TabsContent>
    <TabsContent value="conversas"><WhatsAppInbox/></TabsContent>
    <TabsContent value="crm"><PipelineBoard area="comercial"/></TabsContent>

@@ -1,3 +1,4 @@
+import DeleteItemButton from '@/components/DeleteItemButton';
 import { useSearchParams } from 'react-router-dom';
 import { readAllRows } from "@/lib/readAllRows";
 import { useCallback, useEffect, useState } from "react";
@@ -308,6 +309,7 @@ export default function Chamados() {
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{selected?.title}</DialogTitle>
+            {selected&&<DeleteItemButton kind="ticket" id={selected.id} title={selected.title} description="O chamado e suas mensagens serão excluídos." onDeleted={async()=>{setSelected(null);await load()}}/>}
             <DialogDescription>
               {selected && TICKET_CATEGORIES[selected.category]}
             </DialogDescription>

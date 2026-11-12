@@ -1,3 +1,4 @@
+import {visibleFormFields} from '../_shared/form-conditions.ts';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.103.2";
 import { validateAnswers } from "../_shared/agency-validation.ts";
 
@@ -56,7 +57,7 @@ Deno.serve(async (req) => {
         return respond({ error: "Muitos envios. Aguarde um minuto." }, 429);
       // Keep labels with answers so later edits never rewrite submission history.
       const answers = Object.fromEntries(
-        form.fields.map((f: { id: string; label: string }) => [
+        visibleFormFields(form.fields,body.answers).map((f: { id: string; label: string }) => [
           f.id,
           { label: f.label, value: body.answers[f.id] || "" },
         ]),

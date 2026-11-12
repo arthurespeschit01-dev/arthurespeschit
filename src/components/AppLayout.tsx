@@ -20,6 +20,8 @@ import logoCentralGestor from '@/assets/logo-central-gestor.png';
 const mainNavItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, tourId: 'nav-dashboard' },
   { to: '/clientes', label: 'Clientes', icon: Users, tourId: 'nav-clientes' },
+  {to:'/tasks',label:'Tarefas',icon:ListTodo,tourId:'nav-tasks'},
+  {to:'/comercial/conversas',label:'Conversas',icon:MessageSquare,tourId:'nav-conversas'},
   // { to: '/planilha', label: 'Planilha', icon: BarChart3 },
   { to: '/configuracoes', label: 'Configurações', icon: Settings, tourId: 'nav-config' },
 ];
@@ -33,14 +35,12 @@ const operacoesSubItems = [
   {to:'/chamados',label:'Chamados',icon:MessageSquare},
   {to:'/planilha-teste',label:'Planilha de acompanhamento',icon:BarChart3},
   { to: '/relatorios', label: 'Relatórios', icon: FileText },
-  { to: '/tasks', label: 'Tarefas', icon: ListTodo },
   { to: '/operacao', label: 'Onboarding e execução', icon: ClipboardList },
 ];
 
 const comercialSubItems = [
   { to: '/comercial', label: 'Dashboard comercial', icon: LayoutDashboard },
   { to: '/comercial/crm', label: 'CRM', icon: Users },
-  { to: '/comercial/conversas', label: 'Conversas', icon: MessageSquare },
   { to: '/comercial/formularios', label: 'Formulários', icon: FileText },
   { to: '/comercial/agendamentos', label: 'Agendamentos', icon: ClipboardList },
 ];
@@ -186,7 +186,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <TooltipContent side="right">{item.label}</TooltipContent>
                 </Tooltip>
               ) : link;
-              return item.to === '/clientes' ? <div key={item.to}>{wrapped}{renderNavGroup({ name: 'Operações', id: 'operacoes', items: operacoesSubItems, open: operacoesOpen, setOpen: setOperacoesOpen })}{renderNavGroup({ name: 'Comercial', id: 'comercial', items: comercialSubItems, open: comercialOpen, setOpen: setComercialOpen })}</div> : wrapped;
+              return item.to === '/comercial/conversas' ? <div key={item.to}>{wrapped}{renderNavGroup({ name: 'Operações', id: 'operacoes', items: operacoesSubItems, open: operacoesOpen, setOpen: setOperacoesOpen })}{renderNavGroup({ name: 'Comercial', id: 'comercial', items: comercialSubItems, open: comercialOpen, setOpen: setComercialOpen })}</div> : wrapped;
             })}
 
             {renderNavGroup({name:'Gestão',id:'gestao',items:gestaoSubItems,open:gestaoOpen,setOpen:setGestaoOpen})}

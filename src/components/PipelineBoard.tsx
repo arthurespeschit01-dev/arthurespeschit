@@ -1,3 +1,4 @@
+import DeleteItemButton from '@/components/DeleteItemButton';
 import {useWhatsAppAccount} from '@/hooks/useWhatsAppAccount';
 import {useWhatsAppLive} from '@/hooks/useWhatsAppLive';
 import { useQueryClient } from '@tanstack/react-query';
@@ -383,6 +384,7 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
           onChange={(e) => setSearch(e.target.value)}
         />
       </div>
+      {selected&&<DeleteItemButton kind="pipeline" id={selected} title={pipelines.find(p=>p.id===selected)?.name||'pipeline'} description="A pipeline, suas etapas e seus cards serão excluídos. Clientes e conversas permanecem na base." onDeleted={async()=>{setSelected('');await load()}}/>}
       {area === 'comercial' && <label className="block max-w-xs space-y-2 text-sm">Status de resposta<select className={selectClass} value={contactFilter} onChange={e=>setContactFilter(e.target.value)}><option value="all">Todos os status</option>{Object.entries(CONTACT_LABELS).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>}
       <label className="flex gap-2 items-center text-sm">
         <input
@@ -514,6 +516,7 @@ export default function PipelineBoard({ area }: { area: PipelineArea }) {
                         {new Date(card.meeting_at).toLocaleString("pt-BR")}
                       </p>
                     )}
+                    <DeleteItemButton kind="card" id={card.id} title={card.title} description="Este card e seu vínculo com a pipeline serão removidos. O cliente e as conversas permanecem na base." onDeleted={load}/>
                     <select
                       className={selectClass}
                       aria-label={`Mover ${card.title} para etapa`}

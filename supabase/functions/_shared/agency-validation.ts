@@ -1,14 +1,16 @@
+import {visibleFormFields,formDefinitionError,type ConditionalField} from './form-conditions.ts';
 export function validateAnswers(
-  fields: { id: string; label: string; type: string; required: boolean }[],
+  fields: ConditionalField[],
   answers: unknown,
 ): string | null {
   if (!answers || typeof answers !== "object" || Array.isArray(answers))
     return "Respostas inválidas.";
+  const definitionError=formDefinitionError(fields);if(definitionError)return definitionError;
   const values = answers as Record<string, unknown>;
   const ids = new Set(fields.map((f) => f.id));
   if (Object.keys(values).some((key) => !ids.has(key)))
     return "O formulário mudou. Atualize a página antes de enviar.";
-  for (const field of fields) {
+  for (const field of visibleFormFields(fields,values)) {
     const value = values[field.id] ?? "";
     if (typeof value !== "string" || value.length > 5000)
       return `Resposta inválida: ${field.label}`;
@@ -19,6 +21,7 @@ export function validateAnswers(
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
     )
       return `E-mail inválido: ${field.label}`;
+    if(value&&field.type==='select'&&!field.options?.includes(value))return `Opção inválida: ${field.label}`;
     if (value && field.type === "number" && !Number.isFinite(Number(value)))
       return `Número inválido: ${field.label}`;
     if (

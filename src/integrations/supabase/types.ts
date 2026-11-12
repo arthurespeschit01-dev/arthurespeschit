@@ -750,6 +750,8 @@ export type Database = {
           status: string
           updated_at: string
           user_id: string
+          original_amount: number | null
+          fee_adjusted_at: string | null
           valor: number
           vencimento: string
         }
@@ -761,6 +763,8 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id: string
+          original_amount?: number | null
+          fee_adjusted_at?: string | null
           valor?: number
           vencimento: string
         }
@@ -772,6 +776,8 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id?: string
+          original_amount?: number | null
+          fee_adjusted_at?: string | null
           valor?: number
           vencimento?: string
         }
@@ -1464,6 +1470,7 @@ export type Database = {
       agency_client_progress_view: { Row: { [K in keyof ClientProgress]: ClientProgress[K] }; Relationships: [] }
     }
     Functions: {
+      agency_delete_item: {Args:{p_kind:string;p_id:string};Returns:undefined};
       ensure_agency_monthly_invoices: {Args:{p_month:string};Returns:Database["public"]["Tables"]["mensalidades"]["Row"][]};
       agency_whatsapp_inbox_v2: {Args:{p_search?:string;p_offset?:number;p_filter?:string};Returns:Json};
       agency_whatsapp_mark_read: {Args:{p_address:string};Returns:undefined};

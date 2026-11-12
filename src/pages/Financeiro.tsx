@@ -1,3 +1,4 @@
+import DeleteItemButton from '@/components/DeleteItemButton';
 import ClientStatusFilter from '@/components/ClientStatusFilter';
 import { isActiveClient, matchesClientStatus, type ClientStatusFilter as StatusFilter } from '@/lib/clientStatus';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -25,7 +26,7 @@ interface Transacao {
   data: string; cliente_id: string | null; categoria: string | null;
 }
 interface Mensalidade {
-  id: string; cliente_id: string; valor: number; vencimento: string;
+  id: string; cliente_id: string; valor: number; vencimento: string; original_amount?:number|null; fee_adjusted_at?:string|null;
   status: 'pago' | 'pendente' | 'atrasado'; data_pagamento: string | null;
 }
 
@@ -102,8 +103,10 @@ export default function Financeiro() {
   const lucroLiquido = receitaBruta - custosDiretos - custosFixos;
   const margem = receitaBruta > 0 ? (lucroLiquido / receitaBruta) * 100 : 0;
 
-  const aReceber = mensalidades.filter(m => m.status !== 'pago').reduce((s, m) => s + Number(m.valor), 0);
-  const atrasados = mensalidades.filter(m => m.status === 'atrasado');
+  const scopedInvoices=mensalidades.filter(m=>statusFilter==='Todos'||clients.some(c=>c.id===m.cliente_id&&matchesClientStatus(c,statusFilter)));
+  const feesMensais=clients.filter(c=>matchesClientStatus(c,statusFilter)).reduce((sum,c)=>sum+Number(c.monthly_fee||0),0);
+  const aReceber = scopedInvoices.filter(m => m.status !== 'pago').reduce((s, m) => s + Number(m.valor), 0);
+  const atrasados = scopedInvoices.filter(m => m.status === 'atrasado');
   const totalAtrasado = atrasados.reduce((s, m) => s + Number(m.valor), 0);
 
   // Rentabilidade por cliente
@@ -152,10 +155,11 @@ export default function Financeiro() {
   };
 
   const togglePago = async (m: Mensalidade) => {
-    const novo = m.status === 'pago' ? 'pendente' : 'pago';
-    const dataPag = novo === 'pago' ? new Date().toISOString().slice(0,10) : null;
-    await supabase.from('mensalidades').update({ status: novo, data_pagamento: dataPag }).eq('id', m.id);
-    setMensalidades(prev => prev.map(x => x.id === m.id ? { ...x, status: novo as any, data_pagamento: dataPag } : x));
+    const novo = m.status === 'pago' ? 'pendente' as const : 'pago' as const;
+    const dataPag = novo === 'pago' ? new Date().toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'}) : null;
+    const {error}=await supabase.from('mensalidades').update({ status: novo, data_pagamento: dataPag }).eq('id', m.id).eq('user_id',user!.id).select('id').single();
+    if(error){toast.error('Não foi possível confirmar o pagamento. Tente novamente.');return;}
+    setMensalidades(prev => prev.map(x => x.id === m.id ? { ...x, status: novo, data_pagamento: dataPag } : x));
   };
 
   const transacoesFiltradas = transacoes.filter(t =>
@@ -323,7 +327,7 @@ export default function Financeiro() {
       </div>
 
       <ClientStatusFilter value={statusFilter} onChange={setStatusFilter} />
-      <p className="text-xs text-muted-foreground">O filtro organiza as listas de clientes. Totais e lançamentos preservam todo o histórico financeiro, inclusive pendências de clientes pausados ou encerrados.</p>
+      <p className="text-xs text-muted-foreground">A receber e atrasos respeitam o status selecionado. Fees mensais mostram os contratos atuais; receita recebida e DRE preservam os pagamentos registrados.</p>
       <Tabs defaultValue="visao" className="space-y-6">
         <TabsList className="bg-secondary/50">
           <TabsTrigger value="visao">Visão Geral</TabsTrigger>
@@ -335,12 +339,13 @@ export default function Financeiro() {
         {/* ===== VISÃO GERAL ===== */}
         <TabsContent value="visao" className="space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <KpiCard icon={DollarSign} label={`Fees mensais · ${statusFilter.toLowerCase()}`} value={fmt(feesMensais)} accent="text-primary" />
             <KpiCard icon={DollarSign} label="Receita Bruta" value={fmt(receitaBruta)} accent="text-emerald-400" />
             <KpiCard icon={TrendingDown} label="Custos Fixos" value={fmt(custosFixos)} accent="text-amber-400" />
             <KpiCard icon={TrendingDown} label="Custos Variáveis" value={fmt(custosVariaveis)} accent="text-orange-400" />
             <KpiCard icon={Wallet} label="Lucro Líquido" value={fmt(lucroLiquido)} accent={lucroLiquido >= 0 ? 'text-emerald-400' : 'text-red-400'} />
             <KpiCard icon={Percent} label="Margem" value={`${margem.toFixed(1)}%`} accent={margem >= 30 ? 'text-emerald-400' : margem >= 10 ? 'text-amber-400' : 'text-red-400'} />
-            <KpiCard icon={Clock} label="A Receber" value={fmt(aReceber)} accent="text-blue-400" />
+            <KpiCard icon={Clock} label={`A receber · ${statusFilter==='Todos'?'todos os clientes':statusFilter.toLowerCase()+'s'}`} value={fmt(aReceber)} accent="text-blue-400" />
           </div>
 
           {atrasados.length > 0 && (
@@ -370,7 +375,7 @@ export default function Financeiro() {
                     return (
                       <tr key={m.id} className="border-t border-border/50">
                         <td className="p-3 font-medium">{c?.name || '-'}</td>
-                        <td className="p-3">{fmt(Number(m.valor))}</td>
+                        <td className="p-3">{fmt(Number(m.valor))}{m.original_amount!=null&&<p className="text-[10px] text-muted-foreground">Fee atualizado · original {fmt(Number(m.original_amount))}</p>}</td>
                         <td className="p-3 text-muted-foreground">{new Date(m.vencimento + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
                         <td className="p-3">{statusBadge(m.status,m.vencimento)}</td>
                         <td className="p-3 text-right">
@@ -538,7 +543,7 @@ export default function Financeiro() {
                       <td className="p-3">{t.tipo === 'entrada'
                         ? <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">Entrada</Badge>
                         : <Badge className="bg-red-500/15 text-red-400 border-red-500/30">Saída</Badge>}</td>
-                      <td className="p-3 font-medium">{t.descricao}</td>
+                      <td className="p-3 font-medium">{t.descricao}<DeleteItemButton kind="transaction" id={t.id} title={t.descricao} description="Este lançamento manual será removido dos totais financeiros." onDeleted={loadAll}/></td>
                       <td className="p-3 text-muted-foreground">{t.categoria || '-'}</td>
                       <td className="p-3 text-muted-foreground">{clientName(t.cliente_id)}</td>
                       <td className={`p-3 text-right font-semibold ${t.tipo === 'entrada' ? 'text-emerald-400' : 'text-red-400'}`}>{t.tipo === 'saida' ? '−' : '+'}{fmt(Number(t.valor))}</td>

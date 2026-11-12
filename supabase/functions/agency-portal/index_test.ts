@@ -105,3 +105,19 @@ Deno.test(
     }
   },
 );
+Deno.test('conditional form submissions require only visible answers and never store hidden branch data',async()=>{
+ const originalFetch=globalThis.fetch;let stored:Record<string,unknown>|null=null;let available=true;
+ globalThis.fetch=(async(input:RequestInfo|URL,init?:RequestInit)=>{
+  const url=new URL(String(input));const json=(data:unknown)=>new Response(JSON.stringify(data),{headers:{'content-type':'application/json'}});
+  if(url.pathname.endsWith('/agency_forms'))return json(available?[{id:'form-a',user_id:'owner-a',title:'Condicional',description:'',fields:[{id:'choice',label:'Precisa de design?',type:'select',required:true,options:['Sim','Não']},{id:'budget',label:'Orçamento',type:'number',required:true,condition:{fieldId:'choice',operator:'equals',value:'Sim'}}]}]:[]);
+  if(init?.method==='HEAD')return new Response(null,{headers:{'Content-Range':'0-0/0'}});
+  if(url.pathname.endsWith('/agency_form_responses')&&init?.method==='POST'){stored=JSON.parse(String(init.body));return json([])}
+  throw new Error(`Unexpected fixture call: ${url.pathname}`);
+ }) as typeof fetch;
+ try{
+  const hidden=await handler(request({action:'submit_form',token,answers:{choice:'Não',budget:'500'},user_id:'attacker'}));check(hidden.status===200,'hidden required answer must not block submission');
+  const row=stored as Record<string,unknown>|null;check(row?.user_id==='owner-a','owner comes from form capability');check(!('budget' in (row?.answers as Record<string,unknown>)),'hidden data must not be stored');
+  const missing=await handler(request({action:'submit_form',token,answers:{choice:'Sim'}}));check(missing.status===400,'visible required answer is enforced');
+  available=false;const deleted=await handler(request({action:'form',token}));check(deleted.status===404,'deleted form link becomes invalid');
+ }finally{globalThis.fetch=originalFetch}
+});

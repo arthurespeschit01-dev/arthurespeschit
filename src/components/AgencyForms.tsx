@@ -1,3 +1,6 @@
+import DeleteItemButton from '@/components/DeleteItemButton';
+import AgencyFormFields from '@/components/AgencyFormFields';
+import {formDefinitionError} from '@/lib/formConditions';
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -26,6 +29,7 @@ const fieldTypes = {
   email: "E-mail",
   date: "Data",
   number: "Número",
+  select: "Lista de opções",
 };
 const newField = (): FormField => ({
   id: crypto.randomUUID(),
@@ -42,6 +46,8 @@ type Draft = {
 
 export default function AgencyForms() {
   const { user } = useAuth();
+  const [preview,setPreview]=useState(false);
+  const [previewAnswers,setPreviewAnswers]=useState<Record<string,string>>({});
   const [forms, setForms] = useState<AgencyForm[]>([]);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [selected, setSelected] = useState<AgencyForm | null>(null);
@@ -96,11 +102,13 @@ export default function AgencyForms() {
       toast.error("Preencha o título e o nome de cada campo.");
       return;
     }
+    const fields=draft.fields.map(f=>({...f,label:f.label.trim(),options:f.options?.map(o=>o.trim()).filter(Boolean)}));
+    const definitionError=formDefinitionError(fields);if(definitionError){toast.error(definitionError);return;}
     setBusy(true);
     const payload = {
       title: draft.title.trim(),
       description: draft.description,
-      fields: draft.fields.map((f) => ({ ...f, label: f.label.trim() })),
+      fields,
     };
     const { error } = draft.id
       ? await supabase
@@ -180,6 +188,7 @@ export default function AgencyForms() {
           </h3>
           <p className="text-sm text-muted-foreground">{form.description}</p>
           <div className="flex flex-wrap gap-2">
+            <DeleteItemButton kind="form" id={form.id} title={form.title} description="O formulário, seu link público e todas as respostas recebidas serão excluídos." onDeleted={load}/>
             <Button
               variant="outline"
               onClick={() =>
@@ -228,7 +237,7 @@ export default function AgencyForms() {
       <Dialog
         open={!!draft}
         onOpenChange={(open) => {
-          if (!open && !busy) setDraft(null);
+          if (!open && !busy) {setDraft(null);setPreview(false);}
         }}
       >
         <DialogContent className="max-h-[90vh] overflow-y-auto">
@@ -241,7 +250,9 @@ export default function AgencyForms() {
               momento do envio.
             </DialogDescription>
           </DialogHeader>
-          {draft && (
+          {draft&&<Button variant="outline" onClick={()=>{setPreview(!preview);setPreviewAnswers({})}}>{preview?'Voltar ao editor':'Pré-visualizar formulário'}</Button>}
+          {draft&&preview&&<form onSubmit={e=>e.preventDefault()} className="space-y-4 rounded-xl border p-4"><h3 className="font-semibold">{draft.title||'Pré-visualização'}</h3><p className="text-sm text-muted-foreground">{draft.description}</p><AgencyFormFields fields={draft.fields} answers={previewAnswers} onChange={setPreviewAnswers}/><p className="text-xs text-muted-foreground">Esta prévia não envia nem salva respostas.</p></form>}
+          {draft && !preview && (
             <div className="space-y-4">
               <Label htmlFor="form-title">Título</Label>
               <Input
@@ -286,6 +297,11 @@ export default function AgencyForms() {
                       </option>
                     ))}
                   </select>
+                  {field.type==='select'&&<div className="space-y-2"><Label htmlFor={`options-${field.id}`}>Opções do campo {i+1}</Label><Textarea id={`options-${field.id}`} placeholder={'Uma opção por linha\nSim\nNão'} value={(field.options||[]).join('\n')} onChange={e=>patchField(field.id,{options:e.target.value.split('\n')})}/></div>}
+                  <div className="rounded-lg bg-muted/30 p-3 space-y-3"><label className="flex gap-2 items-center text-sm"><input type="checkbox" disabled={i===0} checked={!!field.condition} onChange={e=>patchField(field.id,{condition:e.target.checked?{fieldId:draft.fields[0].id,operator:'equals',value:''}:undefined})}/>Exibir este campo somente se</label>
+                  {i===0&&<p className="text-xs text-muted-foreground">As condições podem usar respostas dos campos anteriores.</p>}
+                  {field.condition&&<><select aria-label={`Campo da condição ${i+1}`} className={agencySelectClass} value={field.condition.fieldId} onChange={e=>patchField(field.id,{condition:{...field.condition!,fieldId:e.target.value,value:''}})}>{draft.fields.slice(0,i).map(previous=><option key={previous.id} value={previous.id}>{previous.label||'Campo sem nome'}</option>)}</select><select aria-label={`Regra da condição ${i+1}`} className={agencySelectClass} value={field.condition.operator} onChange={e=>patchField(field.id,{condition:{...field.condition!,operator:e.target.value as NonNullable<FormField['condition']>['operator']}})}><option value="equals">A resposta for igual a</option><option value="not_equals">A resposta for diferente de</option><option value="contains">A resposta contiver</option><option value="filled">O campo estiver preenchido</option><option value="not_filled">O campo estiver vazio</option></select>{!['filled','not_filled'].includes(field.condition.operator)&&<Input aria-label={`Valor da condição ${i+1}`} placeholder="Ex.: Sim" value={field.condition.value||''} onChange={e=>patchField(field.id,{condition:{...field.condition!,value:e.target.value}})}/>}</>}
+                  </div>
                   <label className="flex items-center gap-2 text-sm">
                     <input
                       type="checkbox"
@@ -304,6 +320,7 @@ export default function AgencyForms() {
                       onClick={() => {
                         const fields = [...draft.fields];
                         [fields[i], fields[i - 1]] = [fields[i - 1], fields[i]];
+                        const error=formDefinitionError(fields);if(error){toast.error(error);return;}
                         setDraft({ ...draft, fields });
                       }}
                     >
@@ -313,12 +330,7 @@ export default function AgencyForms() {
                       size="sm"
                       variant="ghost"
                       disabled={draft.fields.length === 1}
-                      onClick={() =>
-                        setDraft({
-                          ...draft,
-                          fields: draft.fields.filter((f) => f.id !== field.id),
-                        })
-                      }
+                      onClick={() => {if(draft.fields.some(f=>f.condition?.fieldId===field.id)){toast.error('Remova as condições que usam este campo antes de excluí-lo.');return;}setDraft({...draft,fields:draft.fields.filter(f=>f.id!==field.id)})}}
                     >
                       Remover
                     </Button>
@@ -362,6 +374,7 @@ export default function AgencyForms() {
               key={response.id}
               className="border rounded-lg p-4 space-y-3"
             >
+              <DeleteItemButton kind="response" id={response.id} title="resposta" description="Esta resposta será excluída do formulário." onDeleted={()=>setResponses(current=>current.filter(r=>r.id!==response.id))}/>
               <p className="text-xs text-muted-foreground">
                 {new Date(response.created_at).toLocaleString("pt-BR")}
               </p>

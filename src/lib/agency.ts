@@ -42,7 +42,9 @@ export interface TicketMessage {
 export interface FormField {
   id: string;
   label: string;
-  type: "text" | "textarea" | "email" | "date" | "number";
+  type: "text" | "textarea" | "email" | "date" | "number" | "select";
+  options?: string[];
+  condition?: {fieldId:string;operator:"equals"|"not_equals"|"contains"|"filled"|"not_filled";value?:string};
   required: boolean;
 }
 export interface AgencyForm {

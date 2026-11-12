@@ -1,10 +1,9 @@
+import AgencyFormFields from '@/components/AgencyFormFields';
+import {visibleFormFields} from '@/lib/formConditions';
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import type { FormField } from "@/lib/agency";
 
 export default function PublicForm() {
@@ -43,7 +42,7 @@ export default function PublicForm() {
     setBusy(true);
     setError("");
     const { error } = await supabase.functions.invoke("agency-portal", {
-      body: { action: "submit_form", token, answers },
+      body: { action: "submit_form", token, answers:Object.fromEntries(visibleFormFields(form?.fields||[],answers).map(f=>[f.id,answers[f.id]||''])) },
     });
     setBusy(false);
     if (error) {
@@ -79,36 +78,7 @@ export default function PublicForm() {
           <p className="text-muted-foreground whitespace-pre-wrap">
             {form.description}
           </p>
-          {form.fields.map((field) => (
-            <div key={field.id} className="space-y-2">
-              <Label htmlFor={field.id}>
-                {field.label}
-                {field.required ? " *" : ""}
-              </Label>
-              {field.type === "textarea" ? (
-                <Textarea
-                  id={field.id}
-                  required={field.required}
-                  maxLength={5000}
-                  value={answers[field.id] || ""}
-                  onChange={(e) =>
-                    setAnswers({ ...answers, [field.id]: e.target.value })
-                  }
-                />
-              ) : (
-                <Input
-                  id={field.id}
-                  required={field.required}
-                  type={field.type}
-                  maxLength={5000}
-                  value={answers[field.id] || ""}
-                  onChange={(e) =>
-                    setAnswers({ ...answers, [field.id]: e.target.value })
-                  }
-                />
-              )}
-            </div>
-          ))}
+          <AgencyFormFields fields={form.fields} answers={answers} onChange={setAnswers}/>
           <Button disabled={busy} type="submit">
             {busy ? "Enviando…" : "Enviar respostas"}
           </Button>

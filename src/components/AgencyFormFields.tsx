@@ -1,0 +1,6 @@
+import type {FormField} from '@/lib/agency';
+import {visibleFormFields} from '@/lib/formConditions';
+import {Input} from '@/components/ui/input';import {Label} from '@/components/ui/label';import {Textarea} from '@/components/ui/textarea';
+export default function AgencyFormFields({fields,answers,onChange}:{fields:FormField[];answers:Record<string,string>;onChange:(answers:Record<string,string>)=>void}){
+ return <>{visibleFormFields(fields,answers).map(field=><div key={field.id} className="space-y-2"><Label htmlFor={field.id}>{field.label}{field.required?' *':''}</Label>{field.type==='select'?<select id={field.id} required={field.required} className="w-full h-11 rounded-md border border-input bg-background px-3 text-sm" value={answers[field.id]||''} onChange={e=>onChange({...answers,[field.id]:e.target.value})}><option value="">Selecione uma opção</option>{field.options?.map(option=><option key={option} value={option}>{option}</option>)}</select>:field.type==='textarea'?<Textarea id={field.id} required={field.required} maxLength={5000} value={answers[field.id]||''} onChange={e=>onChange({...answers,[field.id]:e.target.value})}/>:<Input id={field.id} required={field.required} type={field.type} maxLength={5000} value={answers[field.id]||''} onChange={e=>onChange({...answers,[field.id]:e.target.value})}/>}</div>)}</>;
+}
