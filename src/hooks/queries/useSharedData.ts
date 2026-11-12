@@ -16,7 +16,7 @@ export function useClientsQuery() {
     queryFn: async () => {
       const { data } = await supabase
         .from('clients')
-        .select('id, name, status, monthly_fee, payment_day, phone, niche, services, verba_mensal, contract_duration, account_ids, created_at, updated_at, user_id')
+        .select('id, name, status, monthly_fee, payment_day, entry_date, first_payment_date, phone, niche, services, verba_mensal, contract_duration, account_ids, created_at, updated_at, user_id')
         .eq('user_id', user!.id);
       return data || [];
     },

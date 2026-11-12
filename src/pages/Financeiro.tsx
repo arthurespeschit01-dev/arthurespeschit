@@ -1,6 +1,6 @@
 import ClientStatusFilter from '@/components/ClientStatusFilter';
 import { isActiveClient, matchesClientStatus, type ClientStatusFilter as StatusFilter } from '@/lib/clientStatus';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -55,48 +55,29 @@ export default function Financeiro() {
   const periodoStart = useMemo(() => new Date(ano, mes, 1).toISOString().slice(0, 10), [mes, ano]);
   const periodoEnd = useMemo(() => new Date(ano, mes + 1, 0).toISOString().slice(0, 10), [mes, ano]);
 
+  const loadVersion=useRef(0);
   const loadAll = async () => {
     if (!user) return;
+    const version=++loadVersion.current;
     setLoading(true);
     const [clientsRes, transRes, mensRes] = await Promise.all([
       supabase.from('clients').select('id,name,monthly_fee,payment_day,status,phone').eq('user_id', user.id).order('name'),
       supabase.from('transacoes').select('*').eq('user_id', user.id).gte('data', periodoStart).lte('data', periodoEnd).order('data', { ascending: false }),
-      supabase.from('mensalidades').select('*').eq('user_id', user.id).gte('vencimento', periodoStart).lte('vencimento', periodoEnd),
+      supabase.rpc('ensure_agency_monthly_invoices',{p_month:periodoStart}),
     ]);
+    if(version!==loadVersion.current)return;
     setClients(clientsRes.data || []);
     setTransacoes((transRes.data || []) as Transacao[]);
     setMensalidades((mensRes.data || []) as Mensalidade[]);
     setLoading(false);
 
-    // Auto-gerar mensalidades a partir de clients ativos com monthly_fee
-    await ensureMensalidades(clientsRes.data || [], (mensRes.data || []) as Mensalidade[]);
-  };
-
-  const ensureMensalidades = async (cls: Client[], existing: Mensalidade[]) => {
-    if (!user) return;
-    const have = new Set(existing.map(m => m.cliente_id));
-    const toCreate = cls
-      .filter(c => {
-        const ativo = isActiveClient(c);
-        return ativo && c.monthly_fee && c.monthly_fee > 0 && !have.has(c.id);
-      })
-      .map(c => {
-        const day = Math.min(c.payment_day || 5, new Date(ano, mes + 1, 0).getDate());
-        const venc = new Date(ano, mes, day).toISOString().slice(0, 10);
-        return {
-          user_id: user.id, cliente_id: c.id, valor: c.monthly_fee!,
-          vencimento: venc, status: 'pendente',
-        };
-      });
-    if (toCreate.length === 0) return;
-    const { data } = await supabase.from('mensalidades').insert(toCreate).select('*');
-    if (data) setMensalidades(prev => [...prev, ...(data as Mensalidade[])]);
+    if(mensRes.error)toast.error('Não foi possível carregar as mensalidades. Tente novamente.');
   };
 
   // Atualizar status para "atrasado" se vencimento passou e não foi pago
   useEffect(() => {
     if (!user || mensalidades.length === 0) return;
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = new Date().toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'});
     const vencidas = mensalidades.filter(m => m.status === 'pendente' && m.vencimento < hoje);
     if (vencidas.length === 0) return;
     (async () => {
@@ -230,7 +211,9 @@ export default function Financeiro() {
   const meses = Array.from({ length: 12 }, (_, i) => i);
   const anos = Array.from({ length: 5 }, (_, i) => today.getFullYear() - 2 + i);
 
-  const statusBadge = (s: string) => {
+  const statusBadge = (s: string,due?:string) => {
+    const today=new Date().toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'});
+    if(s!=='pago'&&due&&due>=today)return <Badge className="bg-blue-500/15 text-blue-400 border-blue-500/30">{due===today?'Vence hoje':'A vencer'}</Badge>;
     if (s === 'pago') return <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">Pago</Badge>;
     if (s === 'atrasado') return <Badge className="bg-red-500/15 text-red-400 border-red-500/30">Atrasado</Badge>;
     return <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30">Aguardando</Badge>;
@@ -389,7 +372,7 @@ export default function Financeiro() {
                         <td className="p-3 font-medium">{c?.name || '-'}</td>
                         <td className="p-3">{fmt(Number(m.valor))}</td>
                         <td className="p-3 text-muted-foreground">{new Date(m.vencimento + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
-                        <td className="p-3">{statusBadge(m.status)}</td>
+                        <td className="p-3">{statusBadge(m.status,m.vencimento)}</td>
                         <td className="p-3 text-right">
                           <div className="flex justify-end gap-2 flex-wrap">
                             {m.status !== 'pago' && (

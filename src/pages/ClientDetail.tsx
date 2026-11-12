@@ -1,3 +1,5 @@
+import ClientBillingFields from '@/components/ClientBillingFields';
+import {billingError,firstBillingDate,localDate} from '@/lib/billingSchedule';
 import ClientOperationFields from '@/components/ClientOperationFields';
 import { useClientProgress, progressLabel, operationFromProgress, emptyOperation, type OperationSelection } from '@/lib/clientProgress';
 import ClientTicketLink from '@/components/ClientTicketLink';
@@ -32,7 +34,7 @@ interface AccountIds {
 
 interface Client {
   id: string; name: string; services: string; monthly_fee: number; contract_duration: string; status: string;
-  payment_day: number | null; account_ids: AccountIds; verba_mensal: number; niche: string;
+  payment_day: number | null; entry_date: string | null; first_payment_date: string | null; account_ids: AccountIds; verba_mensal: number; niche: string;
 }
 interface Campaign {
   id: string; name: string; platform: string; objective: string; status: string; start_date: string;
@@ -98,7 +100,7 @@ export default function ClientDetail() {
   const [editClient, setEditClient] = useState(false);
   const progress = useClientProgress();
   const [operation, setOperation] = useState<OperationSelection>({ ...emptyOperation });
-  const [clientForm, setClientForm] = useState({ name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo', payment_day: '' as string, verba_mensal: 0, niche: '', account_ids: {} as AccountIds });
+  const [clientForm, setClientForm] = useState({ name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo', entry_date: localDate(), first_payment_date: firstBillingDate(localDate(),5), payment_day: '' as string, verba_mensal: 0, niche: '', account_ids: {} as AccountIds });
   const [attachments, setAttachments] = useState<ClientAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const [attachCategory, setAttachCategory] = useState('criativos');
@@ -151,7 +153,7 @@ export default function ClientDetail() {
       setClient(c);
       setClientForm({
         name: c.name, services: c.services, monthly_fee: c.monthly_fee, contract_duration: c.contract_duration, status: c.status,
-        payment_day: c.payment_day ? String(c.payment_day) : '',
+        entry_date:c.entry_date||'',first_payment_date:c.first_payment_date||'',payment_day: c.payment_day ? String(c.payment_day) : '',
         verba_mensal: c.verba_mensal || 0, niche: c.niche || '',
         account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '', ...c.account_ids },
       });
@@ -385,10 +387,11 @@ export default function ClientDetail() {
   }, [id, campaigns.length, dateRange.preset, dateRange.since, dateRange.until]);
 
   const saveClient = async () => {
+    const scheduleError=billingError(clientForm);if(scheduleError){toast.error(scheduleError);return;}
     const { error } = await supabase.rpc('save_agency_client', { p_id: id || null, p_client: {
       name: clientForm.name, services: clientForm.services, monthly_fee: clientForm.monthly_fee,
       contract_duration: clientForm.contract_duration, status: clientForm.status,
-      payment_day: clientForm.payment_day ? Number(clientForm.payment_day) : null,
+      entry_date:clientForm.entry_date||null,first_payment_date:clientForm.first_payment_date||null,payment_day: clientForm.payment_day ? Number(clientForm.payment_day) : null,
       account_ids: clientForm.account_ids, verba_mensal: clientForm.verba_mensal, niche: clientForm.niche,
     }, p_operation: operation.phase ? { ...operation } : null });
     if (error) { toast.error('Não foi possível salvar o cliente e o onboarding.'); return; }
@@ -642,6 +645,7 @@ export default function ClientDetail() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm"><div><span className="text-muted-foreground">Data de entrada</span><p>{client.entry_date?new Date(client.entry_date+'T12:00:00').toLocaleDateString('pt-BR'):'Não informada'}</p></div><div><span className="text-muted-foreground">Primeiro vencimento</span><p>{client.first_payment_date?new Date(client.first_payment_date+'T12:00:00').toLocaleDateString('pt-BR'):'Não informado'}</p></div></div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm pt-2">
                 <div><span className="text-muted-foreground">Serviços:</span><p className="text-foreground mt-1">{client.services || '—'}</p></div>
                 <div><span className="text-muted-foreground">Duração:</span><p className="text-foreground mt-1">{client.contract_duration || '—'}</p></div>
@@ -675,7 +679,7 @@ export default function ClientDetail() {
                 <div><Label className="text-muted-foreground text-sm">Duração</Label><Input value={clientForm.contract_duration} onChange={(e) => setClientForm({ ...clientForm, contract_duration: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" /></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div><Label className="text-muted-foreground text-sm">Dia de pagamento</Label><Input type="number" min={1} max={31} value={clientForm.payment_day} onChange={(e) => setClientForm({ ...clientForm, payment_day: e.target.value })} placeholder="Ex: 10" className="bg-secondary/50 border-border/50 mt-1" /></div>
+                <ClientBillingFields value={clientForm} onChange={fields=>setClientForm(current=>({...current,...fields}))}/>
                 <div>
                   <Label className="text-muted-foreground text-sm">Status</Label>
                   <Select value={clientForm.status} onValueChange={(v) => setClientForm({ ...clientForm, status: v })}>

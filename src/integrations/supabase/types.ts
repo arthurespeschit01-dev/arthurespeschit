@@ -413,6 +413,8 @@ export type Database = {
           monthly_fee: number | null
           name: string
           niche: string | null
+          entry_date: string | null
+          first_payment_date: string | null
           payment_day: number | null
           phone: string | null
           services: string | null
@@ -429,6 +431,8 @@ export type Database = {
           monthly_fee?: number | null
           name: string
           niche?: string | null
+          entry_date?: string | null
+          first_payment_date?: string | null
           payment_day?: number | null
           phone?: string | null
           services?: string | null
@@ -445,6 +449,8 @@ export type Database = {
           monthly_fee?: number | null
           name?: string
           niche?: string | null
+          entry_date?: string | null
+          first_payment_date?: string | null
           payment_day?: number | null
           phone?: string | null
           services?: string | null
@@ -1455,6 +1461,7 @@ export type Database = {
       agency_client_progress_view: { Row: { [K in keyof ClientProgress]: ClientProgress[K] }; Relationships: [] }
     }
     Functions: {
+      ensure_agency_monthly_invoices: {Args:{p_month:string};Returns:Database["public"]["Tables"]["mensalidades"]["Row"][]};
       agency_whatsapp_inbox_v2: {Args:{p_search?:string;p_offset?:number;p_filter?:string};Returns:Json};
       agency_whatsapp_mark_read: {Args:{p_address:string};Returns:undefined};
       agency_whatsapp_inbox: { Args: {p_search?: string; p_offset?:number}; Returns: Json; }

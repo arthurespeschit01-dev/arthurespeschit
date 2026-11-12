@@ -1,3 +1,5 @@
+import ClientBillingFields from '@/components/ClientBillingFields';
+import {billingError,firstBillingDate,localDate} from '@/lib/billingSchedule';
 import ClientOperationFields from '@/components/ClientOperationFields';
 import { useClientProgress, progressLabel, operationFromProgress, emptyOperation, type OperationSelection } from '@/lib/clientProgress';
 import ClientStatusFilter from '@/components/ClientStatusFilter';
@@ -33,7 +35,7 @@ interface Client {
   monthly_fee: number;
   contract_duration: string;
   status: string;
-  payment_day: number | null;
+  payment_day: number | null; entry_date: string | null; first_payment_date: string | null;
   account_ids: AccountIds;
   verba_mensal: number;
   niche: string;
@@ -85,7 +87,7 @@ export default function Clientes() {
   };
   const [form, setForm] = useState({
     name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo',
-    payment_day: '' as string, verba_mensal: 0, niche: '', phone: '',
+    entry_date: localDate(), first_payment_date: firstBillingDate(localDate(),5), payment_day: '' as string, verba_mensal: 0, niche: '', phone: '',
     account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '' } as AccountIds,
   });
 
@@ -132,7 +134,7 @@ export default function Clientes() {
       if (savedRaw) {
         try {
           const saved = JSON.parse(savedRaw);
-          setForm(saved.form);
+          setForm(current=>({...current,...saved.form,entry_date:saved.form.entry_date??current.entry_date,first_payment_date:saved.form.first_payment_date??current.first_payment_date}));
         } catch { /* ignore */ }
       }
       setMetaPending(true);
@@ -184,7 +186,7 @@ export default function Clientes() {
     setOperation({ phase: "execution", pipeline_id: "", stage_id: "" });
     setAdAccounts([]);
     setSelectedAdAccountId('');
-    setForm({ name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo', payment_day: '', verba_mensal: 0, niche: '', phone: '', account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '' } });
+    setForm({ name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo', entry_date: localDate(), first_payment_date: firstBillingDate(localDate(),5), payment_day: '', verba_mensal: 0, niche: '', phone: '', account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '' } });
     setStep('meta');
     setOpen(true);
     // Reusa o token Meta já autorizado anteriormente (de outro cliente), se válido.
@@ -229,7 +231,7 @@ export default function Clientes() {
     setOperation(operationFromProgress(progress.data?.[c.id]));
     setForm({
       name: c.name, services: c.services, monthly_fee: c.monthly_fee, contract_duration: c.contract_duration, status: c.status,
-      payment_day: c.payment_day ? String(c.payment_day) : '',
+      entry_date:c.entry_date||'',first_payment_date:c.first_payment_date||'',payment_day: c.payment_day ? String(c.payment_day) : '',
       verba_mensal: c.verba_mensal || 0, niche: c.niche || '', phone: c.phone || '',
       account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '', ...c.account_ids },
     });
@@ -239,13 +241,14 @@ export default function Clientes() {
 
   const save = async () => {
     if (!user || saving) return;
+    const scheduleError=billingError(form);if(scheduleError){toast.error(scheduleError);return;}
     if (!form.name.trim()) { toast.error('Informe o nome do cliente'); return; }
     if (!form.niche.trim()) { toast.error('Informe o nicho do cliente'); return; }
     if (!form.verba_mensal || form.verba_mensal <= 0) { toast.error('Informe a verba mensal'); return; }
     const payload = {
       name: form.name, services: form.services, monthly_fee: form.monthly_fee,
       contract_duration: form.contract_duration, status: form.status,
-      payment_day: form.payment_day ? Number(form.payment_day) : null,
+      entry_date:form.entry_date||null,first_payment_date:form.first_payment_date||null,payment_day: form.payment_day ? Number(form.payment_day) : null,
       account_ids: form.account_ids,
       verba_mensal: form.verba_mensal,
       niche: form.niche,
@@ -416,7 +419,7 @@ export default function Clientes() {
         <AccountBalancesPanel initialAccounts={balanceAccounts} onAccountsChange={setBalanceAccounts} defaultOpen={problemCount > 0} />
       </div>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="bg-card border-border max-h-[85vh] overflow-y-auto">
+        <DialogContent className="bg-card border-border w-[calc(100%_-_2rem)] sm:w-full max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editing ? 'Editar Cliente' : step === 'meta' ? 'Conectar Meta Ads' : 'Novo Cliente — dados'}
@@ -499,7 +502,7 @@ export default function Clientes() {
               <div><Label className="text-muted-foreground text-sm">Duração</Label><Input value={form.contract_duration} onChange={(e) => setForm({ ...form, contract_duration: e.target.value })} placeholder="6 meses" className="bg-secondary/50 border-border/50 mt-1" /></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div><Label className="text-muted-foreground text-sm">Dia de pagamento</Label><Input type="number" min={1} max={31} value={form.payment_day} onChange={(e) => setForm({ ...form, payment_day: e.target.value })} placeholder="Ex: 10" className="bg-secondary/50 border-border/50 mt-1" /></div>
+              <ClientBillingFields value={form} onChange={fields=>setForm(current=>({...current,...fields}))}/>
               <div><Label className="text-muted-foreground text-sm">WhatsApp / Telefone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="Ex: 11999998888 (com DDD)" className="bg-secondary/50 border-border/50 mt-1" /></div>
             </div>
             <div className="grid grid-cols-2 gap-4">

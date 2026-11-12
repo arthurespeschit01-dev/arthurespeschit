@@ -29,6 +29,7 @@ await db.exec(`
     ('${randomUUID()}','${owner}','Cliente encerrado de teste','Encerrado');
 `);
 for (const name of [
+  "20260421044957_6c23a9e6-bbdf-4b99-9db9-f66c2eb12105.sql",
   "20261111144901_agency_pipelines.sql",
   "20261111145150_agency_portal_forms.sql",
   "20261111145643_agency_calendar.sql",
@@ -38,6 +39,7 @@ for (const name of [
   "20261111185241_whatsapp_live_conversations.sql",
   "20261111190630_whatsapp_directory_availability.sql",
   "20261111192108_whatsapp_number_mailboxes_crm.sql",
+  "20261112194308_client_billing_schedule.sql",
 ])
   await db.exec(
     await readFile(
@@ -168,6 +170,7 @@ await context.route("https://*.supabase.co/**", async (route) => {
     }
     if (url.pathname.endsWith('/rpc/agency_whatsapp_mark_read')) {await db.query('select agency_whatsapp_mark_read($1)',[body.p_address]);return response(route,null);}
     if (url.pathname.endsWith('/rpc/agency_whatsapp_inbox') || url.pathname.endsWith('/rpc/agency_whatsapp_inbox_v2')) { const result=await db.query("select set_config('request.jwt.claim.sub',$1,false)",[owner]); const inbox=await db.query('select agency_whatsapp_inbox_v2($1,$2,$3) result',[body.p_search,body.p_offset,body.p_filter||'all']); return response(route,inbox.rows[0].result); }
+    if(url.pathname.endsWith('/rpc/ensure_agency_monthly_invoices')){const r=await db.query('select * from ensure_agency_monthly_invoices($1)',[body.p_month]);return response(route,r.rows);}
     if (url.pathname.endsWith('/rpc/save_agency_client')) {
       const result = await db.query('select public.save_agency_client($1,$2::jsonb,$3::jsonb) id',[body.p_id,JSON.stringify(body.p_client),JSON.stringify(body.p_operation)]);
       return response(route,result.rows[0].id);
@@ -428,13 +431,20 @@ try {
   await page.getByText('Em execução · Concluído',{exact:true}).filter({visible:true}).first().waitFor();
   await page.getByRole('button',{name:'Novo Cliente',exact:true}).click();
   await page.getByRole('button',{name:'Pular e continuar',exact:true}).click();
+  await page.setViewportSize({width:390,height:844});
+  await page.waitForFunction(()=>{const el=document.querySelector('[role=dialog]');return el&&el.getBoundingClientRect().right<=innerWidth&&el.getBoundingClientRect().left>=0});
   await page.getByLabel('Nome do cliente *',{exact:true}).fill('Novo cliente em onboarding');
+  await page.getByLabel('Data de entrada',{exact:true}).fill('2026-11-20');
+  await page.getByLabel('Dia de pagamento',{exact:true}).fill('15');
+  assert.equal(await page.getByLabel('Primeiro vencimento',{exact:true}).inputValue(),'2026-12-15');
   await page.getByLabel('Nicho *',{exact:true}).fill('Serviços');
   await page.getByLabel('Verba mensal (R$) *',{exact:true}).fill('1500');
   await page.getByLabel('Fase de trabalho',{exact:true}).selectOption('onboarding');
   await page.getByRole('dialog').getByRole('button',{name:'Salvar',exact:true}).click();
   await page.getByRole('heading',{name:'Novo cliente em onboarding',exact:true}).first().waitFor();
+  await page.setViewportSize({width:1440,height:1000});
   await page.getByText('Onboarding · Entrada',{exact:true}).filter({visible:true}).first().waitFor();
+  assert.equal((await db.query("select first_payment_date::text d from clients where name='Novo cliente em onboarding'")).rows[0].d,'2026-12-15');
   assert.equal((await db.query("select count(*)::int n from agency_pipeline_cards where title='Novo cliente em onboarding'")).rows[0].n,1);
   await page.goto(`${base}/operacao`);
   await page.getByLabel('Mover Novo cliente em onboarding para etapa').selectOption(finalStage.rows[0].id);
@@ -477,7 +487,7 @@ try {
     await page.getByLabel("Cliente do portal").inputValue(),
     activeClient,
   );
-  await page.getByRole("button", { name: "Operações", exact: true }).click();
+  if(await page.getByRole("button", { name: "Operações", exact: true }).getAttribute("aria-expanded")!=="true")await page.getByRole("button", { name: "Operações", exact: true }).click();
   assert.equal(
     await page
       .getByRole("button", { name: "Operações", exact: true })
@@ -498,6 +508,16 @@ try {
       .count(),
     0,
   );
+  await page.getByLabel('Buscar página',{exact:true}).fill('Financeiro');
+  await page.getByRole('navigation').getByRole('link',{name:'Financeiro',exact:true}).click();
+  await page.getByRole('heading',{name:'Financeiro',exact:true}).waitFor();
+  await page.getByLabel('Localização atual').getByText('Gestão',{exact:true}).waitFor();
+  await page.setViewportSize({width:390,height:844});
+  await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
+  await page.getByLabel('Buscar página',{exact:true}).fill('Formulários');
+  await page.getByRole('navigation').getByRole('link',{name:'Formulários',exact:true}).click();
+  await page.getByRole('heading',{name:'Comercial',exact:true}).waitFor();
+  await page.waitForFunction(()=>document.querySelector('nav')?.getBoundingClientRect().right<=0);
   await page.goto(`${base}/comercial/crm`);
   await page.setViewportSize({width:390,height:844});
   await page.getByRole("tab", { name: "Formulários", exact: true }).click();

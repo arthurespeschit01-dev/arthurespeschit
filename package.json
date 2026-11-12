@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:db": "node tests/pipelines-db.mjs && node tests/legacy-data-db.mjs && node tests/client-operations-db.mjs && node tests/whatsapp-inbox-db.mjs && node tests/whatsapp-mailboxes-db.mjs",
+    "test:db": "node tests/pipelines-db.mjs && node tests/legacy-data-db.mjs && node tests/client-operations-db.mjs && node tests/whatsapp-inbox-db.mjs && node tests/whatsapp-mailboxes-db.mjs && node tests/billing-schedule-db.mjs",
     "test:browser": "node tests/agency-browser.mjs",
     "test:edge": "deno test --allow-env supabase/functions/agency-portal/index_test.ts supabase/functions/agency-calendar/index_test.ts supabase/functions/agency-whatsapp/index_test.ts"
   },
