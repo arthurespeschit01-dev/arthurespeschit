@@ -1030,6 +1030,7 @@ export type Database = {
       operational_tasks: {
         Row: {
           client_id: string | null
+          closed_at: string | null
           created_at: string
           description: string | null
           end_date: string | null
@@ -1046,6 +1047,7 @@ export type Database = {
         }
         Insert: {
           client_id?: string | null
+          closed_at?: string | null
           created_at?: string
           description?: string | null
           end_date?: string | null
@@ -1062,6 +1064,7 @@ export type Database = {
         }
         Update: {
           client_id?: string | null
+          closed_at?: string | null
           created_at?: string
           description?: string | null
           end_date?: string | null

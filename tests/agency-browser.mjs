@@ -28,6 +28,12 @@ await db.exec(`
     ('${randomUUID()}','${owner}','Cliente pausado de teste','Pausado'),
     ('${randomUUID()}','${owner}','Cliente encerrado de teste','Encerrado');
 `);
+const taskBase=await readFile(new URL('../supabase/migrations/20260416021855_a62b0b3d-1228-4ace-a4b7-e4ee215bd546.sql',import.meta.url),'utf8');
+await db.exec(taskBase.split('-- Storage bucket')[0]);
+await db.exec(await readFile(new URL('../supabase/migrations/20260416022733_4abf73de-3b98-4c14-8d99-332e0ea6a01c.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../supabase/migrations/20260422161434_1bb772b8-8950-4b83-8ce3-f50120c7d2f9.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../supabase/migrations/20260422162705_c172d709-3f2d-4b9b-841d-cf4b466b3aeb.sql',import.meta.url),'utf8'));
+await db.query("insert into operational_tasks(user_id,title,status,priority,end_date) values($1,'Entrega em aberto','pendente','alta','2026-10-22'),($1,'Concluída antiga','concluída','média','2026-10-22'),($1,'Cancelada antiga','cancelada','baixa','2026-10-22')",[owner]);
 for (const name of [
   "20260421044957_6c23a9e6-bbdf-4b99-9db9-f66c2eb12105.sql",
   "20261111144901_agency_pipelines.sql",
@@ -40,6 +46,7 @@ for (const name of [
   "20261111190630_whatsapp_directory_availability.sql",
   "20261111192108_whatsapp_number_mailboxes_crm.sql",
   "20261112194308_client_billing_schedule.sql",
+  "20261112195910_task_closure_history.sql",
 ])
   await db.exec(
     await readFile(
@@ -192,7 +199,7 @@ await context.route("https://*.supabase.co/**", async (route) => {
     const table = url.pathname.split("/").pop();
     if (table === "profiles")
       return response(route, [{ user_id: owner, onboarding_completed: true }]);
-    if (!/^agency_[a-z_]+$/.test(table) && table !== "clients")
+    if (!/^agency_[a-z_]+$/.test(table) && !["clients","operational_tasks","task_comments","task_attachments"].includes(table))
       return response(route, []);
     const params = [];
     const clauses = [];
@@ -250,6 +257,7 @@ await context.route("https://*.supabase.co/**", async (route) => {
 });
 try {
   const base = process.env.TEST_APP_URL || "http://localhost:8080";
+  if(!process.env.TEST_TASKS_ONLY){
   await page.goto(`${base}/comercial/crm`, { waitUntil: "domcontentloaded" });
   await page
     .getByRole("button", { name: "Nova pipeline", exact: true })
@@ -643,11 +651,52 @@ try {
   assert.equal(ticketSent, true);
   assert.equal(publicAuthRequests, 0);
   await publicContext.close();
+  }
+  await page.goto(`${base}/tasks`);
+  await page.getByRole('heading',{name:'Entrega em aberto',exact:true}).waitFor();
+  assert.equal(await page.getByRole('heading',{name:'Concluída antiga',exact:true}).count(),0);
+  await page.getByText('Filtros e ordenação',{exact:true}).click();
+  await page.getByLabel('Filtrar prioridade das tarefas',{exact:true}).selectOption('baixa');
+  assert.equal(await page.getByRole('heading',{name:'Entrega em aberto',exact:true}).count(),0);
+  await page.getByRole('button',{name:'Limpar filtros',exact:true}).click();
+  await page.getByRole('heading',{name:'Entrega em aberto',exact:true}).waitFor();
+  await page.getByRole('tab',{name:'Histórico',exact:true}).click();
+  await page.getByLabel('Período de encerramento',{exact:true}).selectOption('todos');
+  await page.getByRole('heading',{name:'Concluída antiga',exact:true}).waitFor();
+  await page.getByRole('heading',{name:'Cancelada antiga',exact:true}).waitFor();
+  assert.equal(await page.getByText('Data de encerramento não registrada',{exact:true}).count(),2);
+  await page.getByLabel('Período de encerramento',{exact:true}).selectOption('semana');
+  await page.getByText('Nenhuma tarefa encontrada.',{exact:true}).waitFor();
+  await page.getByRole('tab',{name:'Quadro de trabalho',exact:true}).click();
+  await page.getByRole('button',{name:'Alterar status de Entrega em aberto',exact:true}).click();
+  await page.getByRole('menuitem',{name:'Concluída',exact:true}).click();
+  await page.getByRole('button',{name:'Mostrar concluídas desta semana (1)',exact:true}).waitFor();
+  assert.equal(await page.getByRole('heading',{name:'Entrega em aberto',exact:true}).count(),0);
+  await page.getByRole('button',{name:'Mostrar concluídas desta semana (1)',exact:true}).click();
+  await page.getByRole('heading',{name:'Entrega em aberto',exact:true}).waitFor();
+  await page.getByText('Tarefa concluída. Disponível no histórico.',{exact:true}).waitFor();
+  assert((await db.query("select closed_at from operational_tasks where title='Entrega em aberto'")).rows[0].closed_at);
+  await page.getByRole('tab',{name:'Histórico',exact:true}).click();
+  await page.getByLabel('Período de encerramento',{exact:true}).selectOption('todos');
+  await page.setViewportSize({width:390,height:844});
+  const reOpen=page.getByRole('button',{name:'Reabrir Concluída antiga',exact:true});
+  assert(await reOpen.evaluate(el=>el.getBoundingClientRect().height>=44));
+  await reOpen.click();
+  await page.getByText('Tarefa reaberta.',{exact:true}).waitFor();
+  await page.getByRole('tab',{name:'Quadro de trabalho',exact:true}).click();
+  await page.getByRole('heading',{name:'Concluída antiga',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Alterar status de Concluída antiga',exact:true}).click();
+  await page.getByRole('menuitem',{name:'Cancelada',exact:true}).click();
+  await page.getByRole('button',{name:'Ver tarefas canceladas',exact:true}).click();
+  await page.getByRole('heading',{name:'Concluída antiga',exact:true}).waitFor();
+  assert.equal((await db.query("select status from operational_tasks where title='Concluída antiga'")).rows[0].status,'cancelada');
+  assert.equal((await db.query('select count(*)::int n from operational_tasks')).rows[0].n,3);
+  await page.setViewportSize({width:1440,height:1000});
   assert.equal(subscriptionChecks, 0, "Login must never consult the retired purchase gate");
   assert.equal(apiErrors.length, 0, apiErrors.join("\n"));
   assert.equal(errors.length, 0, errors.join("\n"));
   console.log(
-    "PASS: browser → RPC → PostgreSQL, pipeline editing, preserving cards, client onboarding creation/completion sync, manual appointment persistence/cancellation, dynamic commercial dashboard, active/paused filtering, form creation, client portal creation",
+    process.env.TEST_TASKS_ONLY?"PASS: task board/history, legacy preservation, completion dates, cancellation and mobile reopening":"PASS: browser → RPC → PostgreSQL, pipelines, client onboarding, manual calendar, commercial dashboard, forms, portal and task board/history",
   );
 } catch (error) {
   console.error("Original browser failure:", error, {statusCalls,activeMailbox,fixtureConnected,visibility:await page.evaluate(()=>({visibility:document.visibilityState,account:document.querySelector('[data-account-id]')?.getAttribute('data-account-id')})).catch(()=>null)});

@@ -1,0 +1,12 @@
+import {PGlite} from '@electric-sql/pglite';import {readFile} from 'node:fs/promises';import assert from 'node:assert/strict';
+const db=new PGlite();await db.exec(`create role anon;create role authenticated;create table operational_tasks(id int primary key,user_id uuid,status text,title text);insert into operational_tasks values(1,gen_random_uuid(),'concluída','Legada'),(2,gen_random_uuid(),'pendente','Aberta');`);
+const before=(await db.query('select to_jsonb(t) t from operational_tasks t order by id')).rows;
+await db.exec(await readFile(new URL('../supabase/migrations/20261112195910_task_closure_history.sql',import.meta.url),'utf8'));
+assert.deepEqual((await db.query("select to_jsonb(t)-'closed_at' t from operational_tasks t order by id")).rows,before);
+assert.equal((await db.query('select closed_at from operational_tasks where id=1')).rows[0].closed_at,null);
+await db.exec("update operational_tasks set status='concluída' where id=2");const closed=(await db.query('select closed_at::text t from operational_tasks where id=2')).rows[0].t;assert(closed);
+await db.exec("update operational_tasks set title='Editada',closed_at='2000-01-01' where id=2");assert.equal((await db.query('select closed_at::text t from operational_tasks where id=2')).rows[0].t,closed);
+await db.exec("update operational_tasks set status='pendente' where id=2");assert.equal((await db.query('select closed_at from operational_tasks where id=2')).rows[0].closed_at,null);
+await db.exec("update operational_tasks set status='cancelada' where id=2");assert((await db.query('select closed_at from operational_tasks where id=2')).rows[0].closed_at);
+await db.exec("insert into operational_tasks(id,status) values(3,'cancelada')");assert((await db.query('select closed_at from operational_tasks where id=3')).rows[0].closed_at);
+await db.close();console.log('PASS: historical tasks unchanged; completion/cancellation timestamps recorded, edits cannot falsify dates, reopening clears closure');

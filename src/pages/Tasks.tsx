@@ -1,4 +1,6 @@
-import { useEffect, useState, useMemo } from 'react';
+import {readAllRows} from '@/lib/readAllRows';
+import {isClosedTask,closedInPeriod} from '@/lib/taskViews';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -35,6 +37,7 @@ interface Task {
   end_date: string | null;
   client_id: string | null;
   created_at: string;
+  closed_at: string | null;
   recurrence: string;
   recurrence_interval: number;
   recurrence_days: number[];
@@ -184,6 +187,13 @@ export default function Tasks() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
   const [search, setSearch] = useState('');
+  const pendingStatus=useRef(new Set<string>());
+  const [view,setView]=useState('quadro');
+  const [historyPeriod,setHistoryPeriod]=useState('semana');
+  const [historyFrom,setHistoryFrom]=useState(''),[historyTo,setHistoryTo]=useState('');
+  const [closedExpanded,setClosedExpanded]=useState<Record<string,boolean>>({});
+  const [filterClient,setFilterClient]=useState('todos'),[filterPriority,setFilterPriority]=useState('todos'),[sort,setSort]=useState('prazo');
+  const [saving,setSaving]=useState(false);
   const [filterStatus, setFilterStatus] = useState('todos');
   const [filterPeriod, setFilterPeriod] = useState('todos');
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
@@ -203,11 +213,12 @@ export default function Tasks() {
   const load = async () => {
     if (!user) return;
     const [tasksRes, clientsRes, attachRes, commentsRes] = await Promise.all([
-      supabase.from('operational_tasks').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+      readAllRows((from,to)=>supabase.from('operational_tasks').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).order('id').range(from,to)),
       supabase.from('clients').select('id, name, status').eq('user_id', user.id).order('name'),
       supabase.from('task_attachments').select('*').eq('user_id', user.id),
       supabase.from('task_comments').select('*').eq('user_id', user.id).order('created_at', { ascending: true }),
     ]);
+    if(tasksRes.error){toast.error('Não foi possível carregar as tarefas. Tente novamente.');return;}
     const normalized: Task[] = (tasksRes.data || []).map((t) => ({
       ...t,
       recurrence_days: Array.isArray(t.recurrence_days)
@@ -223,8 +234,8 @@ export default function Tasks() {
   useEffect(() => { load(); }, [user]);
 
   const openNew = () => {
-    setEditing(null);
-    setForm({ title: '', description: '', status: 'pendente', priority: 'média', start_date: '', end_date: '', client_id: '', recurrence: 'none', recurrence_interval: 1, recurrence_days: [] });
+    setEditing(null);setView('quadro');setFilterStatus('todos');setFilterPeriod('todos');setSearch('');
+    setForm({ title: '', description: '', status: 'pendente', priority: filterPriority==='todos'?'média':filterPriority, start_date: '', end_date: '', client_id: filterClient==='todos'?'':filterClient, recurrence: 'none', recurrence_interval: 1, recurrence_days: [] });
     setOpen(true);
   };
 
@@ -240,6 +251,7 @@ export default function Tasks() {
   };
 
   const save = async () => {
+    if(saving)return;
     if (!user || !form.title.trim()) { toast.error('Título é obrigatório'); return; }
     const payload = {
       title: form.title.trim(), description: form.description.trim(), status: form.status,
@@ -249,14 +261,17 @@ export default function Tasks() {
       recurrence_interval: Math.max(1, Number(form.recurrence_interval) || 1),
       recurrence_days: form.recurrence === 'none' ? [] : [...form.recurrence_days].sort((a, b) => a - b),
     };
+    setSaving(true);
     if (editing) {
-      await supabase.from('operational_tasks').update(payload).eq('id', editing.id);
+      const {error}=await supabase.from('operational_tasks').update(payload).eq('id', editing.id).eq('user_id',user.id);
+      if(error){setSaving(false);toast.error('Não foi possível salvar a tarefa.');return;}
       toast.success('Tarefa atualizada!');
     } else {
-      await supabase.from('operational_tasks').insert({ ...payload, user_id: user.id });
+      const {error}=await supabase.from('operational_tasks').insert({ ...payload, user_id: user.id });
+      if(error){setSaving(false);toast.error('Não foi possível criar a tarefa.');return;}
       toast.success('Tarefa criada!');
     }
-    setOpen(false);
+    setSaving(false);setOpen(false);
     load();
   };
 
@@ -267,23 +282,20 @@ export default function Tasks() {
   };
 
   const changeStatus = async (t: Task, newStatus: string) => {
-    if (t.status === newStatus) return;
+    if (t.status === newStatus||pendingStatus.current.has(t.id)) return;
+    pendingStatus.current.add(t.id);
 
     // Atualização otimista: muda na UI imediatamente (sem aguardar rede)
     const previousStatus = t.status;
-    setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: newStatus } : x)));
+    setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: newStatus,closed_at:isClosedTask({status:newStatus})?new Date().toISOString():null } : x)));
 
-    // Persiste em background — não bloqueia a UI
-    supabase
-      .from('operational_tasks')
-      .update({ status: newStatus })
-      .eq('id', t.id)
-      .then(({ error }) => {
-        if (error) {
-          setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: previousStatus } : x)));
-          toast.error('Erro ao atualizar status');
-        }
-      });
+    const {data:updated,error}=await supabase.from('operational_tasks').update({status:newStatus}).eq('id',t.id).eq('user_id',user!.id).select('*').single();
+    pendingStatus.current.delete(t.id);
+    if(error||!updated){setTasks(prev=>prev.map(x=>x.id===t.id?{...x,status:previousStatus,closed_at:t.closed_at}:x));toast.error('Erro ao atualizar status');return;}
+    setTasks(prev=>prev.map(x=>x.id===t.id?{...x,...updated,recurrence_days:x.recurrence_days}:x));
+    setDetailTask(current=>current?.id===t.id?{...current,...updated,recurrence_days:current.recurrence_days}:current);
+    if(isClosedTask({status:newStatus}))toast.success(newStatus==='concluída'?'Tarefa concluída. Disponível no histórico.':'Tarefa cancelada. Disponível no histórico.');
+    else if(isClosedTask(t))toast.success('Tarefa reaberta.',{action:{label:'Ver no quadro',onClick:()=>{setView('quadro');setFilterStatus('todos')}}});
 
     // Recorrência: cria próxima ocorrência em background, atualizando a lista localmente
     if (newStatus === 'concluída' && t.recurrence && t.recurrence !== 'none' && user) {
@@ -405,9 +417,16 @@ export default function Tasks() {
         matchPeriod = !endDateStr;
       }
 
-      return matchSearch && matchStatus && matchPeriod;
+      const closed=isClosedTask(t);
+      const matchView=view==='historico'?closed&&closedInPeriod(t,historyPeriod,historyFrom,historyTo):!closed||closedInPeriod(t,'semana');
+      return matchSearch && matchStatus && (view==='historico'||matchPeriod) && matchView && (filterClient==='todos'||t.client_id===filterClient) && (filterPriority==='todos'||t.priority===filterPriority);
+    }).sort((a,b)=>{
+      if(sort==='titulo')return a.title.localeCompare(b.title,'pt-BR');
+      if(sort==='prioridade'){const priority:Record<string,number>={'alta':0,'média':1,'baixa':2};return (priority[a.priority]??3)-(priority[b.priority]??3)||(a.end_date||'9999').localeCompare(b.end_date||'9999');}
+      if(view==='historico')return (b.closed_at||'').localeCompare(a.closed_at||'');
+      return (a.end_date||'9999').localeCompare(b.end_date||'9999')||a.title.localeCompare(b.title,'pt-BR');
     });
-  }, [tasks, search, filterStatus, filterPeriod, dateFrom, dateTo]);
+  }, [tasks, search, filterStatus, filterPeriod, dateFrom, dateTo,view,historyPeriod,historyFrom,historyTo,filterClient,filterPriority,sort]);
 
   const getClientName = (clientId: string | null) => {
     if (!clientId) return null;
@@ -440,7 +459,7 @@ export default function Tasks() {
         {Object.entries(statusConfig).map(([key, cfg]) => {
           const Icon = cfg.icon;
           return (
-            <div key={key} className="glass-surface rounded-xl p-3 sm:p-4 flex items-center gap-3 border border-border/20 min-w-0">
+            <button type="button" aria-label={`Ver tarefas ${cfg.label.toLowerCase()}s`} onClick={()=>{setView(isClosedTask({status:key})?'historico':'quadro');setFilterStatus(key);if(isClosedTask({status:key}))setHistoryPeriod('todos')}} key={key} className="text-left glass-surface rounded-xl p-3 sm:p-4 flex items-center gap-3 border border-border/20 min-w-0">
               <div className={`p-2 rounded-lg shrink-0 ${cfg.color.split(' ')[0]}`}>
                 <Icon className={`w-4 h-4 ${cfg.color.split(' ')[1]}`} />
               </div>
@@ -448,30 +467,33 @@ export default function Tasks() {
                 <p className="text-xl sm:text-2xl font-bold text-foreground">{counts[key as keyof typeof counts]}</p>
                 <p className="text-xs text-muted-foreground truncate">{cfg.label}</p>
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
 
+      <div className="space-y-3"><div role="tablist" aria-label="Visualização de tarefas" className="inline-flex rounded-lg bg-secondary/50 p-1 gap-1"><Button role="tab" aria-selected={view==='quadro'} variant={view==='quadro'?'default':'ghost'} onClick={()=>{setView('quadro');setFilterStatus('todos')}}>Quadro de trabalho</Button><Button role="tab" aria-selected={view==='historico'} variant={view==='historico'?'default':'ghost'} onClick={()=>{setView('historico');setFilterStatus('todos')}}>Histórico</Button></div>
+      <p className="text-xs text-muted-foreground">{view==='quadro'?'Pendentes e em andamento sem limite de semana. Concluídas e canceladas desta semana ficam recolhidas. Consulte os demais períodos no Histórico.':'Filtre pela data real de conclusão ou cancelamento. Tarefas antigas sem essa informação ficam em “Sem data registrada” ou “Todo o histórico”.'}</p>
+      {view==='historico'&&<div className="flex gap-3 flex-wrap items-end"><div><Label htmlFor="task-history-period">Período de encerramento</Label><select id="task-history-period" value={historyPeriod} onChange={e=>setHistoryPeriod(e.target.value)} className="block h-10 rounded-md bg-secondary border border-border px-3 text-sm mt-1"><option value="semana">Esta semana</option><option value="anterior">Semana passada</option><option value="mes">Este mês</option><option value="todos">Todo o histórico</option><option value="sem_data">Sem data registrada</option><option value="custom">Período personalizado</option></select></div>{historyPeriod==='custom'&&<><div><Label htmlFor="closed-from">Encerradas a partir de</Label><Input id="closed-from" type="date" value={historyFrom} onChange={e=>setHistoryFrom(e.target.value)}/></div><div><Label htmlFor="closed-to">Encerradas até</Label><Input id="closed-to" type="date" min={historyFrom||undefined} value={historyTo} onChange={e=>setHistoryTo(e.target.value)}/></div></>}</div>}
+      </div>
       {/* Search & Filter */}
       <div className="flex gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="Buscar tarefas..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 bg-secondary/50 border-border/50" />
+          <Input aria-label="Buscar tarefas" placeholder="Buscar tarefas..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 bg-secondary/50 border-border/50" />
         </div>
-        <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-44 bg-secondary/50 border-border/50">
+        <Select value={filterStatus} onValueChange={value=>{setFilterStatus(value);if(isClosedTask({status:value})&&view==='quadro'){setView('historico');setHistoryPeriod('todos')}}}>
+          <SelectTrigger aria-label="Filtrar status das tarefas" className="w-44 bg-secondary/50 border-border/50">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">Todos os Status</SelectItem>
-            <SelectItem value="pendente">Pendente</SelectItem>
-            <SelectItem value="em andamento">Em Andamento</SelectItem>
+            {view!=='historico'&&<><SelectItem value="pendente">Pendente</SelectItem><SelectItem value="em andamento">Em Andamento</SelectItem></>}
             <SelectItem value="concluída">Concluída</SelectItem>
             <SelectItem value="cancelada">Cancelada</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={filterPeriod} onValueChange={(v) => { setFilterPeriod(v); if (v !== 'custom') { setDateFrom(undefined); setDateTo(undefined); } }}>
+        {view==='quadro'&&<Select value={filterPeriod} onValueChange={(v) => { setFilterPeriod(v); if (v !== 'custom') { setDateFrom(undefined); setDateTo(undefined); } }}>
           <SelectTrigger className="w-44 bg-secondary/50 border-border/50">
             <SelectValue placeholder="Período" />
           </SelectTrigger>
@@ -483,11 +505,14 @@ export default function Tasks() {
             <SelectItem value="sem_data">Sem Data</SelectItem>
             <SelectItem value="custom">Período Personalizado</SelectItem>
           </SelectContent>
-        </Select>
+        </Select>}
       </div>
 
+      <details className="rounded-lg border border-border/40 bg-secondary/10 p-3"><summary className="cursor-pointer text-sm font-medium flex items-center gap-2 min-h-10"><Filter size={16}/>Filtros e ordenação{(filterClient!=='todos'||filterPriority!=='todos'||sort!=='prazo')&&<Badge variant="outline">Ativos</Badge>}</summary>
+      <div className="flex gap-3 flex-wrap pt-3"><select aria-label="Filtrar tarefas por cliente" value={filterClient} onChange={e=>setFilterClient(e.target.value)} className="h-10 max-w-full rounded-md border border-border bg-secondary px-3 text-sm"><option value="todos">Todos os clientes</option>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><select aria-label="Filtrar prioridade das tarefas" value={filterPriority} onChange={e=>setFilterPriority(e.target.value)} className="h-10 rounded-md border border-border bg-secondary px-3 text-sm"><option value="todos">Todas as prioridades</option><option value="alta">Alta</option><option value="média">Média</option><option value="baixa">Baixa</option></select><select aria-label="Ordenar tarefas" value={sort} onChange={e=>setSort(e.target.value)} className="h-10 rounded-md border border-border bg-secondary px-3 text-sm"><option value="prazo">{view==='historico'?'Encerradas mais recentes':'Prazo mais próximo'}</option><option value="prioridade">Prioridade</option><option value="titulo">Título</option></select><Button variant="ghost" onClick={()=>{setSearch('');setFilterStatus('todos');setFilterPeriod('todos');setFilterClient('todos');setFilterPriority('todos');setDateFrom(undefined);setDateTo(undefined);setSort('prazo');setHistoryPeriod('semana');setHistoryFrom('');setHistoryTo('')}}>Limpar filtros</Button></div>
+      </details>
       {/* Custom date range */}
-      {filterPeriod === 'custom' && (
+      {view==='quadro' && filterPeriod === 'custom' && (
         <div className="flex gap-3 items-center flex-wrap">
           <Popover>
             <PopoverTrigger asChild>
@@ -521,16 +546,16 @@ export default function Tasks() {
       )}
 
       {/* Kanban board */}
-      {filtered.length === 0 ? (
+      {view==='historico'&&filtered.length === 0 ? (
         <div className="text-center py-16">
           <CheckCircle2 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
           <p className="text-muted-foreground">Nenhuma tarefa encontrada.</p>
-          <Button onClick={openNew} variant="outline" className="mt-4 gap-2"><Plus className="w-4 h-4" /> Criar primeira tarefa</Button>
+          <Button onClick={openNew} variant="outline" className="mt-4 gap-2"><Plus className="w-4 h-4" /> Criar tarefa</Button>
         </div>
       ) : (
         <div className="overflow-x-auto pb-2 -mx-4 lg:-mx-6 px-4 lg:px-6">
-          <div className="flex gap-4 min-w-max lg:min-w-0 lg:grid lg:grid-cols-4">
-            {(['pendente', 'em andamento', 'concluída', 'cancelada'] as const).map(statusKey => {
+          <div className={`flex gap-4 min-w-max lg:min-w-0 lg:grid ${view==='historico'?'lg:grid-cols-2':'lg:grid-cols-4'}`}>
+            {(['pendente', 'em andamento', 'concluída', 'cancelada'] as const).filter(status=>(view!=='historico'||isClosedTask({status}))&&(filterStatus==='todos'||filterStatus===status)).map(statusKey => {
               const tasksInStatus = filtered.filter(t => t.status === statusKey);
               const cfg = statusConfig[statusKey];
               const Icon = cfg.icon;
@@ -538,6 +563,7 @@ export default function Tasks() {
               return (
                 <div
                   key={statusKey}
+                  role="region" aria-label={`Coluna ${statusConfig[statusKey].label}`}
                   onDragOver={(e) => { e.preventDefault(); if (dragOverStatus !== statusKey) setDragOverStatus(statusKey); }}
                   onDragLeave={(e) => {
                     if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverStatus(null);
@@ -550,7 +576,7 @@ export default function Tasks() {
                     setDraggingId(null);
                     setDragOverStatus(null);
                   }}
-                  className={`w-80 lg:w-auto shrink-0 glass-surface rounded-xl border flex flex-col max-h-[calc(100vh-360px)] min-h-[300px] transition-colors ${
+                  className={`w-80 lg:w-auto shrink-0 glass-surface rounded-xl border flex flex-col max-h-[calc(100vh-360px)] min-h-[240px] transition-colors ${
                     dragOverStatus === statusKey ? 'border-primary/60 bg-primary/5' : 'border-border/20'
                   }`}
                 >
@@ -563,8 +589,9 @@ export default function Tasks() {
                     <Badge variant="outline" className={`text-[10px] ${cfg.color}`}>{tasksInStatus.length}</Badge>
                   </div>
 
+                  {view==='quadro'&&isClosedTask({status:statusKey})&&<div className="p-2 space-y-2"><Button variant="ghost" className="w-full min-h-11 text-xs" aria-expanded={!!closedExpanded[statusKey]} onClick={()=>setClosedExpanded(current=>({...current,[statusKey]:!current[statusKey]}))}>{closedExpanded[statusKey]?'Recolher':'Mostrar'} {cfg.label.toLowerCase()}s desta semana ({tasksInStatus.length})</Button><Button variant="outline" className="w-full min-h-11 text-xs" onClick={()=>{setView('historico');setFilterStatus(statusKey);setHistoryPeriod('todos')}}>Ver todo o histórico</Button></div>}
                   {/* Column body */}
-                  <ScrollArea className="flex-1">
+                  {(view==='historico'||!isClosedTask({status:statusKey})||closedExpanded[statusKey])&&<ScrollArea className="flex-1">
                     <div className="p-2 space-y-2">
                       {tasksInStatus.length === 0 ? (
                         <p className="text-xs text-muted-foreground text-center py-8">Solte aqui</p>
@@ -580,6 +607,7 @@ export default function Tasks() {
                           return (
                             <div
                               key={t.id}
+                              role="article" aria-label={t.title}
                               draggable
                               onDragStart={(e) => {
                                 setDraggingId(t.id);
@@ -591,7 +619,7 @@ export default function Tasks() {
                                 draggingId === t.id ? 'opacity-40' : ''
                               }`}
                             >
-                              <div className="flex items-start justify-between gap-2 mb-2">
+                              <div className="flex flex-col gap-2 mb-2">
                                 <div
                                   className="flex-1 min-w-0 cursor-pointer"
                                   onClick={() => setDetailTask(t)}
@@ -600,10 +628,10 @@ export default function Tasks() {
                                     {t.title}
                                   </h3>
                                 </div>
-                                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                <div className="flex items-center gap-1 shrink-0">
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                      <button className="p-1 rounded hover:bg-secondary" title="Alterar status">
+                                      <button className="min-w-11 min-h-11 flex items-center justify-center rounded hover:bg-secondary" aria-label={`Alterar status de ${t.title}`} title="Alterar status">
                                         <StatusIcon className={`w-3.5 h-3.5 ${sc.color.split(' ')[1]}`} />
                                       </button>
                                     </DropdownMenuTrigger>
@@ -619,12 +647,12 @@ export default function Tasks() {
                                       })}
                                     </DropdownMenuContent>
                                   </DropdownMenu>
-                                  <button onClick={() => openEdit(t)} className="p-1 rounded hover:bg-secondary text-muted-foreground" title="Editar">
+                                  <button onClick={() => openEdit(t)} className="min-w-11 min-h-11 flex items-center justify-center rounded hover:bg-secondary text-muted-foreground" aria-label={`Editar ${t.title}`} title="Editar">
                                     <Edit2 className="w-3.5 h-3.5" />
                                   </button>
                                   <AlertDialog>
                                     <AlertDialogTrigger asChild>
-                                      <button className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-destructive" title="Excluir">
+                                      <button className="min-w-11 min-h-11 flex items-center justify-center rounded hover:bg-secondary text-muted-foreground hover:text-destructive" aria-label={`Excluir ${t.title}`} title="Excluir">
                                         <Trash2 className="w-3.5 h-3.5" />
                                       </button>
                                     </AlertDialogTrigger>
@@ -652,6 +680,8 @@ export default function Tasks() {
                                 )}
                               </div>
 
+                              {isClosedTask(t)&&<Button variant="outline" size="sm" className="min-h-11 w-full mt-2" aria-label={`Reabrir ${t.title}`} onClick={()=>void changeStatus(t,'pendente')}>Reabrir tarefa</Button>}
+                              {isClosedTask(t)&&<p className="text-[11px] text-muted-foreground mt-2">{t.closed_at?`${t.status==='concluída'?'Concluída':'Cancelada'} em ${new Date(t.closed_at).toLocaleString('pt-BR')}`:'Data de encerramento não registrada'}</p>}
                               {clientName && (
                                 <div className="mt-2 cursor-pointer" onClick={() => setDetailTask(t)}>
                                   <span className="text-xs text-primary flex items-center gap-1">
@@ -685,7 +715,7 @@ export default function Tasks() {
                         })
                       )}
                     </div>
-                  </ScrollArea>
+                  </ScrollArea>}
                 </div>
               );
             })}
@@ -1005,7 +1035,7 @@ export default function Tasks() {
                 Ao marcar como concluída, uma nova ocorrência será criada automaticamente com as datas avançadas.
               </p>
             )}
-            <Button onClick={save} className="w-full neon-glow">Salvar</Button>
+            <Button disabled={saving} onClick={save} className="w-full neon-glow">Salvar</Button>
           </div>
         </DialogContent>
       </Dialog>
