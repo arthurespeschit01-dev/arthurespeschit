@@ -22,8 +22,7 @@ const STEPS: Step[] = [
   { icon: "📈", title: "Planilha de acompanhamento", description: "Acompanhe métricas e indicadores dos clientes de forma organizada, com visão consolidada do desempenho.", target: "nav-planilha" },
   { icon: "📄", title: "Controle seus contratos", description: "Registre contratos com valor, início e vencimento. Receba notificações por email antes do contrato vencer.", target: "nav-contratos" },
   { icon: "🔗", title: "Gerador de UTMs", description: "Crie links rastreáveis para suas campanhas com parâmetros UTM padronizados.", target: "nav-utms" },
-  { icon: "📁", title: "Processos, Scripts e mais", description: "Acesse Processo de Onboarding, Estudos de Caso, Scripts de vendas e respostas para Objeções.", target: "nav-processos" },
-  { icon: "🔔", title: "Notificações e configurações", description: "Configure alertas por email para vencimentos, pagamentos atrasados, tasks urgentes e saldo baixo.", target: "nav-config" },
+  { icon: "🔔", title: "Notificações e configurações", description: "Acesse processos, estudos de caso, scripts e objeções. Configure também integrações e alertas por email.", target: "nav-config" },
   { icon: "🚀", title: "Sua Central está pronta!", description: "Comece agora cadastrando seu primeiro cliente ou explore o dashboard." },
 ];
 

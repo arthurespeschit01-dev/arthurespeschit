@@ -163,7 +163,7 @@ export default function AgencyForms() {
     <div className="space-y-4">
       <div className="flex justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold">Formulários</h2>
+          <h1 className="text-2xl font-bold">Formulários</h1>
           <p className="text-sm text-muted-foreground">
             Crie briefings, onboarding e formulários internos. Compartilhe o
             link para receber respostas.

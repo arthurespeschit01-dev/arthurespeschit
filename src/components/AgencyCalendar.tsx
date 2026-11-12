@@ -44,7 +44,7 @@ export default function AgencyCalendar() {
  };
  const visible=events.filter(e=>showPast || (new Date(e.ends_at)>=new Date() && e.status==='agendado'));
  return <div className="space-y-5">
-  <div className="flex justify-between gap-3 flex-wrap"><div><h2 className="text-xl font-semibold">Agendamentos</h2><p className="text-sm text-muted-foreground">Cadastre e acompanhe seus compromissos na Central do Gestor.</p></div><Button variant="outline" onClick={()=>void load()} disabled={busy}>Atualizar agendamentos</Button></div>
+  <div className="flex justify-between gap-3 flex-wrap"><div><h1 className="text-2xl font-bold">Agendamentos</h1><p className="text-sm text-muted-foreground">Cadastre e acompanhe seus compromissos na Central do Gestor.</p></div><Button variant="outline" onClick={()=>void load()} disabled={busy}>Atualizar agendamentos</Button></div>
   {error && <p role="alert" className="border border-destructive/40 rounded-lg p-4">{error}</p>}
   <form onSubmit={save} className="rounded-xl border p-5 space-y-3">
    <h3 className="font-semibold">{editing ? 'Editar agendamento' : 'Novo agendamento'}</h3>

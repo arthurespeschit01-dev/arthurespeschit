@@ -530,11 +530,12 @@ try {
   await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
   await page.getByLabel('Buscar página',{exact:true}).fill('Formulários');
   await page.getByRole('navigation').getByRole('link',{name:'Formulários',exact:true}).click();
-  await page.getByRole('heading',{name:'Comercial',exact:true}).waitFor();
+  await page.getByRole('heading',{name:'Formulários',exact:true}).waitFor();
   await page.waitForFunction(()=>document.querySelector('nav')?.getBoundingClientRect().right<=0);
   await page.goto(`${base}/comercial/crm`);
   await page.setViewportSize({width:390,height:844});
-  await page.getByRole("tab", { name: "Formulários", exact: true }).click();
+  await page.getByRole("button",{name:"Abrir menu",exact:true}).click();
+  await page.getByRole("navigation").getByRole("link", { name: "Formulários", exact: true }).click();
   await page
     .getByRole("button", { name: "Novo formulário", exact: true })
     .click();
@@ -574,7 +575,8 @@ try {
   await page.getByText('Nenhum formulário criado.',{exact:true}).waitFor();
   assert.equal((await db.query('select count(*)::int n from agency_form_responses')).rows[0].n,0);
 
-  await page.getByRole('tab',{name:'Agendamentos',exact:true}).click();
+  await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
+  await page.getByRole('navigation').getByRole('link',{name:'Agendamentos',exact:true}).click();
   assert.equal(await page.getByRole('button',{name:'Conectar Google Agenda',exact:true}).count(),0);
   await page.getByLabel('Título do agendamento',{exact:true}).fill('Reunião manual de onboarding');
   await page.getByLabel('Início',{exact:true}).fill('2026-12-01T10:00');

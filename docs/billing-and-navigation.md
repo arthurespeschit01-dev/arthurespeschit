@@ -21,7 +21,7 @@ O Chronos apresenta Comercial, Operacional e Gestão como áreas integradas. O C
 - Operações fica imediatamente abaixo de Clientes: chamados, acompanhamento, relatórios, tarefas e onboarding.
 - Comercial reúne dashboard, CRM, conversas, formulários e agendamentos.
 - Gestão reúne financeiro e contratos.
-- Processos guarda os materiais de trabalho existentes; Ferramentas guarda UTMs.
+- Configurações reúne Processos e materiais: onboarding, estudos de caso, scripts e objeções. Ferramentas guarda UTMs.
 - Configurações fica depois dos módulos, fora das ações da rotina.
 
 O logo ocupa menos espaço; a busca revela destinos dentro de pastas fechadas; o caminho da página mostra a localização; o menu no celular abre com os nomes e fecha ao navegar. Todas as rotas anteriores continuam válidas. Nenhuma funcionalidade foi removida.

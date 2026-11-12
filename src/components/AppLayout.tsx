@@ -1,3 +1,4 @@
+import {settingsResources} from '@/lib/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import NotificationBar from '@/components/NotificationBar';
@@ -8,7 +9,7 @@ import OnboardingTour from '@/components/OnboardingTour';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ClipboardList,
-  BookOpen, FileText, MessageSquare, ShieldAlert,
+  FileText, MessageSquare,
   BarChart3, LogOut, Zap, Menu, X, ListTodo, ChevronDown, Folder, Link2, Search, DollarSign, PanelLeftClose, PanelLeftOpen, Settings
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -45,13 +46,6 @@ const comercialSubItems = [
   { to: '/comercial/agendamentos', label: 'Agendamentos', icon: ClipboardList },
 ];
 
-const processosSubItems = [
-  { to: '/processos', label: 'Processo de Onboarding', icon: ClipboardList },
-  { to: '/estudos', label: 'Estudos de Caso', icon: BookOpen },
-  { to: '/scripts', label: 'Scripts', icon: MessageSquare },
-  { to: '/objecoes', label: 'Objeções', icon: ShieldAlert },
-];
-
 const SIDEBAR_COLLAPSED_KEY = 'sidebar:collapsed';
 const SIDEBAR_ICON_CLASS = 'w-5 h-5 shrink-0';
 const SIDEBAR_ICON_BUTTON_CLASS = 'flex items-center justify-center w-10 h-10 rounded-lg';
@@ -85,28 +79,26 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (typeof window === 'undefined') return false;
     return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1';
   });
-  const [processosOpen, setProcessosOpen] = useState(() => processosSubItems.some(item => pathname === item.to));
-  const [comercialOpen, setComercialOpen] = useState(() => pathname.startsWith('/comercial'));
+  const [comercialOpen, setComercialOpen] = useState(() => comercialSubItems.some(item=>item.to===pathname));
   const [operacoesOpen, setOperacoesOpen] = useState(() => operacoesSubItems.some(item => pathname === item.to));
   useEffect(() => {
     setNavSearch('');setSidebarOpen(false);
     if(gestaoSubItems.some(item=>item.to===pathname))setGestaoOpen(true);
     if(ferramentasSubItems.some(item=>item.to===pathname))setFerramentasOpen(true);
-    if (pathname.startsWith('/comercial')) setComercialOpen(true);
+    setComercialOpen(comercialSubItems.some(item=>item.to===pathname));
     if (operacoesSubItems.some(item => item.to === pathname)) setOperacoesOpen(true);
-    if (processosSubItems.some(item => item.to === pathname)) setProcessosOpen(true);
   }, [pathname]);
 
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
       const next = !prev;
       try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? '1' : '0'); } catch {}
-      if (next) { setProcessosOpen(false); setOperacoesOpen(false); setComercialOpen(false); }
+      if (next) { setOperacoesOpen(false); setComercialOpen(false); }
       return next;
     });
   };
 
-  const renderNavGroup = (group: { name: string; id: string; items: typeof processosSubItems; open: boolean; setOpen: (open: boolean) => void }) => {
+  const renderNavGroup = (group: { name: string; id: string; items: {to:string;label:string;icon:LucideIcon}[]; open: boolean; setOpen: (open: boolean) => void }) => {
               const query=navSearch.trim().toLocaleLowerCase('pt-BR');
               const items=group.items.filter(item=>!query||`${group.name} ${item.label}`.toLocaleLowerCase('pt-BR').includes(query));
               if(!items.length)return null;
@@ -131,8 +123,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   };
 
-  const currentGroup=[{name:'Operações',items:operacoesSubItems},{name:'Comercial',items:comercialSubItems},{name:'Gestão',items:gestaoSubItems},{name:'Processos',items:processosSubItems},{name:'Ferramentas',items:ferramentasSubItems}].find(group=>group.items.some(item=>item.to===pathname));
-  const currentPage=[...mainNavItems,...operacoesSubItems,...comercialSubItems,...gestaoSubItems,...processosSubItems,...ferramentasSubItems].find(item=>item.to===pathname)?.label||(pathname.startsWith('/clientes/')?'Detalhes do cliente':'Central do Gestor');
+  const currentGroup=[{name:'Operações',items:operacoesSubItems},{name:'Comercial',items:comercialSubItems},{name:'Gestão',items:gestaoSubItems},{name:'Configurações',items:settingsResources},{name:'Ferramentas',items:ferramentasSubItems}].find(group=>group.items.some(item=>item.to===pathname));
+  const currentPage=[...mainNavItems,...operacoesSubItems,...comercialSubItems,...gestaoSubItems,...settingsResources,...ferramentasSubItems].find(item=>item.to===pathname)?.label||(pathname.startsWith('/clientes/')?'Detalhes do cliente':'Central do Gestor');
   const asideWidth = collapsed ? 'lg:w-16' : 'lg:w-64';
 
 
@@ -190,9 +182,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             })}
 
             {renderNavGroup({name:'Gestão',id:'gestao',items:gestaoSubItems,open:gestaoOpen,setOpen:setGestaoOpen})}
-            {renderNavGroup({ name: 'Processos', id: 'processos', items: processosSubItems, open: processosOpen, setOpen: setProcessosOpen })}
             {renderNavGroup({name:'Ferramentas',id:'ferramentas',items:ferramentasSubItems,open:ferramentasOpen,setOpen:setFerramentasOpen})}
-            {(!navSearch||'configurações'.includes(navSearch.toLocaleLowerCase('pt-BR')))&&<NavLink to="/configuracoes" data-tour-id="nav-config" aria-label="Configurações" className={({isActive})=>`${collapsed?SIDEBAR_ICON_BUTTON_CLASS:'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm'} mt-3 border-t border-sidebar-border ${isActive?'bg-primary/15 text-primary':'text-sidebar-foreground hover:bg-sidebar-accent'}`}><SidebarIcon icon={Settings}/>{!collapsed&&<span>Configurações</span>}</NavLink>}
+            {(!navSearch||'configurações'.includes(navSearch.toLocaleLowerCase('pt-BR')))&&<NavLink to="/configuracoes" data-tour-id="nav-config" aria-label="Configurações" className={({isActive})=>`${collapsed?SIDEBAR_ICON_BUTTON_CLASS:'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm'} mt-3 border-t border-sidebar-border ${isActive||settingsResources.some(item=>item.to===pathname)?'bg-primary/15 text-primary':'text-sidebar-foreground hover:bg-sidebar-accent'}`}><SidebarIcon icon={Settings}/>{!collapsed&&<span>Configurações</span>}</NavLink>}
           </nav>
 
           <div className={`p-3 border-t border-sidebar-border ${collapsed ? 'flex flex-col items-center gap-1' : 'space-y-1'}`}>

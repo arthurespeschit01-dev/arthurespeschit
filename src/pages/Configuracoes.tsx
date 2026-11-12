@@ -1,3 +1,5 @@
+import {Link} from 'react-router-dom';
+import {settingsResources} from '@/lib/navigation';
 import AgencyWhatsApp from '@/components/AgencyWhatsApp';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -99,12 +101,13 @@ export default function Configuracoes() {
   }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
         <Bell className="w-6 h-6 text-primary" />
         <h1 className="text-2xl font-bold text-foreground">Configurações</h1>
       </div>
 
+      <section className="rounded-xl border bg-card p-4 sm:p-6 space-y-4" aria-labelledby="settings-resources"><h2 id="settings-resources" className="text-lg font-semibold">Processos e materiais</h2><p className="text-sm text-muted-foreground">Organize os processos e consulte os materiais de apoio da agência.</p><div className="grid sm:grid-cols-2 gap-3">{settingsResources.map(item=><Link key={item.to} to={item.to} className="rounded-lg border p-4 hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><h3 className="font-medium">{item.label}</h3><p className="text-xs text-muted-foreground mt-1">{item.description}</p></Link>)}</div></section>
       <AgencyWhatsApp />
 
       <div className="bg-card border border-border rounded-xl p-6 space-y-5">

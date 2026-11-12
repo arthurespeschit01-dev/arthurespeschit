@@ -6,23 +6,23 @@
 
 @layer base {
   :root, .dark {
-    --background: 230 20% 4%;
-    --foreground: 220 20% 92%;
+    --background: 224 22% 12%;
+    --foreground: 220 20% 95%;
 
-    --card: 232 25% 7%;
-    --card-foreground: 220 20% 92%;
+    --card: 224 21% 17%;
+    --card-foreground: 220 20% 95%;
 
-    --popover: 232 25% 7%;
-    --popover-foreground: 220 20% 92%;
+    --popover: 224 21% 19%;
+    --popover-foreground: 220 20% 95%;
 
     --primary: 263 70% 58%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 232 30% 12%;
-    --secondary-foreground: 220 20% 85%;
+    --secondary: 224 20% 21%;
+    --secondary-foreground: 220 20% 90%;
 
-    --muted: 232 20% 14%;
-    --muted-foreground: 220 10% 55%;
+    --muted: 224 17% 22%;
+    --muted-foreground: 220 12% 73%;
 
     --accent: 217 91% 53%;
     --accent-foreground: 0 0% 100%;
@@ -30,27 +30,27 @@
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 10% 12%;
-    --input: 232 20% 14%;
-    --ring: 263 70% 58%;
+    --border: 222 16% 30%;
+    --input: 222 16% 30%;
+    --ring: 263 85% 75%;
 
     --radius: 0.75rem;
 
-    --sidebar-background: 232 28% 6%;
-    --sidebar-foreground: 220 15% 70%;
+    --sidebar-background: 224 24% 14%;
+    --sidebar-foreground: 220 16% 82%;
     --sidebar-primary: 263 70% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 232 25% 12%;
-    --sidebar-accent-foreground: 220 20% 92%;
-    --sidebar-border: 220 10% 10%;
-    --sidebar-ring: 263 70% 58%;
+    --sidebar-accent: 224 22% 22%;
+    --sidebar-accent-foreground: 220 20% 95%;
+    --sidebar-border: 222 17% 27%;
+    --sidebar-ring: 263 85% 75%;
 
     --neon-purple: 263 70% 58%;
     --neon-purple-light: 263 85% 75%;
     --neon-blue: 217 91% 53%;
     --neon-blue-light: 199 89% 61%;
-    --surface: 232 28% 8%;
-    --surface-hover: 232 25% 12%;
+    --surface: 224 22% 18%;
+    --surface-hover: 224 21% 24%;
   }
 
   .light {
@@ -163,14 +163,14 @@
   width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: hsl(232 28% 6%);
+  background: hsl(var(--sidebar-background));
 }
 ::-webkit-scrollbar-thumb {
-  background: hsl(232 20% 20%);
+  background: hsl(var(--border));
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(232 20% 30%);
+  background: hsl(var(--muted-foreground));
 }
 
 /* ===== Strategy chat markdown ===== */
@@ -278,3 +278,6 @@
   -webkit-overflow-scrolling: touch;
 }
 
+
+/* Keep purple labels readable on the softer dark surfaces. */
+.dark .text-primary { color: hsl(var(--neon-purple-light)); }
