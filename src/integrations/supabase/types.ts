@@ -1041,6 +1041,9 @@ export type Database = {
       }
       operational_tasks: {
         Row: {
+          assignee_user_id: string | null
+          area: string
+          recurrence_anchor: string | null
           assignee_name: string
           recurrence_of: string | null
           client_id: string | null
@@ -1060,6 +1063,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          assignee_user_id?: string | null
+          area?: string
+          recurrence_anchor?: string | null
           assignee_name?: string
           recurrence_of?: string | null
           client_id?: string | null
@@ -1079,6 +1085,9 @@ export type Database = {
           user_id: string
         }
         Update: {
+          assignee_user_id?: string | null
+          area?: string
+          recurrence_anchor?: string | null
           assignee_name?: string
           recurrence_of?: string | null
           client_id?: string | null
@@ -1482,6 +1491,8 @@ export type Database = {
       agency_client_progress_view: { Row: { [K in keyof ClientProgress]: ClientProgress[K] }; Relationships: [] }
     }
     Functions: {
+      agency_tasks_list: {Args:{p_scope:string};Returns:Database['public']['Tables']['operational_tasks']['Row'][]}
+      agency_task_summary: {Args:Record<string,never>;Returns:Json}
       agency_tasks_update: {Args:{p_ids:string[];p_patch:Json};Returns:Database['public']['Tables']['operational_tasks']['Row'][]}
       agency_task_duplicate: {Args:{p_id:string};Returns:string}
       agency_review_form: {Args:{p_response_id:string;p_reviewed:boolean};Returns:undefined};

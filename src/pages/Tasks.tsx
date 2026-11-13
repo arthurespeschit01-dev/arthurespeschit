@@ -19,20 +19,20 @@ import {
   MessageSquare, Send, Filter, Repeat, MoreHorizontal, ListTodo, LayoutGrid, CalendarDays, History
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 
 import type {Task,TaskSubtask,TaskPatch} from '@/lib/tasks';
-import {taskDeadline} from '@/lib/tasks';
+import {taskDeadline,taskIsCurrent,taskScheduleDay,taskAreas,taskStatusColors} from '@/lib/tasks';
 import {TaskTable} from '@/components/tasks/TaskTable';
 import {TaskCalendar} from '@/components/tasks/TaskCalendar';
 import {TaskSubtasks} from '@/components/tasks/TaskSubtasks';
 import {TaskActions} from '@/components/tasks/TaskActions';
 import {TaskProgress} from '@/components/tasks/TaskProgress';
+import {TaskStatusSelect} from '@/components/tasks/TaskStatusSelect';
+import {TaskAssigneeSelect} from '@/components/tasks/TaskAssigneeSelect';
 import {TaskBulkActions} from '@/components/tasks/TaskBulkActions';
 
 const recurrenceLabels: Record<string, string> = {
@@ -80,7 +80,7 @@ interface Comment {
 
 const statusConfig: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   pendente: { label: 'Pendente', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20', icon: Clock },
-  'em andamento': { label: 'Em Andamento', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', icon: AlertCircle },
+  'em andamento': { label: 'Em Andamento', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20', icon: AlertCircle },
   concluída: { label: 'Concluída', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', icon: CheckCircle2 },
   cancelada: { label: 'Cancelada', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20', icon: XCircle },
 };
@@ -107,10 +107,11 @@ export default function Tasks() {
   const [filterAssignee,setFilterAssignee]=useState('todos');
   const [mutating,setMutating]=useState(false);
   const [deleting,setDeleting]=useState<{kind:'task'|'comment'|'attachment';id:string;title:string}|null>(null);
-  const [view,setView]=useState('tabela');
+  const [view,setView]=useState('tabela');const viewRef=useRef(view);viewRef.current=view;
   const [historyPeriod,setHistoryPeriod]=useState('semana');
   const [historyFrom,setHistoryFrom]=useState(''),[historyTo,setHistoryTo]=useState('');
-  const [closedExpanded,setClosedExpanded]=useState<Record<string,boolean>>({});
+  const [filterArea,setFilterArea]=useState('todos');
+  const [summary,setSummary]=useState<Record<string,number|string>>({today:taskDay(new Date().toISOString()),pendente:0,'em andamento':0,'concluída':0,cancelada:0,scheduled:0});
   const [filterClient,setFilterClient]=useState('todos'),[filterPriority,setFilterPriority]=useState('todos'),[sort,setSort]=useState('prazo');
   const [saving,setSaving]=useState(false);
   const [filterStatus, setFilterStatus] = useState('todos');
@@ -122,8 +123,9 @@ export default function Tasks() {
   const [newComment, setNewComment] = useState('');
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
+  const selfName=String(user?.user_metadata?.full_name||user?.user_metadata?.name||user?.email||'Minha conta').slice(0,120);
   const [form, setForm] = useState({
-    title: '', description: '', status: 'pendente', priority: 'média', assignee_name:'',
+    title: '', description: '', status: 'pendente', priority: 'média', assignee_name:'',assignee_user_id:null as string|null,area:'',
     start_date: '', end_date: '', client_id: '',
     recurrence: 'none', recurrence_interval: 1,
     recurrence_days: [] as number[],
@@ -131,15 +133,16 @@ export default function Tasks() {
 
   const load = useCallback(async () => {
     if (!userId) return;const version=++loadSequence.current;
-    const [tasksRes, clientsRes, attachRes, commentsRes, subtaskRes] = await Promise.all([
-      readAllRows((from,to)=>supabase.from('operational_tasks').select('*').eq('user_id',userId).order('created_at',{ascending:false}).order('id').range(from,to)),
+    const [tasksRes, clientsRes, attachRes, commentsRes, subtaskRes, summaryRes] = await Promise.all([
+      readAllRows((from,to)=>supabase.rpc('agency_tasks_list',{p_scope:view==='historico'?'history':view==='calendario'?'planning':'active'}).order('created_at',{ascending:false}).order('id').range(from,to)),
       supabase.from('clients').select('id, name, status').eq('user_id', userId).order('name'),
       supabase.from('task_attachments').select('*').eq('user_id', userId),
       supabase.from('task_comments').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
       readAllRows<TaskSubtask>((a,b)=>supabase.from('agency_task_subtasks').select('*').eq('user_id',userId).order('position').order('created_at').order('id').range(a,b)),
+      supabase.rpc('agency_task_summary'),
     ]);
-    if(version!==loadSequence.current)return;
-    if(tasksRes.error||clientsRes.error||attachRes.error||commentsRes.error||subtaskRes.error){toast.error('Não foi possível carregar as tarefas. Tente novamente.');return;}
+    if(version!==loadSequence.current||view!==viewRef.current)return;
+    if(tasksRes.error||clientsRes.error||attachRes.error||commentsRes.error||subtaskRes.error||summaryRes.error){toast.error('Não foi possível carregar as tarefas. Tente novamente.');return;}
     const normalized: Task[] = (tasksRes.data || []).map((t) => ({
       ...t, assignee_name:t.assignee_name||'',recurrence_of:t.recurrence_of||null,
       recurrence_days: Array.isArray(t.recurrence_days)
@@ -147,12 +150,13 @@ export default function Tasks() {
         : [],
     }));
     setTasks(normalized);
+    setSummary(summaryRes.data as Record<string,number|string>);
     setDetailTask(current=>current?normalized.find(t=>t.id===current.id)||null:null);
     setSubtasks(subtaskRes.data);
     setClients(clientsRes.data || []);
     setAttachments(attachRes.data || []);
     setComments(commentsRes.data || []);
-  },[userId]);
+  },[userId,view]);
 
   useEffect(() => {void load();if(!userId)return;const sequence=loadSequence;let timer:ReturnType<typeof setTimeout>;const refresh=()=>{clearTimeout(timer);timer=setTimeout(()=>{if(!mutationLock.current)void load()},250)};
     let channel=supabase.channel(`tasks-${userId}-${crypto.randomUUID()}`);
@@ -160,18 +164,18 @@ export default function Tasks() {
     channel.subscribe();const interval=setInterval(()=>{if(!document.hidden)refresh()},15000);window.addEventListener('focus',refresh);
     return()=>{++sequence.current;clearTimeout(timer);clearInterval(interval);window.removeEventListener('focus',refresh);void supabase.removeChannel(channel)};
   }, [load,userId]);
-  useEffect(()=>{setSelected(new Set())},[view,search,filterStatus,filterPeriod,filterClient,filterPriority,filterAssignee]);
+  useEffect(()=>{setSelected(new Set())},[view,search,filterStatus,filterPeriod,filterClient,filterPriority,filterAssignee,filterArea]);
 
   const openNew = () => {
     setEditing(null);if(view==='historico')setView('tabela');setFilterStatus('todos');setFilterPeriod('todos');setSearch('');
-    setForm({ title: '', description: '', status: 'pendente', priority: filterPriority==='todos'?'média':filterPriority, start_date: '', end_date: '', client_id: filterClient==='todos'?'':filterClient, recurrence: 'none', recurrence_interval: 1, recurrence_days: [],assignee_name:filterAssignee==='todos'||filterAssignee==='none'?'':filterAssignee });
+    setForm({ title: '', description: '', status: 'pendente', priority: filterPriority==='todos'?'média':filterPriority, start_date: '', end_date: '', client_id: filterClient==='todos'?'':filterClient, recurrence: 'none', recurrence_interval: 1, recurrence_days: [],assignee_name:filterAssignee==='self'?selfName:'',assignee_user_id:filterAssignee==='self'?userId||null:null,area:filterArea==='todos'?'':filterArea });
     setOpen(true);
   };
 
   const openEdit = (t: Task) => {
     setEditing(t);
     setForm({
-      title: t.title, description: t.description || '', status: t.status, priority: t.priority,assignee_name:t.assignee_name||'',
+      title: t.title, description: t.description || '', status: t.status, priority: t.priority,assignee_name:t.assignee_name||'',assignee_user_id:t.assignee_user_id||null,area:t.area||'',
       start_date: t.start_date || '', end_date: t.end_date || '', client_id: t.client_id || '',
       recurrence: t.recurrence || 'none', recurrence_interval: t.recurrence_interval || 1,
       recurrence_days: t.recurrence_days || [],
@@ -183,13 +187,14 @@ export default function Tasks() {
     if(saving||mutationLock.current)return;
     if (!user || !form.title.trim()) { toast.error('Título é obrigatório'); return; }
     const payload = {
-      title: form.title.trim(), description: form.description.trim(), status: form.status,assignee_name:form.assignee_name.trim(),
+      title: form.title.trim(), description: form.description.trim(), status: form.status,assignee_name:form.assignee_name.trim(),assignee_user_id:form.assignee_user_id,area:form.area,
       priority: form.priority, start_date: form.start_date || null, end_date: form.end_date || null,
       client_id: form.client_id && form.client_id !== 'none' ? form.client_id : null,
       recurrence: form.recurrence || 'none',
       recurrence_interval: Math.min(1000,Math.max(1, Number(form.recurrence_interval) || 1)),
       recurrence_days: form.recurrence === 'none' ? [] : [...form.recurrence_days].sort((a, b) => a - b),
     };
+    if(form.recurrence!=='none'&&!form.start_date){toast.error('Defina a data de início da recorrência.');return;}
     if(form.start_date&&form.end_date&&form.start_date>form.end_date){toast.error('O prazo deve ser igual ou posterior à data de início.');return;}
     setSaving(true);
     if (editing) {
@@ -202,7 +207,8 @@ export default function Tasks() {
       toast.success('Tarefa criada!');
     }
     setSaving(false);setOpen(false);
-    load();
+    if(payload.start_date&&payload.start_date>String(summary.today))toast.success('Tarefa agendada. Disponível em Planejamento até a data de início.');
+    void load();
   };
 
   const applyPatch=async(ids:string[],patch:TaskPatch)=>{
@@ -266,7 +272,7 @@ export default function Tasks() {
 
   const filtered = useMemo(() => {
     const now = new Date();
-    const todayStr = taskDay(now.toISOString());
+    const todayStr = String(summary.today)||taskDay(now.toISOString());
 
     return tasks.filter(t => {
       const matchSearch = t.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -275,7 +281,7 @@ export default function Tasks() {
 
       // Period filter — compare as plain date strings (YYYY-MM-DD) to avoid timezone issues
       let matchPeriod = true;
-      const endDateStr = t.end_date || '';
+      const endDateStr = (view==='calendario'?taskScheduleDay(t):t.end_date)||'';
 
       if (filterPeriod === 'custom') {
         if (!endDateStr) { matchPeriod = false; }
@@ -296,21 +302,21 @@ export default function Tasks() {
       } else if (filterPeriod === 'semana') {
         const weekEnd = new Date(todayStr+'T12:00:00Z');weekEnd.setUTCDate(weekEnd.getUTCDate()+7);
         const weekEndStr = weekEnd.toISOString().slice(0,10);
-        matchPeriod = !!endDateStr && endDateStr >= todayStr && endDateStr <= weekEndStr;
+        matchPeriod = view==='calendario'?!!endDateStr&&endDateStr>=todayStr&&endDateStr<=weekEndStr:taskIsCurrent(t,todayStr);
       } else if (filterPeriod === 'sem_data') {
         matchPeriod = !endDateStr;
       }
 
       const closed=isClosedTask(t);
-      const matchView=view==='historico'?closed&&closedInPeriod(t,historyPeriod,historyFrom,historyTo):view==='quadro'?(!closed||closedInPeriod(t,'semana')):!closed;
-      return matchSearch && matchStatus && (view==='historico'||matchPeriod) && matchView && (filterClient==='todos'||t.client_id===filterClient) && (filterPriority==='todos'||t.priority===filterPriority)&&(filterAssignee==='todos'||(filterAssignee==='none'?!t.assignee_name:t.assignee_name===filterAssignee));
+      const matchView=view==='historico'?closed&&closedInPeriod(t,historyPeriod,historyFrom,historyTo):view==='calendario'?!closed:taskIsCurrent(t,todayStr);
+      return matchSearch && matchStatus && (view==='historico'||matchPeriod) && matchView && (filterClient==='todos'||t.client_id===filterClient) && (filterPriority==='todos'||t.priority===filterPriority)&&(filterAssignee==='todos'||(filterAssignee==='none'?!t.assignee_user_id&&!t.assignee_name:t.assignee_user_id===userId))&&(filterArea==='todos'||t.area===filterArea);
     }).sort((a,b)=>{
       if(sort==='titulo')return a.title.localeCompare(b.title,'pt-BR');
       if(sort==='prioridade'){const priority:Record<string,number>={'alta':0,'média':1,'baixa':2};return (priority[a.priority]??3)-(priority[b.priority]??3)||(a.end_date||'9999').localeCompare(b.end_date||'9999');}
       if(view==='historico')return (b.closed_at||'').localeCompare(a.closed_at||'');
       return (a.end_date||'9999').localeCompare(b.end_date||'9999')||a.title.localeCompare(b.title,'pt-BR');
     });
-  }, [tasks, search, filterStatus, filterPeriod, dateFrom, dateTo,view,historyPeriod,historyFrom,historyTo,filterClient,filterPriority,filterAssignee,sort,clients]);
+  }, [tasks, search, filterStatus, filterPeriod, dateFrom, dateTo,view,historyPeriod,historyFrom,historyTo,filterClient,filterPriority,filterAssignee,filterArea,sort,clients,summary.today,userId]);
 
   const getClientName = (clientId: string | null) => {
     if (!clientId) return null;
@@ -320,118 +326,18 @@ export default function Tasks() {
   const getTaskAttachments = (taskId: string) => attachments.filter(a => a.task_id === taskId);
   const getTaskComments = (taskId: string) => comments.filter(c => c.task_id === taskId);
 
-  const counts = useMemo(() => ({
-    pendente: tasks.filter(t => t.status === 'pendente').length,
-    'em andamento': tasks.filter(t => t.status === 'em andamento').length,
-    concluída: tasks.filter(t => t.status === 'concluída').length,
-    cancelada: tasks.filter(t => t.status === 'cancelada').length,
-  }), [tasks]);
-
+  const today=String(summary.today);const currentTasks=tasks.filter(t=>taskIsCurrent(t,today));
+  const quickCounts={todos:currentTasks.length,vencidas:currentTasks.filter(t=>taskDeadline(t,today)==='atrasada').length,hoje:currentTasks.filter(t=>(t.end_date||t.start_date)===today).length};
   return (
-    <div className="animate-fade-in space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Tarefas Operacionais</h1>
-          <p className="text-muted-foreground text-sm mt-1">Planeje entregas, distribua responsáveis e acompanhe cada etapa</p>
-        </div>
-        <Button onClick={openNew} className="neon-glow gap-2 w-full sm:w-auto"><Plus className="w-4 h-4" /> Nova Tarefa</Button>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {Object.entries(statusConfig).map(([key, cfg]) => {
-          const Icon = cfg.icon;
-          return (
-            <button type="button" aria-label={`Ver tarefas ${cfg.label.toLowerCase()}s`} onClick={()=>{setView(isClosedTask({status:key})?'historico':'quadro');setFilterStatus(key);if(isClosedTask({status:key}))setHistoryPeriod('todos')}} key={key} className="text-left glass-surface rounded-xl p-3 sm:p-4 flex items-center gap-3 border border-border/20 min-w-0">
-              <div className={`p-2 rounded-lg shrink-0 ${cfg.color.split(' ')[0]}`}>
-                <Icon className={`w-4 h-4 ${cfg.color.split(' ')[1]}`} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xl sm:text-2xl font-bold text-foreground">{counts[key as keyof typeof counts]}</p>
-                <p className="text-xs text-muted-foreground leading-tight">{cfg.label}</p>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="space-y-3"><div role="tablist" aria-label="Visualização de tarefas" className="grid grid-cols-2 sm:flex w-full sm:w-fit rounded-lg bg-secondary/50 p-1 gap-1">{[{id:'tabela',label:'Tabela',icon:ListTodo},{id:'quadro',label:'Quadro de trabalho',icon:LayoutGrid},{id:'calendario',label:'Calendário',icon:CalendarDays},{id:'historico',label:'Histórico',icon:History}].map(tab=><Button key={tab.id} role="tab" aria-selected={view===tab.id} variant={view===tab.id?'default':'ghost'} className="min-h-11 shrink-0 gap-2" onClick={()=>{setView(tab.id);setFilterStatus('todos')}}><tab.icon size={16}/>{tab.label}</Button>)}</div>
-      <p className="text-xs text-muted-foreground">{view==='quadro'?'Pendentes e em andamento sem limite de semana. Concluídas e canceladas desta semana ficam recolhidas. Consulte os demais períodos no Histórico.':view==='historico'?'Filtre pela data real de conclusão ou cancelamento. Tarefas antigas sem essa informação ficam em “Sem data registrada” ou “Todo o histórico”.':'Tarefas em aberto, com edição rápida. Concluídas e canceladas ficam no Histórico.'}</p>
-      {view==='historico'&&<div className="flex gap-3 flex-wrap items-end"><div><Label htmlFor="task-history-period">Período de encerramento</Label><select id="task-history-period" value={historyPeriod} onChange={e=>setHistoryPeriod(e.target.value)} className="block h-10 rounded-md bg-secondary border border-border px-3 text-sm mt-1"><option value="semana">Esta semana</option><option value="anterior">Semana passada</option><option value="mes">Este mês</option><option value="todos">Todo o histórico</option><option value="sem_data">Sem data registrada</option><option value="custom">Período personalizado</option></select></div>{historyPeriod==='custom'&&<><div><Label htmlFor="closed-from">Encerradas a partir de</Label><Input id="closed-from" type="date" value={historyFrom} onChange={e=>setHistoryFrom(e.target.value)}/></div><div><Label htmlFor="closed-to">Encerradas até</Label><Input id="closed-to" type="date" min={historyFrom||undefined} value={historyTo} onChange={e=>setHistoryTo(e.target.value)}/></div></>}</div>}
-      </div>
-      {/* Search & Filter */}
-      <div className="grid grid-cols-2 sm:flex gap-3 sm:flex-wrap">
-        <div className="relative col-span-2 sm:flex-1 min-w-0 sm:min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input aria-label="Buscar tarefas" placeholder="Buscar tarefas..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 bg-secondary/50 border-border/50" />
-        </div>
-        <Select value={filterStatus} onValueChange={value=>{setFilterStatus(value);if(isClosedTask({status:value})&&view!=='historico'){setView('historico');setHistoryPeriod('todos')}}}>
-          <SelectTrigger aria-label="Filtrar status das tarefas" className="w-full sm:w-44 bg-secondary/50 border-border/50">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos os Status</SelectItem>
-            {view!=='historico'&&<><SelectItem value="pendente">Pendente</SelectItem><SelectItem value="em andamento">Em Andamento</SelectItem></>}
-            <SelectItem value="concluída">Concluída</SelectItem>
-            <SelectItem value="cancelada">Cancelada</SelectItem>
-          </SelectContent>
-        </Select>
-        {view!=='historico'&&<Select value={filterPeriod} onValueChange={(v) => { setFilterPeriod(v); if (v !== 'custom') { setDateFrom(undefined); setDateTo(undefined); } }}>
-          <SelectTrigger aria-label="Filtrar prazo das tarefas" className="w-full sm:w-44 bg-secondary/50 border-border/50">
-            <SelectValue placeholder="Período" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos os Períodos</SelectItem>
-            <SelectItem value="vencidas">Vencidas</SelectItem>
-            <SelectItem value="hoje">Vence Hoje</SelectItem>
-            <SelectItem value="semana">Próx. 7 dias</SelectItem>
-            <SelectItem value="sem_data">Sem Data</SelectItem>
-            <SelectItem value="custom">Período Personalizado</SelectItem>
-          </SelectContent>
-        </Select>}
-      </div>
-
-      {view==='tabela'&&<div className="flex flex-wrap items-center gap-3"><Label htmlFor="task-group">Agrupar por</Label><select id="task-group" value={groupBy} onChange={e=>setGroupBy(e.target.value)} className="h-11 rounded-md border bg-secondary px-3 text-sm"><option value="status">Status</option><option value="cliente">Cliente</option><option value="responsavel">Responsável</option><option value="prioridade">Prioridade</option><option value="nenhum">Sem agrupamento</option></select></div>}
-      <details className="rounded-lg border border-border/40 bg-secondary/10 p-3"><summary className="cursor-pointer text-sm font-medium flex items-center gap-2 min-h-10"><Filter size={16}/>Filtros e ordenação{(filterClient!=='todos'||filterPriority!=='todos'||filterAssignee!=='todos'||sort!=='prazo')&&<Badge variant="outline">Ativos</Badge>}</summary>
-      <div className="flex gap-3 flex-wrap pt-3"><select aria-label="Filtrar tarefas por cliente" value={filterClient} onChange={e=>setFilterClient(e.target.value)} className="h-10 max-w-full rounded-md border border-border bg-secondary px-3 text-sm"><option value="todos">Todos os clientes</option>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><select aria-label="Filtrar prioridade das tarefas" value={filterPriority} onChange={e=>setFilterPriority(e.target.value)} className="h-10 rounded-md border border-border bg-secondary px-3 text-sm"><option value="todos">Todas as prioridades</option><option value="alta">Alta</option><option value="média">Média</option><option value="baixa">Baixa</option></select><select aria-label="Filtrar tarefas por responsável" value={filterAssignee} onChange={e=>setFilterAssignee(e.target.value)} className="h-11 max-w-full rounded-md border border-border bg-secondary px-3 text-sm"><option value="todos">Todos os responsáveis</option><option value="none">Sem responsável</option>{[...new Set(tasks.map(t=>t.assignee_name).filter(Boolean))].sort().map(name=><option key={name} value={name}>{name}</option>)}</select><select aria-label="Ordenar tarefas" value={sort} onChange={e=>setSort(e.target.value)} className="h-10 rounded-md border border-border bg-secondary px-3 text-sm"><option value="prazo">{view==='historico'?'Encerradas mais recentes':'Prazo mais próximo'}</option><option value="prioridade">Prioridade</option><option value="titulo">Título</option></select><Button variant="ghost" onClick={()=>{setSearch('');setFilterStatus('todos');setFilterPeriod('todos');setFilterClient('todos');setFilterPriority('todos');setFilterAssignee('todos');setDateFrom(undefined);setDateTo(undefined);setSort('prazo');setHistoryPeriod('semana');setHistoryFrom('');setHistoryTo('')}}>Limpar filtros</Button></div>
-      </details>
-      {/* Custom date range */}
-      {view!=='historico' && filterPeriod === 'custom' && (
-        <div className="flex gap-3 items-center flex-wrap">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className={cn("w-44 justify-start text-left font-normal bg-secondary/50 border-border/50", !dateFrom && "text-muted-foreground")}>
-                <Calendar className="w-4 h-4 mr-2" />
-                {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Data inicial"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <CalendarComponent mode="single" selected={dateFrom} onSelect={setDateFrom} locale={ptBR} initialFocus className={cn("p-3 pointer-events-auto")} />
-            </PopoverContent>
-          </Popover>
-          <span className="text-muted-foreground text-sm">até</span>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className={cn("w-44 justify-start text-left font-normal bg-secondary/50 border-border/50", !dateTo && "text-muted-foreground")}>
-                <Calendar className="w-4 h-4 mr-2" />
-                {dateTo ? format(dateTo, "dd/MM/yyyy") : "Data final"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <CalendarComponent mode="single" selected={dateTo} onSelect={setDateTo} locale={ptBR} initialFocus className={cn("p-3 pointer-events-auto")} />
-            </PopoverContent>
-          </Popover>
-          {(dateFrom || dateTo) && (
-            <Button variant="ghost" size="sm" onClick={() => { setDateFrom(undefined); setDateTo(undefined); }} className="text-muted-foreground hover:text-foreground">
-              <X className="w-4 h-4 mr-1" /> Limpar
-            </Button>
-          )}
-        </div>
-      )}
-
-      {view!=='historico'&&<div className="flex gap-2 flex-wrap" aria-label="Atalhos de prazo">{[{key:'todos',label:'Em aberto'},{key:'vencidas',label:'Atrasadas'},{key:'hoje',label:'Hoje'},{key:'semana',label:'Próximos 7 dias'}].map(chip=><Button key={chip.key} variant={filterPeriod===chip.key?'secondary':'ghost'} className="min-h-11 text-xs" onClick={()=>setFilterPeriod(chip.key)}>{chip.label} ({tasks.filter(t=>!isClosedTask(t)&&(chip.key==='todos'||chip.key==='vencidas'&&taskDeadline(t)==='atrasada'||chip.key==='hoje'&&taskDeadline(t)==='hoje'||chip.key==='semana'&&!!t.end_date&&t.end_date>=taskDay(new Date().toISOString())&&t.end_date<=new Date(new Date(taskDay(new Date().toISOString())+'T12:00:00Z').getTime()+7*86400000).toISOString().slice(0,10))).length})</Button>)}</div>}
-      {view==='tabela'&&<><TaskBulkActions count={filtered.filter(t=>selected.has(t.id)).length} busy={mutating||saving} onClear={()=>setSelected(new Set())} onApply={async patch=>{const ok=await applyPatch(filtered.filter(t=>selected.has(t.id)).map(t=>t.id),patch);if(ok)toast.success('Tarefas selecionadas atualizadas.');return ok}}/><TaskTable tasks={filtered} clients={clients} subtasks={subtasks} groupBy={groupBy} selected={selected} busy={mutating||saving} onSelect={id=>setSelected(prev=>{const next=new Set(prev);if(next.has(id))next.delete(id);else next.add(id);return next})} onSelectAll={()=>setSelected(prev=>filtered.every(t=>prev.has(t.id))?new Set():new Set(filtered.map(t=>t.id)))} onUpdate={updateTask} onOpen={setDetailTask} onEdit={openEdit} onDuplicate={t=>void duplicate(t)} onDelete={requestDelete}/></>}
+    <div className="animate-fade-in space-y-3" data-task-workspace>
+      <div className="flex items-center justify-between gap-3 flex-wrap"><div><h1 className="text-xl font-bold">Tarefas Operacionais</h1><p className="text-xs text-muted-foreground mt-1">{view==='calendario'?'Planeje as próximas entregas, cada uma na sua data.':view==='historico'?'Consulte as tarefas concluídas e canceladas.':'Sua fila de trabalho: tarefas disponíveis até hoje.'}</p></div><Button onClick={openNew} className="gap-2 min-h-11"><Plus size={16}/>Nova Tarefa</Button></div>
+      <div className="flex flex-wrap gap-2" aria-label="Resumo de tarefas">{Object.entries(statusConfig).map(([key,cfg])=><Button key={key} variant="outline" className="min-h-10 h-auto text-xs gap-2" aria-label={`Ver tarefas ${cfg.label.toLowerCase()}s`} onClick={()=>{setView(isClosedTask({status:key})?'historico':'tabela');setFilterStatus(key);if(isClosedTask({status:key}))setHistoryPeriod('todos')}}><span className="h-2 w-2 rounded-full" style={{backgroundColor:taskStatusColors[key].backgroundColor}}/>{cfg.label}<strong>{summary[key]||0}</strong></Button>)}<Button variant="ghost" className="min-h-10 h-auto text-xs" onClick={()=>{setView('calendario');setFilterStatus('todos');setFilterPeriod('todos')}}>Planejadas ({summary.scheduled||0})</Button></div>
+      <div role="tablist" aria-label="Visualização de tarefas" className="grid grid-cols-2 sm:flex w-full sm:w-fit rounded-lg bg-secondary/50 p-1 gap-1">{[{id:'tabela',label:'Tabela',icon:ListTodo},{id:'quadro',label:'Quadro de trabalho',icon:LayoutGrid},{id:'calendario',label:'Planejamento',icon:CalendarDays},{id:'historico',label:'Histórico',icon:History}].map(tab=><Button key={tab.id} role="tab" aria-selected={view===tab.id} variant={view===tab.id?'default':'ghost'} className="min-h-11 shrink-0 gap-2" onClick={()=>{setView(tab.id);setFilterStatus('todos');setFilterPeriod('todos')}}><tab.icon size={16}/>{tab.label}</Button>)}</div>
+      <div className="flex flex-wrap items-center gap-2"><div className="relative flex-1 min-w-36"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"/><Input aria-label="Buscar tarefas" placeholder="Buscar tarefas..." value={search} onChange={e=>setSearch(e.target.value)} className="pl-9 h-10"/></div>{view==='tabela'&&<select aria-label="Agrupar por" value={groupBy} onChange={e=>setGroupBy(e.target.value)} className="h-10 rounded-md border bg-secondary px-2 text-xs max-w-full"><option value="status">Agrupar: status</option><option value="area">Agrupar: área</option><option value="cliente">Agrupar: cliente</option><option value="responsavel">Agrupar: responsável</option><option value="prioridade">Agrupar: prioridade</option><option value="nenhum">Sem agrupamento</option></select>}
+      <Popover><PopoverTrigger asChild><Button variant="outline" className="h-10 text-xs gap-2"><Filter size={14}/>Filtros e ordenação{(filterClient!=='todos'||filterPriority!=='todos'||filterAssignee!=='todos'||filterArea!=='todos'||filterStatus!=='todos'||filterPeriod!=='todos')&&<span className="h-2 w-2 bg-primary rounded-full"/>}</Button></PopoverTrigger><PopoverContent align="end" className="w-80 max-w-[calc(100vw-2rem)] max-h-[75dvh] overflow-y-auto space-y-3"><div><Label>Cliente</Label><select aria-label="Filtrar tarefas por cliente" value={filterClient} onChange={e=>setFilterClient(e.target.value)} className="w-full h-11 rounded-md border bg-secondary px-2 text-sm"><option value="todos">Todos os clientes</option>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div><div><Label>Área</Label><select aria-label="Filtrar tarefas por área" value={filterArea} onChange={e=>setFilterArea(e.target.value)} className="w-full h-11 rounded-md border bg-secondary px-2 text-sm"><option value="todos">Todas as áreas</option>{taskAreas.map(area=><option key={area} value={area}>{area}</option>)}</select></div><div><Label>Responsável</Label><select aria-label="Filtrar tarefas por responsável" value={filterAssignee} onChange={e=>setFilterAssignee(e.target.value)} className="w-full h-11 rounded-md border bg-secondary px-2 text-sm"><option value="todos">Todos</option><option value="self">{selfName}</option><option value="none">Sem responsável</option></select></div><div><Label>Prioridade</Label><select aria-label="Filtrar prioridade das tarefas" value={filterPriority} onChange={e=>setFilterPriority(e.target.value)} className="w-full h-11 rounded-md border bg-secondary px-2 text-sm"><option value="todos">Todas as prioridades</option><option value="alta">Alta</option><option value="média">Média</option><option value="baixa">Baixa</option></select></div><div><Label>Status</Label><Select value={filterStatus} onValueChange={value=>{setFilterStatus(value);if(isClosedTask({status:value})&&view!=='historico'){setView('historico');setHistoryPeriod('todos')}}}><SelectTrigger aria-label="Filtrar status das tarefas"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="todos">Todos os status</SelectItem>{Object.entries(statusConfig).map(([key,cfg])=><SelectItem key={key} value={key} style={taskStatusColors[key]} className="my-1 min-h-11">{cfg.label}</SelectItem>)}</SelectContent></Select></div><div><Label>Ordenação</Label><select aria-label="Ordenar tarefas" value={sort} onChange={e=>setSort(e.target.value)} className="w-full h-11 rounded-md border bg-secondary px-2 text-sm"><option value="prazo">{view==='historico'?'Mais recentes':'Prazo mais próximo'}</option><option value="prioridade">Prioridade</option><option value="titulo">Título</option></select></div>{view!=='historico'&&<div><Label>Datas</Label><select aria-label="Filtrar prazo das tarefas" value={filterPeriod} onChange={e=>setFilterPeriod(e.target.value)} className="w-full h-11 rounded-md border bg-secondary px-2 text-sm"><option value="todos">Todas as disponíveis</option><option value="vencidas">Atrasadas</option><option value="hoje">Hoje</option><option value="sem_data">Sem prazo</option><option value="custom">Intervalo personalizado</option></select>{filterPeriod==='custom'&&<div className="grid grid-cols-2 gap-2 pt-2"><Input aria-label="Data inicial" type="date" value={dateFrom?format(dateFrom,'yyyy-MM-dd'):''} onChange={e=>setDateFrom(e.target.value?new Date(e.target.value+'T12:00:00'):undefined)}/><Input aria-label="Data final" type="date" value={dateTo?format(dateTo,'yyyy-MM-dd'):''} onChange={e=>setDateTo(e.target.value?new Date(e.target.value+'T12:00:00'):undefined)}/></div>}</div>}<Button variant="ghost" className="w-full min-h-11" onClick={()=>{setSearch('');setFilterStatus('todos');setFilterPeriod('todos');setFilterClient('todos');setFilterPriority('todos');setFilterAssignee('todos');setFilterArea('todos');setDateFrom(undefined);setDateTo(undefined);setSort('prazo');setHistoryPeriod('semana');setHistoryFrom('');setHistoryTo('')}}>Limpar filtros</Button></PopoverContent></Popover></div>
+      {view==='historico'&&<div className="flex gap-2 flex-wrap items-end"><div><Label htmlFor="task-history-period">Período de encerramento</Label><select id="task-history-period" value={historyPeriod} onChange={e=>setHistoryPeriod(e.target.value)} className="block h-10 rounded-md bg-secondary border px-2 text-sm"><option value="semana">Esta semana</option><option value="anterior">Semana passada</option><option value="mes">Este mês</option><option value="todos">Todo o histórico</option><option value="sem_data">Sem data registrada</option><option value="custom">Período personalizado</option></select></div>{historyPeriod==='custom'&&<><Input aria-label="Encerradas a partir de" type="date" value={historyFrom} onChange={e=>setHistoryFrom(e.target.value)} className="w-40"/><Input aria-label="Encerradas até" type="date" value={historyTo} onChange={e=>setHistoryTo(e.target.value)} className="w-40"/></>}</div>}
+      {(view==='tabela'||view==='quadro')&&<div className="flex gap-1 flex-wrap" aria-label="Atalhos de prazo">{[{key:'todos',label:'Disponíveis'},{key:'vencidas',label:'Atrasadas'},{key:'hoje',label:'Hoje'}].map(chip=><Button key={chip.key} variant={filterPeriod===chip.key?'secondary':'ghost'} className="min-h-9 h-9 text-xs" onClick={()=>setFilterPeriod(chip.key)}>{chip.label} ({quickCounts[chip.key as keyof typeof quickCounts]})</Button>)}</div>}
+      {view==='tabela'&&<><TaskBulkActions selfId={userId||'self'} selfName={selfName} count={filtered.filter(t=>selected.has(t.id)).length} busy={mutating||saving} onClear={()=>setSelected(new Set())} onApply={async patch=>{const ok=await applyPatch(filtered.filter(t=>selected.has(t.id)).map(t=>t.id),patch);if(ok)toast.success('Tarefas selecionadas atualizadas.');return ok}}/><TaskTable selfId={userId||'self'} selfName={selfName} tasks={filtered} clients={clients} subtasks={subtasks} groupBy={groupBy} selected={selected} busy={mutating||saving} onSelect={id=>setSelected(prev=>{const next=new Set(prev);if(next.has(id))next.delete(id);else next.add(id);return next})} onSelectAll={()=>setSelected(prev=>filtered.every(t=>prev.has(t.id))?new Set():new Set(filtered.map(t=>t.id)))} onUpdate={updateTask} onOpen={setDetailTask} onEdit={openEdit} onDuplicate={t=>void duplicate(t)} onDelete={requestDelete}/></>}
       {view==='calendario'&&<TaskCalendar tasks={filtered} onOpen={setDetailTask}/>}
       {/* Kanban board */}
       {(view==='quadro'||view==='historico')&&<>
@@ -443,8 +349,8 @@ export default function Tasks() {
         </div>
       ) : (
         <div className="overflow-x-auto pb-2 -mx-4 lg:-mx-6 px-4 lg:px-6">
-          <div className={`flex gap-4 min-w-max lg:min-w-0 lg:grid ${view==='historico'?'lg:grid-cols-2':'lg:grid-cols-4'}`}>
-            {(['pendente', 'em andamento', 'concluída', 'cancelada'] as const).filter(status=>(view!=='historico'||isClosedTask({status}))&&(filterStatus==='todos'||filterStatus===status)).map(statusKey => {
+          <div className={`flex gap-4 min-w-max lg:min-w-0 lg:grid lg:grid-cols-2`}>
+            {(['pendente', 'em andamento', 'concluída', 'cancelada'] as const).filter(status=>(view==='historico'?isClosedTask({status}):!isClosedTask({status}))&&(filterStatus==='todos'||filterStatus===status)).map(statusKey => {
               const tasksInStatus = filtered.filter(t => t.status === statusKey);
               const cfg = statusConfig[statusKey];
               const Icon = cfg.icon;
@@ -478,9 +384,7 @@ export default function Tasks() {
                     <Badge variant="outline" className={`text-[10px] ${cfg.color}`}>{tasksInStatus.length}</Badge>
                   </div>
 
-                  {view==='quadro'&&isClosedTask({status:statusKey})&&<div className="p-2 space-y-2"><Button variant="ghost" className="w-full min-h-11 text-xs" aria-expanded={!!closedExpanded[statusKey]} onClick={()=>setClosedExpanded(current=>({...current,[statusKey]:!current[statusKey]}))}>{closedExpanded[statusKey]?'Recolher':'Mostrar'} {cfg.label.toLowerCase()}s desta semana ({tasksInStatus.length})</Button><Button variant="outline" className="w-full min-h-11 text-xs" onClick={()=>{setView('historico');setFilterStatus(statusKey);setHistoryPeriod('todos')}}>Ver todo o histórico</Button></div>}
-                  {/* Column body */}
-                  {(view==='historico'||!isClosedTask({status:statusKey})||closedExpanded[statusKey])&&<ScrollArea className="flex-1">
+                  <ScrollArea className="flex-1">
                     <div className="p-2 space-y-2">
                       {tasksInStatus.length === 0 ? (
                         <p className="text-xs text-muted-foreground text-center py-8">Solte aqui</p>
@@ -528,8 +432,8 @@ export default function Tasks() {
                                       {Object.entries(statusConfig).map(([key, cfgItem]) => {
                                         const DdIcon = cfgItem.icon;
                                         return (
-                                          <DropdownMenuItem key={key} onClick={() => changeStatus(t, key)} className={t.status === key ? 'bg-secondary' : ''}>
-                                            <DdIcon className={`w-4 h-4 mr-2 ${cfgItem.color.split(' ')[1]}`} />
+                                          <DropdownMenuItem key={key} onClick={() => changeStatus(t, key)} style={taskStatusColors[key]} className="my-1 min-h-11">
+                                            <DdIcon className="w-4 h-4 mr-2" />
                                             {cfgItem.label}
                                           </DropdownMenuItem>
                                         );
@@ -550,6 +454,7 @@ export default function Tasks() {
                                 )}
                               </div>
 
+                              {t.area&&<Badge variant="outline" className="mt-2">{t.area}</Badge>}
                               {t.assignee_name&&<p className="mt-2 text-xs text-muted-foreground">Responsável: {t.assignee_name}</p>}
                               {subtasks.some(item=>item.task_id===t.id)&&<div className="mt-3"><TaskProgress items={subtasks.filter(item=>item.task_id===t.id)}/></div>}
                               {taskDeadline(t)==='atrasada'&&<Badge variant="outline" className="text-destructive mt-2">Atrasada</Badge>}
@@ -588,7 +493,7 @@ export default function Tasks() {
                         })
                       )}
                     </div>
-                  </ScrollArea>}
+                  </ScrollArea>
                 </div>
               );
             })}
@@ -615,6 +520,7 @@ export default function Tasks() {
                     <Badge variant="outline" className={`text-[10px] ${sc.color}`}>{sc.label}</Badge>
                     <Badge variant="outline" className={`text-[10px] ${pc.color}`}>{pc.label}</Badge>
                   </div>
+                  {detailTask.area&&<Badge variant="outline">{detailTask.area}</Badge>}
                   {detailTask.assignee_name&&<p className="text-xs text-muted-foreground">Responsável: {detailTask.assignee_name}</p>}
                   {clientName && <p className="text-sm text-primary mt-1">{clientName}</p>}
                   {(detailTask.start_date || detailTask.end_date) && (
@@ -726,7 +632,7 @@ export default function Tasks() {
               <Label htmlFor="task-title" className="text-muted-foreground text-sm">Título *</Label>
               <Input id="task-title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" placeholder="Ex: Criar campanha Black Friday" />
             </div>
-            <div><Label htmlFor="task-assignee">Responsável</Label><Input id="task-assignee" placeholder="Nome do responsável" maxLength={120} list="task-assignees" value={form.assignee_name} onChange={e=>setForm({...form,assignee_name:e.target.value})}/><datalist id="task-assignees">{[...new Set(tasks.map(t=>t.assignee_name).filter(Boolean))].map(name=><option key={name} value={name}/>)}</datalist><p className="text-xs text-muted-foreground mt-1">Identifica quem cuida da entrega. O acesso à conta permanece o mesmo.</p></div>
+            <div className="grid grid-cols-2 gap-3"><div><Label>Responsável</Label><TaskAssigneeSelect value={form.assignee_user_id} legacyName={form.assignee_user_id?undefined:form.assignee_name} selfId={userId||'self'} selfName={selfName} label="Responsável" onChange={id=>setForm({...form,assignee_user_id:id,assignee_name:id?selfName:''})}/></div><div><Label htmlFor="task-area">Área</Label><select id="task-area" className="w-full h-11 rounded-md bg-secondary border px-2 text-sm" value={form.area} onChange={e=>setForm({...form,area:e.target.value})}><option value="">Sem área</option>{taskAreas.map(area=><option key={area} value={area}>{area}</option>)}</select></div></div>
             <div>
               <Label className="text-muted-foreground text-sm">Descrição</Label>
               <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" rows={3} placeholder="Detalhes da task..." />
@@ -748,15 +654,8 @@ export default function Tasks() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-muted-foreground text-sm">Status</Label>
-                <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                  <SelectTrigger className="bg-secondary/50 border-border/50 mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pendente">Pendente</SelectItem>
-                    <SelectItem value="em andamento">Em Andamento</SelectItem>
-                    <SelectItem value="concluída">Concluída</SelectItem>
-                    <SelectItem value="cancelada">Cancelada</SelectItem>
-                  </SelectContent>
-                </Select>
+                <TaskStatusSelect label="Status da tarefa" value={form.status} onChange={status=>setForm({...form,status})}/>
+
               </div>
               <div>
                 <Label className="text-muted-foreground text-sm">Prioridade</Label>
@@ -773,11 +672,11 @@ export default function Tasks() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-muted-foreground text-sm">Data Início</Label>
-                <Input type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" />
+                <Input aria-label="Data de início" type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" />
               </div>
               <div>
                 <Label className="text-muted-foreground text-sm">Data Fim</Label>
-                <Input type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" />
+                <Input aria-label="Data de entrega" type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">

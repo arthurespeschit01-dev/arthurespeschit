@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCallback } from 'react';
+import {taskDay} from '@/lib/taskViews';
 
 const STALE = 5 * 60_000; // 5 min — dados raramente mudam por segundo
 const GC = 15 * 60_000;   // 15 min em memória
@@ -26,15 +27,14 @@ export function useClientsQuery() {
 export function useTasksQuery() {
   const { user } = useAuth();
   return useQuery({
-    queryKey: ['operational_tasks', user?.id],
+    queryKey: ['operational_tasks', user?.id,taskDay(new Date().toISOString())],
     enabled: !!user,
-    staleTime: STALE,
+    staleTime: 30_000,
+    refetchInterval:30_000,
     gcTime: GC,
     queryFn: async () => {
       const { data } = await supabase
-        .from('operational_tasks')
-        .select('id, title, status, priority, end_date, start_date, recurrence, recurrence_interval, recurrence_days, client_id, description, created_at, updated_at, user_id')
-        .eq('user_id', user!.id)
+        .rpc('agency_tasks_list',{p_scope:'active'})
         .limit(500);
       return data || [];
     },

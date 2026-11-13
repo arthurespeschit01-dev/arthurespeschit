@@ -78,7 +78,7 @@ export default function Dashboard() {
         supabase.from('clients').select('id, name, status, monthly_fee, payment_day, phone').eq('user_id', user.id),
         supabase.from('mensalidades').select('*').eq('user_id', user.id).gte('vencimento', inicioMes).lte('vencimento', fimMes),
         supabase.from('transacoes').select('*').eq('user_id', user.id).gte('data', inicioMes).lte('data', fimMes),
-        supabase.from('operational_tasks').select('id, title, status, priority, end_date').eq('user_id', user.id).neq('status', 'concluída').order('end_date', { ascending: true, nullsFirst: false }).limit(6),
+        supabase.rpc('agency_tasks_list',{p_scope:'active'}).order('end_date', { ascending: true, nullsFirst: false }).limit(6),
         supabase.from('signed_contracts').select('id, title, client_name, expiry_date').eq('user_id', user.id).not('expiry_date', 'is', null).order('expiry_date', { ascending: true }),
         supabase.from('transacoes').select('tipo, valor, data').eq('user_id', user.id).gte('data', inicio6Meses),
         supabase.from('mensalidades').select('valor, status, vencimento').eq('user_id', user.id).gte('vencimento', inicio6Meses),
@@ -446,11 +446,11 @@ export default function Dashboard() {
       {/* Tasks em andamento */}
       <div className="glass-surface rounded-xl p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-foreground">Integrações em andamento</h2>
+          <h2 className="text-lg font-semibold text-foreground">Tarefas disponíveis</h2>
           <button onClick={() => navigate('/tasks')} className="text-xs text-primary hover:underline flex items-center gap-1">Ver todas <ArrowUpRight className="w-3 h-3" /></button>
         </div>
         {tasks.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">Nenhuma task pendente 🎉</p>
+          <p className="text-sm text-muted-foreground text-center py-4">Nenhuma tarefa disponível hoje.</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {tasks.map(t => (

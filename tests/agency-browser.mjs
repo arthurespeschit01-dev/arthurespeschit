@@ -50,6 +50,7 @@ for (const name of [
   "20261112201959_forms_deletion_finance_alignment.sql",
   "20261112214328_commercial_form_intake.sql",
   "20261112222942_task_workspace.sql",
+  "20261113014400_task_schedule_visibility.sql",
 ])
   await db.exec(
     await readFile(
@@ -184,6 +185,8 @@ await context.route("https://*.supabase.co/**", async (route) => {
     }
     if (url.pathname.endsWith('/rpc/agency_whatsapp_mark_read')) {await db.query('select agency_whatsapp_mark_read($1)',[body.p_address]);return response(route,null);}
     if (url.pathname.endsWith('/rpc/agency_whatsapp_inbox') || url.pathname.endsWith('/rpc/agency_whatsapp_inbox_v2')) { const result=await db.query("select set_config('request.jwt.claim.sub',$1,false)",[owner]); const inbox=await db.query('select agency_whatsapp_inbox_v2($1,$2,$3) result',[body.p_search,body.p_offset,body.p_filter||'all']); return response(route,inbox.rows[0].result); }
+    if(url.pathname.endsWith('/rpc/agency_tasks_list')){const r=await db.query('select * from agency_tasks_list($1)',[body.p_scope]);return response(route,r.rows);}
+    if(url.pathname.endsWith('/rpc/agency_task_summary'))return response(route,(await db.query('select agency_task_summary() s')).rows[0].s);
     if(url.pathname.endsWith('/rpc/agency_tasks_update')){const r=await db.query('select * from agency_tasks_update($1,$2)',[body.p_ids,JSON.stringify(body.p_patch)]);return response(route,r.rows);}
     if(url.pathname.endsWith('/rpc/agency_delete_item')){await db.query('select agency_delete_item($1,$2)',[body.p_kind,body.p_id]);return response(route,null);}
     if(url.pathname.endsWith('/rpc/ensure_agency_monthly_invoices')){const r=await db.query('select * from ensure_agency_monthly_invoices($1)',[body.p_month]);return response(route,r.rows);}
@@ -566,7 +569,7 @@ try {
   await page.getByText('Filtros e ordenação',{exact:true}).click();
   await page.getByLabel('Filtrar prioridade das tarefas',{exact:true}).selectOption('baixa');
   assert.equal(await page.getByRole('heading',{name:'Entrega em aberto',exact:true}).count(),0);
-  await page.getByRole('button',{name:'Limpar filtros',exact:true}).click();
+  await page.getByRole('button',{name:'Limpar filtros',exact:true}).click();await page.keyboard.press('Escape');
   await page.getByRole('heading',{name:'Entrega em aberto',exact:true}).waitFor();
   await page.getByRole('tab',{name:'Histórico',exact:true}).click();
   await page.getByLabel('Período de encerramento',{exact:true}).selectOption('todos');
@@ -578,10 +581,7 @@ try {
   await page.getByRole('tab',{name:'Quadro de trabalho',exact:true}).click();
   await page.getByRole('button',{name:'Alterar status de Entrega em aberto',exact:true}).click();
   await page.getByRole('menuitem',{name:'Concluída',exact:true}).click();
-  await page.getByRole('button',{name:'Mostrar concluídas desta semana (1)',exact:true}).waitFor();
   assert.equal(await page.getByRole('heading',{name:'Entrega em aberto',exact:true}).count(),0);
-  await page.getByRole('button',{name:'Mostrar concluídas desta semana (1)',exact:true}).click();
-  await page.getByRole('heading',{name:'Entrega em aberto',exact:true}).waitFor();
   await page.getByText('Tarefa concluída. Disponível no histórico.',{exact:true}).waitFor();
   assert((await db.query("select closed_at from operational_tasks where title='Entrega em aberto'")).rows[0].closed_at);
   await page.getByRole('tab',{name:'Histórico',exact:true}).click();
