@@ -94,6 +94,7 @@ export async function reconcileWhatsapp(db:any,connection:any){
    }
    await db.from('agency_whatsapp_connections').update({directory_synced_at:now.toISOString(),directory_warning:directoryError?'A agenda de contatos não foi disponibilizada pelo provedor. Nomes conhecidos e grupos continuam disponíveis.':null}).eq('user_id',connection.user_id).eq('active_account_id',account.id);
   }
+  if(connection.bridge_url){try{await bridge(connection,'recover_avatars',{source_number:account.phone})}catch{/* Avatar retries are independent from attachment recovery. */}}
   try{await recoverMedia(db,connection,account)}catch{/* Private media state records its own recovery failures; text history remains available. */}
   if(connection.bridge_url){try{await bridge(connection,'recover_media',{source_number:account.phone})}catch{/* The next scheduled run retries pending media. */}}
   return {ok:true,imported};
