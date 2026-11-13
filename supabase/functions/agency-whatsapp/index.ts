@@ -1,3 +1,4 @@
+import {profilePicture as whatsappAvatar} from '../_shared/agency-whatsapp-avatar.ts';
 import {ensureMedia as ensureWhatsappMedia,recoverMedia as recoverWhatsappMedia} from '../_shared/agency-whatsapp-media.ts';
 import {resolveWhatsappAccount,mirrorToVertice} from '../_shared/agency-whatsapp-accounts.ts';
 import {ingestWhatsapp,reconcileWhatsapp} from '../_shared/agency-whatsapp-sync.ts';
@@ -160,12 +161,13 @@ Deno.serve(async (request) => {
       if(!sameInstance)await db.from('agency_whatsapp_account_state').upsert({user_id:user.id,account_id:null,connected:false,checked_at:new Date().toISOString()});
       return respond({ ok: true });
     }
-    if(body.action==='messages'||body.action==='media'||body.action==='send'||body.action==='status'){
+    if(body.action==='messages'||body.action==='avatar'||body.action==='media'||body.action==='send'||body.action==='status'){
       if(connection){const active=await resolveWhatsappAccount(db,connection,body.action==='send'||body.action==='status');
        connection.active_number=active.phone;connection.active_account_id=active.account_id;
        if(body.action!=='status'&&(!active.connected || body.account_id && body.account_id!==active.account_id))return respond({error:'O número conectado mudou ou foi desconectado. Abra a conversa no número correto.'},409);
       }else if(body.action!=='status')return respond({error:'Conecte o WhatsApp para abrir as conversas.'},409);
     }
+    if(body.action==='avatar')return respond(await whatsappAvatar(db,connection,user.id,body.phone));
     if(body.action==='media'){
       if(typeof body.message_id!=='string')return respond({error:'Mídia inválida'},400);
       const {data:message,error}=await db.from('agency_whatsapp_messages').select('*').eq('id',body.message_id).eq('user_id',user.id).eq('account_id',connection.active_account_id).maybeSingle();if(error)throw error;if(!message)return respond({error:'Mídia não encontrada nesta conta'},404);

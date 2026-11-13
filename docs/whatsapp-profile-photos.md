@@ -1,0 +1,9 @@
+# WhatsApp profile photos
+
+Both inboxes show contact/group photos in their list and chat header. Each avatar is keyed by the connected sender account and contact address. APIs require a valid session or the existing private bridge capability, the active sender number, and a known conversation. Random numbers cannot enumerate profile pictures. Account changes clear displayed identities; unavailable or hidden pictures retain initials/group icons.
+
+Vértice first uses the matching webhook's chat/contact picture, never a participant's photo as a group's photo. Older/missing/expired links fall back to W-API's documented contacts/profile-picture endpoint. Photos are fetched only from allowed HTTPS WhatsApp/provider hosts with bounded streams (2 MB) and verified image signatures, stored in the existing private bucket, and served as one-hour signed URLs. The private source/address cache refreshes after twelve hours and caches unavailable pictures for thirty minutes. Browser roles cannot read the cache or raw photo metadata RPC. A small scheduled warm-up covers a recent contact and group, while other pictures load on demand with limited concurrency.
+
+Central validates owner/account/address before asking the bridge and accepts only the expected project's private avatar URL. Standalone Central connections use their own provider credentials server-side and validated WhatsApp photo URLs. Provider tokens are never returned. Photos do not create leads, send messages, alter conversations or modify financial/client data.
+
+Tests cover host/image validation, private cache/source binding, group-versus-member selection, denied metadata access, foreign-owner rejection and shared URL delivery. Browser tests cover contact/group avatars in both inboxes and mobile layout while photo-message/audio playback remains functional.
