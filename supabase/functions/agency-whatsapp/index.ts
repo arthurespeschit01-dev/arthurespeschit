@@ -1,3 +1,4 @@
+import {prepareUpload,uploadedFile,providerMedia} from '../_shared/agency-whatsapp-upload.ts';
 import {profilePicture as whatsappAvatar} from '../_shared/agency-whatsapp-avatar.ts';
 import {ensureMedia as ensureWhatsappMedia,recoverMedia as recoverWhatsappMedia} from '../_shared/agency-whatsapp-media.ts';
 import {resolveWhatsappAccount,mirrorToVertice} from '../_shared/agency-whatsapp-accounts.ts';
@@ -161,12 +162,13 @@ Deno.serve(async (request) => {
       if(!sameInstance)await db.from('agency_whatsapp_account_state').upsert({user_id:user.id,account_id:null,connected:false,checked_at:new Date().toISOString()});
       return respond({ ok: true });
     }
-    if(body.action==='messages'||body.action==='avatar'||body.action==='media'||body.action==='send'||body.action==='status'){
+    if(body.action==='upload'||body.action==='messages'||body.action==='avatar'||body.action==='media'||body.action==='send'||body.action==='status'){
       if(connection){const active=await resolveWhatsappAccount(db,connection,body.action==='send'||body.action==='status');
        connection.active_number=active.phone;connection.active_account_id=active.account_id;
        if(body.action!=='status'&&(!active.connected || body.account_id && body.account_id!==active.account_id))return respond({error:'O número conectado mudou ou foi desconectado. Abra a conversa no número correto.'},409);
       }else if(body.action!=='status')return respond({error:'Conecte o WhatsApp para abrir as conversas.'},409);
     }
+    if(body.action==='upload')return respond(await prepareUpload(db,user.id,connection.active_account_id,body));
     if(body.action==='avatar')return respond(await whatsappAvatar(db,connection,user.id,body.phone));
     if(body.action==='media'){
       if(typeof body.message_id!=='string')return respond({error:'Mídia inválida'},400);
@@ -273,7 +275,7 @@ Deno.serve(async (request) => {
     if (body.action === "send") {
       if (
         typeof body.text !== "string" ||
-        !body.text.trim() ||
+        (!body.text.trim() && !body.media_path) ||
         body.text.length > 10000 ||
         !/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(
           body.request_id || "",
@@ -291,6 +293,8 @@ Deno.serve(async (request) => {
       }
       if (!validWhatsappAddress(phone))
         return respond({ error: "Cadastre um telefone válido no card." }, 400);
+      const file=body.media_path?await uploadedFile(db,user.id,connection.active_account_id,body.media_path):null;
+      const messageBody=body.text.trim()||(file?`[${file.kind}]`:'');
       const { data: existing, error: existingError } = await db
         .from("agency_whatsapp_messages")
         .select("id,status,phone,body")
@@ -301,7 +305,7 @@ Deno.serve(async (request) => {
       if (existingError) throw existingError;
       if (
         existing &&
-        (existing.phone !== phone || existing.body !== body.text.trim())
+        (existing.phone !== phone || existing.body !== messageBody)
       )
         return respond(
           { error: "Este identificador já foi utilizado em outra mensagem." },
@@ -319,7 +323,8 @@ Deno.serve(async (request) => {
           request_id: body.request_id,
           account_id:connection.active_account_id,
           phone,
-          body: body.text.trim(),
+          body: messageBody,
+          kind:file?.kind||'texto',
           direction: "saida",
           status: "enviando",
         })
@@ -334,10 +339,10 @@ Deno.serve(async (request) => {
           409,
         );
       try {
-        const result = await provider(connection, "POST", "message/send-text", {
-          phone,
-          message: body.text.trim(),
-        });
+        if(file){const {error:saveFile}=await db.from('agency_whatsapp_media').upsert({message_id:info.id,user_id:user.id,account_id:connection.active_account_id,storage_path:file.path,mime:file.mime,name:file.name,bytes:file.bytes,state:'ready'},{onConflict:'message_id'});if(saveFile)throw saveFile;}
+        const outgoing=file?providerMedia(file,phone,body.text.trim()):{action:'message/send-text',body:{phone,message:body.text.trim()}};
+        const result=await provider(connection,'POST',outgoing.action,outgoing.body);
+
         const { error: updateError } = await db.rpc('agency_confirm_whatsapp_send',{p_user_id:user.id,p_id:info.id,p_provider_id:result.messageId || null});
         if (updateError)
           return respond(

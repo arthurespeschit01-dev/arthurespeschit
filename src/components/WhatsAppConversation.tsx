@@ -1,3 +1,4 @@
+import AudioRecorder from './AudioRecorder';
 import WhatsAppMedia from './WhatsAppMedia';
 import {useWhatsAppAccount} from '@/hooks/useWhatsAppAccount';
 import {useCallback,useEffect,useRef,useState} from 'react';
@@ -6,11 +7,14 @@ import {Textarea} from '@/components/ui/textarea';
 import {whatsappRequest} from '@/lib/whatsapp';
 import {supabase} from '@/integrations/supabase/client';
 import {useWhatsAppLive} from '@/hooks/useWhatsAppLive';
-import {Check,CheckCheck,Send} from 'lucide-react';
+import {Check,CheckCheck,Send,Paperclip,X} from 'lucide-react';
 interface Message{id:string;direction:'entrada'|'saida';body:string;status:string;created_at:string;kind:string;sender_name?:string|null}
 export default function WhatsAppConversation({cardId,phone,onChanged,fullHeight=false,isGroup=false,accountId:providedAccount}:{cardId?:string;phone:string;onChanged:()=>void;fullHeight?:boolean;isGroup?:boolean;accountId?:string}){
  const active=useWhatsAppAccount();const accountId=providedAccount||active.data?.account_id;
  const [messages,setMessages]=useState<Message[]>([]),[text,setText]=useState(''),[hasMore,setHasMore]=useState(false),[olderBusy,setOlderBusy]=useState(false),[error,setError]=useState(''),[sending,setSending]=useState(false),[loading,setLoading]=useState(true);
+ const [attachment,setAttachment]=useState<File|null>(null),[uploading,setUploading]=useState(false),[preview,setPreview]=useState<string|null>(null);const fileInput=useRef<HTMLInputElement>(null);
+ useEffect(()=>{const url=attachment?.type.startsWith('audio/')?URL.createObjectURL(attachment):null;setPreview(url);return()=>{if(url)URL.revokeObjectURL(url)}},[attachment]);
+ const attach=(file:File)=>{if(file.size>16*1024*1024){setError('Arquivo maior que 16 MB.');return}setAttachment(file);requestId.current=null;setError('')};
  const currentAccount=useRef(accountId);currentAccount.current=accountId;
  const requestId=useRef<string|null>(null),lastId=useRef<string|null>(null),olderLoaded=useRef(false),loadingRef=useRef(false),viewport=useRef<HTMLDivElement>(null),follow=useRef(true),onChangedRef=useRef(onChanged),alive=useRef(true);onChangedRef.current=onChanged;
  useEffect(()=>{alive.current=true;return()=>{alive.current=false}},[]);
@@ -26,11 +30,11 @@ export default function WhatsAppConversation({cardId,phone,onChanged,fullHeight=
   }catch(e){if(alive.current){setError((e as Error).message);setLoading(false)}}finally{loadingRef.current=false}
  },[cardId,phone,accountId,active.data?.connected]);
  useWhatsAppLive(()=>void load());
- useEffect(()=>{setMessages([]);setText('');lastId.current=null;olderLoaded.current=false;void load()},[accountId]);
+ useEffect(()=>{setMessages([]);setText('');setAttachment(null);lastId.current=null;olderLoaded.current=false;void load()},[accountId]);
  useEffect(()=>{void load()},[load]);
  useEffect(()=>{if(follow.current&&viewport.current)viewport.current.scrollTop=viewport.current.scrollHeight},[messages]);
  const loadOlder=async()=>{if(olderBusy)return;setOlderBusy(true);const height=viewport.current?.scrollHeight||0;try{const data=await whatsappRequest<{messages:Message[];has_more:boolean}>('messages',{card_id:cardId,phone,account_id:accountId,offset:messages.length});if(currentAccount.current!==accountId)return;olderLoaded.current=true;follow.current=false;setMessages(current=>[...data.messages.filter(m=>!current.some(c=>c.id===m.id)),...current]);setHasMore(data.has_more);requestAnimationFrame(()=>{if(viewport.current)viewport.current.scrollTop=viewport.current.scrollHeight-height})}catch(e){setError((e as Error).message)}finally{setOlderBusy(false)}};
- const send=async(event:React.FormEvent)=>{event.preventDefault();if(!text.trim()||sending)return;setSending(true);setError('');requestId.current||=crypto.randomUUID();try{await whatsappRequest('send',{card_id:cardId,phone,account_id:accountId,text:text.trim(),request_id:requestId.current});setText('');requestId.current=null;follow.current=true;await load();onChangedRef.current()}catch(e){setError((e as Error).message)}finally{setSending(false)}};
+ const send=async(event:React.FormEvent)=>{event.preventDefault();if((!text.trim()&&!attachment)||sending)return;setSending(true);setError('');requestId.current||=crypto.randomUUID();try{const separate=!!attachment&&!attachment.type.startsWith('image/')&&!attachment.type.startsWith('video/');let mediaPath:string|undefined;if(attachment){setUploading(true);const upload=await whatsappRequest<{path:string;token:string}>('upload',{account_id:accountId,name:attachment.name,size:attachment.size,mime:attachment.type||'application/octet-stream'});const {error}=await supabase.storage.from('agency-whatsapp-media').uploadToSignedUrl(upload.path,upload.token,attachment,{contentType:attachment.type||'application/octet-stream'});if(error)throw error;mediaPath=upload.path;setUploading(false)}await whatsappRequest('send',{card_id:cardId,phone,account_id:accountId,text:separate?'':text.trim(),media_path:mediaPath,request_id:requestId.current});setAttachment(null);requestId.current=null;if(separate&&text.trim()){requestId.current=crypto.randomUUID();await whatsappRequest('send',{card_id:cardId,phone,account_id:accountId,text:text.trim(),request_id:requestId.current})}setText('');requestId.current=null;follow.current=true;await load();onChangedRef.current()}catch(e){setError((e as Error).message)}finally{setSending(false);setUploading(false)}};
  const day=(value:string)=>new Date(value).toLocaleDateString('pt-BR');
  return <section className={fullHeight?'flex flex-col flex-1 min-h-0 overflow-hidden':'flex flex-col h-[28rem] border-t mt-3'} aria-label="Conversa WhatsApp do card">
   <div ref={viewport} onScroll={e=>{const el=e.currentTarget;follow.current=el.scrollHeight-el.scrollTop-el.clientHeight<100}} className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 py-5 bg-muted/20" aria-live="polite" aria-label="Mensagens da conversa">
@@ -44,9 +48,13 @@ export default function WhatsAppConversation({cardId,phone,onChanged,fullHeight=
    {!loading&&!messages.length&&<p className="text-center text-sm text-muted-foreground py-12">Nenhuma mensagem registrada nesta conversa.</p>}
   </div>
   {error&&<p role="alert" className="text-sm text-destructive border-t px-4 py-2">{error}</p>}
+  {attachment&&<div className="border-t px-4 py-2 flex flex-wrap gap-2 items-center text-sm"><span className="truncate flex-1 min-w-0">{attachment.name}</span><Button type="button" variant="ghost" size="icon" aria-label="Remover anexo" disabled={sending} onClick={()=>{setAttachment(null);requestId.current=null}}><X size={16}/></Button>{preview&&<audio aria-label="Ouvir áudio antes de enviar" className="w-full max-w-sm" controls src={preview}/>}</div>}
   <form onSubmit={send} style={{paddingBottom:'calc(0.75rem + env(safe-area-inset-bottom))'}} className="shrink-0 border-t bg-background px-3 sm:px-5 py-3 flex items-end gap-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+   <input ref={fileInput} type="file" hidden onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(file)attach(file)}}/>
+   <Button type="button" variant="ghost" size="icon" className="shrink-0 h-11 w-9" aria-label="Anexar arquivo" disabled={sending} onClick={()=>fileInput.current?.click()}><Paperclip size={19}/></Button>
+   <AudioRecorder key={`${accountId}:${phone}`} disabled={sending||!!attachment} onFile={attach} onError={setError}/>
    <Textarea aria-label="Mensagem WhatsApp" maxLength={10000} value={text} onChange={e=>{setText(e.target.value);requestId.current=null}} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing&&!window.matchMedia('(pointer: coarse)').matches){e.preventDefault();void send(e)}}} disabled={sending} placeholder="Escreva uma mensagem" rows={1} className="min-h-11 max-h-36 resize-none rounded-xl flex-1"/>
-   <Button type="submit" disabled={sending||!text.trim()||!active.data?.connected||active.isError} aria-label="Enviar pelo WhatsApp" className="h-11 gap-2"><Send size={17}/><span className="hidden sm:inline">{sending?'Enviando…':'Enviar'}</span></Button>
+   <Button type="submit" disabled={sending||(!text.trim()&&!attachment)||!active.data?.connected||active.isError} aria-label="Enviar pelo WhatsApp" className="h-11 gap-2"><Send size={17}/><span className="hidden sm:inline">{uploading?'Anexando…':sending?'Enviando…':'Enviar'}</span></Button>
   </form>
  </section>;
 }

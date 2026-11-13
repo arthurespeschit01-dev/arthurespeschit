@@ -32,7 +32,9 @@ export async function mirrorToVertice(db:any,connection:any,message:any,sourcePh
 }
 async function deliverMirror(db:any,connection:any,id:string,payload:any){
  try{
-  const response=await fetch(connection.bridge_url,{method:'POST',headers:{'content-type':'application/json','x-central-secret':connection.webhook_secret},body:JSON.stringify({action:'receive',instance_id:connection.instance_id,message:payload}),signal:AbortSignal.timeout(15000)});
+  const deliveredPayload={...payload};
+  if(payload.kind&&payload.kind!=='texto'){const {data:media}=await db.from('agency_whatsapp_media').select('storage_path,mime,name').eq('message_id',id).eq('user_id',connection.user_id).maybeSingle();if(media?.storage_path){const {data:link}=await db.storage.from('agency-whatsapp-media').createSignedUrl(media.storage_path,3600);if(link?.signedUrl)deliveredPayload.media={url:link.signedUrl,mime:media.mime,name:media.name};}}
+  const response=await fetch(connection.bridge_url,{method:'POST',headers:{'content-type':'application/json','x-central-secret':connection.webhook_secret},body:JSON.stringify({action:'receive',instance_id:connection.instance_id,message:deliveredPayload}),signal:AbortSignal.timeout(15000)});
   if(!response.ok){await db.from('agency_whatsapp_mirror_events').update({attempted_at:new Date().toISOString(),last_error:`Ponte respondeu HTTP ${response.status}`}).eq('message_id',id).eq('user_id',connection.user_id);return {delivered:false};}
   const {error}=await db.from('agency_whatsapp_mirror_events').update({delivered_at:new Date().toISOString(),attempted_at:new Date().toISOString(),last_error:null}).eq('message_id',id).eq('user_id',connection.user_id);if(error)throw error;return {delivered:true};
  }catch{await db.from('agency_whatsapp_mirror_events').update({attempted_at:new Date().toISOString(),last_error:'Não foi possível confirmar a entrega ao Vértice.'}).eq('message_id',id).eq('user_id',connection.user_id);return {delivered:false};}

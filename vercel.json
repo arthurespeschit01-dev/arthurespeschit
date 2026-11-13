@@ -1,5 +1,16 @@
 {
   "rewrites": [
-    { "source": "/((?!assets/|.*\\..*).*)", "destination": "/index.html" }
+    {
+      "source": "/prospeccao",
+      "destination": "https://vertice-gmn.vercel.app/"
+    },
+    {
+      "source": "/prospeccao/:path*",
+      "destination": "https://vertice-gmn.vercel.app/:path*"
+    },
+    {
+      "source": "/((?!assets/|.*\\..*).*)",
+      "destination": "/index.html"
+    }
   ]
 }

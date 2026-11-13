@@ -324,3 +324,20 @@ Deno.test('provider-ID recovery replaces a LID only inside its verified sender a
  const db:any={from(table:string){const q:any={upsert(){return q},select(){return q},single:async()=>({data:{id:'account',phone:'553171789803'},error:null}),insert:async()=>({error:{code:'23505'}}),update(value:any){updates.push({table,value,filters:[]});return q},eq(k:string,v:any){updates.at(-1)?.filters.push([k,v]);return q},is(){return q},like(k:string,v:string){updates.at(-1)?.filters.push([k,v]);return q},neq(){return q},then(resolve:any){return Promise.resolve({error:null}).then(resolve)}};return q},rpc:async()=>({error:null})};
  await ingestWhatsapp(db,{user_id:'owner',instance_id:'shared'},{event:'webhookDelivery',instanceId:'shared',connectedPhone:'553171789803',messageId:'provider',fromMe:true,chat:{id:'5511999990000'},msgContent:{conversation:'Recuperada'}});const fix=updates.find(u=>u.value.phone==='5511999990000');check(fix,'LID correction emitted');check(fix.filters.some(([k,v]:any)=>k==='user_id'&&v==='owner')&&fix.filters.some(([k,v]:any)=>k==='account_id'&&v==='account')&&fix.filters.some(([k,v]:any)=>k==='provider_message_id'&&v==='provider')&&fix.filters.some(([k,v]:any)=>k==='phone'&&v==='%@lid'),'correction requires matching owner/account/provider and prior LID');
 });
+
+Deno.test('Central sends owned audio using provider media endpoint and saves a playable private file',async()=>{
+ const original=globalThis.fetch;let sent=0,saved=false,kind='';
+ globalThis.fetch=accountFixtures((async(input:RequestInfo|URL,init?:RequestInit)=>{const url=new URL(String(input));const method=init?.method||'GET';const body=init?.body&&typeof init.body==='string'?JSON.parse(init.body):{};
+ if(url.pathname.includes('/auth/'))return json({id:'owner-a'});
+ if(url.pathname.endsWith('/agency_whatsapp_connections'))return json([{user_id:'owner-a',instance_id:'dedicated',token:'fixture',webhook_secret:secret}]);
+ if(url.pathname.includes('/storage/v1/object/list/'))return json([{name:'audio.webm',metadata:{size:120,mimetype:'audio/webm'}}]);
+ if(url.pathname.includes('/storage/v1/object/sign/'))return json({signedURL:'/object/sign/agency-whatsapp-media/owner-a/account-a/outgoing/uuid/audio.webm?token=fixture'});
+ if(url.pathname.endsWith('/agency_whatsapp_messages')){if(method==='POST'){kind=body.kind;return json({id:'saved-message'})}return url.searchParams.has('request_id')?json(null):json({id:'saved-message',kind:'audio',provider_message_id:'provider-audio',account_id:'account-a',phone:'5511999990000',body:'[audio]'})}
+ if(url.pathname.endsWith('/agency_whatsapp_media')){saved=body.state==='ready'&&body.mime==='audio/webm';return json(null)}
+ if(url.pathname.endsWith('/agency_confirm_whatsapp_send'))return json(null);
+ if(url.pathname.endsWith('/instance/fetch-instance'))return json({connected:true,connectedPhone:'5511999990000'});
+ if(url.pathname.endsWith('/message/send-audio')){sent++;check(!!body.audio&&body.phone==='5511999990000','private file sent to correct destination');return json({messageId:'provider-audio'})}
+ throw Error('Unexpected fixture path '+url.pathname);
+ }) as typeof fetch);
+ try{const result=await handler(request({action:'send',phone:'5511999990000',account_id:'account-a',text:'',media_path:'owner-a/account-a/outgoing/uuid/audio.webm',request_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'}));check(result.status===200,'audio accepted: '+await result.text());check(sent===1&&saved&&kind==='audio','one media send and private playable history saved');}finally{globalThis.fetch=original}
+});
