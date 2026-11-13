@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import {toast} from 'sonner';
 import { ArrowLeft, ArrowRight, X } from "lucide-react";
 
 type Step = {
@@ -13,17 +14,16 @@ type Step = {
 };
 
 const STEPS: Step[] = [
-  { icon: "🎉", title: "Bem-vindo à Central do Gestor!", description: "Tudo que você precisa para gerenciar sua operação em um só lugar. Vamos fazer um tour rápido pelas funcionalidades." },
-  { icon: "🖥️", title: "Dashboard — visão geral do seu negócio", description: "Acompanhe em tempo real total de clientes, ativos, campanhas e sua receita mensal recorrente, com evolução mês a mês.", target: "nav-dashboard" },
-  { icon: "👥", title: "Gerencie seus clientes", description: "Cadastre clientes com contato, status e mensalidade. Veja ativos, inativos, inadimplentes e o histórico completo de cada um.", target: "nav-clientes" },
-  { icon: "📊", title: "Relatórios automáticos do Meta Ads", description: "Conecte a conta de anúncios e visualize alcance, CPM, CTR e ROAS. Gere relatórios em PDF profissionais com um clique.", target: "nav-relatorios" },
-  { icon: "✅", title: "Organize suas tarefas", description: "Crie tarefas por cliente com prazo e prioridade. Acompanhe status e receba alertas por email antes do vencimento.", target: "nav-tarefas" },
-  { icon: "💰", title: "Controle financeiro da agência", description: "Registre entradas e saídas, veja a rentabilidade por cliente e o DRE simplificado do mês.", target: "nav-financeiro" },
-  { icon: "📈", title: "Planilha de acompanhamento", description: "Acompanhe métricas e indicadores dos clientes de forma organizada, com visão consolidada do desempenho.", target: "nav-planilha" },
-  { icon: "📄", title: "Controle seus contratos", description: "Registre contratos com valor, início e vencimento. Receba notificações por email antes do contrato vencer.", target: "nav-contratos" },
-  { icon: "🔗", title: "Gerador de UTMs", description: "Crie links rastreáveis para suas campanhas com parâmetros UTM padronizados.", target: "nav-utms" },
-  { icon: "🔔", title: "Notificações e configurações", description: "Acesse processos, estudos de caso, scripts e objeções. Configure também integrações e alertas por email.", target: "nav-config" },
-  { icon: "🚀", title: "Sua Central está pronta!", description: "Comece agora cadastrando seu primeiro cliente ou explore o dashboard." },
+  {icon:'🎉',title:'Bem-vindo à Central do Gestor!',description:'Esta é a sua Central: sua conta começa vazia, com espaço para os seus clientes, tarefas e processos. Vamos conhecer o sistema.'},
+  {icon:'🖥️',title:'Dashboard da sua agência',description:'Acompanhe seus clientes, entregas e financeiro. Os indicadores começam zerados e crescem conforme você cadastrar os dados.',target:'nav-dashboard'},
+  {icon:'👥',title:'Cadastre seu primeiro cliente',description:'Organize contato, serviços, mensalidade, início do contrato e primeiro pagamento. Cada cliente pode ter seu próprio acompanhamento.',target:'nav-clientes'},
+  {icon:'✅',title:'Seu quadro de tarefas',description:'Crie tarefas por área, com responsável e prazo. Alterne entre tabela, quadro, planejamento e histórico. As recorrências respeitam a data de início.',target:'nav-tasks'},
+  {icon:'💬',title:'Conversas da sua conta',description:'Se quiser usar o WhatsApp, configure sua própria instância nas Configurações. Conversas e conexões de outras contas não são compartilhadas.',target:'nav-conversas'},
+  {icon:'🗂️',title:'Acompanhe a operação',description:'Organize o onboarding, acompanhe etapas e gere relatórios dos seus clientes na área de Operações.',target:'nav-operacoes'},
+  {icon:'📈',title:'Organize o comercial',description:'Configure suas pipelines, crie formulários e registre agendamentos. Respostas dos seus formulários entram no seu CRM.',target:'nav-comercial'},
+  {icon:'💰',title:'Financeiro e contratos',description:'Use a área de Gestão para acompanhar recebimentos, pagamentos e contratos da sua agência.',target:'nav-gestao'},
+  {icon:'⚙️',title:'Personalize sua Central',description:'Configure suas integrações e alertas. Processos e materiais de apoio também ficam nas Configurações.',target:'nav-config'},
+  {icon:'🚀',title:'Sua Central está pronta!',description:'Você pode começar cadastrando um cliente ou explorar o dashboard. Seus dados ficam separados das outras contas.'},
 ];
 
 const PADDING = 8;
@@ -33,36 +33,34 @@ const TOOLTIP_GAP = 16;
 type Rect = { top: number; left: number; width: number; height: number };
 
 export default function OnboardingTour() {
-  const { user } = useAuth();
+  const { user } = useAuth();const userId=user?.id;
   const navigate = useNavigate();
   const [show, setShow] = useState(false);
   const [step, setStep] = useState(0);
   const [checking, setChecking] = useState(true);
+  const [finishing,setFinishing]=useState(false);
   const [rect, setRect] = useState<Rect | null>(null);
   const [viewport, setViewport] = useState({ w: typeof window !== "undefined" ? window.innerWidth : 1024, h: typeof window !== "undefined" ? window.innerHeight : 768 });
 
   useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    (async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("onboarding_completed")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (cancelled) return;
-      if (!data) {
-        await supabase.from("profiles").insert({ user_id: user.id, onboarding_completed: false } as any);
-        setShow(true);
-      } else if (!(data as any).onboarding_completed) {
-        setShow(true);
+    let cancelled=false;setShow(false);setStep(0);setChecking(true);
+    if(!userId){setChecking(false);return;}
+    (async()=>{
+      let {data,error}=await supabase.from('profiles').select('onboarding_completed').eq('user_id',userId).maybeSingle();
+      if(error)throw error;
+      if(!data){
+        const result=await supabase.from('profiles').upsert({user_id:userId,onboarding_completed:false},{onConflict:'user_id',ignoreDuplicates:true});
+        if(result.error)throw result.error;
+        const profile=await supabase.from('profiles').select('onboarding_completed').eq('user_id',userId).maybeSingle();
+        data=profile.data;error=profile.error;if(error||!data)throw error||new Error('Perfil indisponível');
       }
-      setChecking(false);
-    })();
-    return () => { cancelled = true; };
-  }, [user]);
+      if(!cancelled)setShow(!data.onboarding_completed);
+    })().catch(()=>{if(!cancelled)toast.error('Não foi possível carregar o guia inicial. Atualize a página para tentar novamente.')}).finally(()=>{if(!cancelled)setChecking(false)});
+    return()=>{cancelled=true};
+  },[userId]);
 
   const current = STEPS[step];
+  const tooltipWidth=Math.min(TOOLTIP_WIDTH,viewport.w-24);
 
   // Measure target element
   useLayoutEffect(() => {
@@ -78,8 +76,8 @@ export default function OnboardingTour() {
         setRect(null);
         return;
       }
-      el.scrollIntoView({ block: "nearest", behavior: "smooth" });
       const r = el.getBoundingClientRect();
+      if(r.width===0||r.left<0||r.right>window.innerWidth||r.top<0||r.bottom>window.innerHeight){setRect(null);return;}
       setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
     };
     measure();
@@ -94,11 +92,10 @@ export default function OnboardingTour() {
   }, [show, step, current.target]);
 
   const finish = async (navigateTo?: string) => {
-    if (user) {
-      await supabase.from("profiles").update({ onboarding_completed: true } as any).eq("user_id", user.id);
-    }
-    setShow(false);
-    if (navigateTo) navigate(navigateTo);
+    if(!userId||finishing)return;setFinishing(true);
+    const {error}=await supabase.from('profiles').update({onboarding_completed:true}).eq('user_id',userId).select('user_id').single();
+    setFinishing(false);if(error){toast.error('Não foi possível salvar o guia inicial. Tente novamente.');return;}
+    setShow(false);if(navigateTo)navigate(navigateTo);
   };
 
   if (checking || !show) return null;
@@ -125,7 +122,7 @@ export default function OnboardingTour() {
       top: "50%",
       left: "50%",
       transform: "translate(-50%, -50%)",
-      width: TOOLTIP_WIDTH,
+      width: tooltipWidth,
     };
   } else {
     // try right of element
@@ -133,23 +130,23 @@ export default function OnboardingTour() {
     const spaceLeft = sr.left - TOOLTIP_GAP;
     let left: number;
     let top: number = sr.top;
-    if (spaceRight >= TOOLTIP_WIDTH) {
+    if (spaceRight >= tooltipWidth) {
       left = sr.left + sr.width + TOOLTIP_GAP;
-    } else if (spaceLeft >= TOOLTIP_WIDTH) {
-      left = sr.left - TOOLTIP_GAP - TOOLTIP_WIDTH;
+    } else if (spaceLeft >= tooltipWidth) {
+      left = sr.left - TOOLTIP_GAP - tooltipWidth;
     } else {
       // place below
-      left = Math.max(16, Math.min(viewport.w - TOOLTIP_WIDTH - 16, sr.left));
+      left = Math.max(16, Math.min(viewport.w - tooltipWidth - 16, sr.left));
       top = sr.top + sr.height + TOOLTIP_GAP;
     }
     // clamp vertically (estimate tooltip height ~ 280)
     const estH = 300;
     top = Math.max(80, Math.min(viewport.h - estH - 16, top));
-    tooltipStyle = { top, left, width: TOOLTIP_WIDTH };
+    tooltipStyle = { top, left, width: tooltipWidth };
   }
 
   return (
-    <div className="fixed inset-0 z-[100] animate-fade-in" style={{ pointerEvents: "auto" }}>
+    <div aria-label="Guia inicial da sua conta" className="fixed inset-0 z-[100] animate-fade-in" style={{ pointerEvents: "auto" }}>
       {/* SVG mask overlay */}
       <svg className="absolute inset-0 w-full h-full" style={{ pointerEvents: "auto" }}>
         <defs>
@@ -220,8 +217,8 @@ export default function OnboardingTour() {
 
       {/* Skip button */}
       <button
-        onClick={() => finish()}
-        className="absolute top-3 right-4 text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 z-10 bg-background/40 backdrop-blur px-2.5 py-1 rounded-md border border-border"
+        disabled={finishing} onClick={() => void finish()}
+        className="absolute top-3 right-4 text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 z-10 bg-background/40 backdrop-blur px-2.5 py-1 min-h-11 rounded-md border border-border"
       >
         Pular tour <X className="h-3 w-3" />
       </button>
@@ -229,7 +226,7 @@ export default function OnboardingTour() {
       {/* Floating tooltip card */}
       <div
         key={step}
-        className="absolute bg-card border border-primary/30 rounded-xl p-5 shadow-[0_0_50px_-10px_hsl(var(--primary)/0.5)] animate-scale-in z-10"
+        className="absolute max-h-[calc(100dvh-5rem)] overflow-y-auto bg-card border border-primary/30 rounded-xl p-5 shadow-[0_0_50px_-10px_hsl(var(--primary)/0.5)] animate-scale-in z-10"
         style={{ ...tooltipStyle, transition: "top 0.4s ease, left 0.4s ease" }}
       >
         <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
@@ -241,23 +238,23 @@ export default function OnboardingTour() {
 
         {isLast ? (
           <div className="flex flex-col gap-2">
-            <Button className="w-full" onClick={() => finish("/clientes")}>
+            <Button className="w-full" disabled={finishing} onClick={() => void finish("/clientes")}>
               Cadastrar primeiro cliente
             </Button>
-            <Button variant="outline" className="w-full" onClick={() => finish("/")}>
+            <Button variant="outline" className="w-full" disabled={finishing} onClick={() => void finish("/")}>
               Ir para o Dashboard
             </Button>
           </div>
         ) : (
           <div className="flex items-center justify-between gap-2">
             {step > 0 ? (
-              <Button variant="outline" size="sm" onClick={() => setStep((s) => s - 1)}>
+              <Button variant="outline" size="sm" className="min-h-11" disabled={finishing} onClick={() => setStep((s) => s - 1)}>
                 <ArrowLeft className="h-4 w-4" /> Voltar
               </Button>
             ) : (
               <div />
             )}
-            <Button size="sm" className="ml-auto" onClick={() => setStep((s) => s + 1)}>
+            <Button size="sm" className="ml-auto min-h-11" disabled={finishing} onClick={() => setStep((s) => s + 1)}>
               {step === 0 ? "Começar" : "Próximo"} <ArrowRight className="h-4 w-4" />
             </Button>
           </div>

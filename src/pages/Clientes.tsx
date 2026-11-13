@@ -126,7 +126,7 @@ export default function Clientes() {
     const params = new URLSearchParams(window.location.search);
     const metaParam = params.get('meta');
     if (!metaParam) return;
-    const savedRaw = localStorage.getItem('meta-onboarding-form');
+    const savedRaw = localStorage.getItem(`meta-onboarding-form:${user?.id}`);
     // Limpa os params da URL imediatamente
     const cleanUrl = window.location.pathname;
     window.history.replaceState({}, '', cleanUrl);
@@ -145,7 +145,7 @@ export default function Clientes() {
     } else {
       toast.error('Falha ao conectar Meta: ' + (params.get('msg') || 'erro desconhecido'));
     }
-    localStorage.removeItem('meta-onboarding-form');
+    localStorage.removeItem(`meta-onboarding-form:${user?.id}`);
   }, []);
 
   const loadAdAccounts = async () => {
@@ -206,7 +206,7 @@ export default function Clientes() {
       const accessToken = sessionData?.session?.access_token;
       if (!accessToken) { toast.error('Sessão expirada. Faça login novamente.'); return; }
       // Persistir o estado do formulário antes de redirecionar
-      localStorage.setItem('meta-onboarding-form', JSON.stringify({ form, ts: Date.now() }));
+      localStorage.setItem(`meta-onboarding-form:${user?.id}`, JSON.stringify({ form, ts: Date.now() }));
       const origin = `${window.location.origin}/clientes`;
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-auth?onboarding=1&origin=${encodeURIComponent(origin)}`, {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -216,11 +216,11 @@ export default function Clientes() {
         const target = window.top || window;
         target.location.href = json.auth_url;
       } else {
-        localStorage.removeItem('meta-onboarding-form');
+        localStorage.removeItem(`meta-onboarding-form:${user?.id}`);
         toast.error('Não foi possível iniciar a conexão.');
       }
     } catch {
-      localStorage.removeItem('meta-onboarding-form');
+      localStorage.removeItem(`meta-onboarding-form:${user?.id}`);
       toast.error('Erro ao conectar com Meta Ads');
     }
   };

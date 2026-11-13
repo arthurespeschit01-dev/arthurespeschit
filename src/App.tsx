@@ -100,7 +100,7 @@ function ProtectedRoutes() {
     <Routes>
       <Route path="/bloqueado" element={<Navigate to="/" replace />} />
       <Route path="*" element={
-        <AppLayout>
+        <AppLayout key={user.id}>
           <RouteBoundary>
             <Suspense fallback={<PageFallback />}>
               <Routes>
