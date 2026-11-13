@@ -1,3 +1,4 @@
+import {queueMedia,recoverMedia} from './agency-whatsapp-media.ts';
 import {replayHistoryPage} from './agency-whatsapp-replay.ts';
 import {ensureDeliveryWebhook} from './agency-whatsapp-delivery.ts';
 import {accountForNumber,resolveWhatsappAccount,flushMirrors} from './agency-whatsapp-accounts.ts';
@@ -20,6 +21,7 @@ export async function ingestWhatsapp(db:any,connection:any,payload:any){
  }
 
  const {error:metadata}=await db.rpc('agency_whatsapp_account_metadata',{p_user_id:connection.user_id,p_account_id:account.id,p_address:event.phone,p_name:event.contactName||'',p_source:event.nameSource,p_group:event.isGroup});if(metadata)throw metadata;
+ await queueMedia(db,connection,account,event,payload);
  return {ok:true};
 }
 async function bridge(connection:any,action:string,payload:any={}){
@@ -91,6 +93,8 @@ export async function reconcileWhatsapp(db:any,connection:any){
    }
    await db.from('agency_whatsapp_connections').update({directory_synced_at:now.toISOString(),directory_warning:directoryError?'A agenda de contatos não foi disponibilizada pelo provedor. Nomes conhecidos e grupos continuam disponíveis.':null}).eq('user_id',connection.user_id).eq('active_account_id',account.id);
   }
+  try{await recoverMedia(db,connection,account)}catch{/* Private media state records its own recovery failures; text history remains available. */}
+  if(connection.bridge_url){try{await bridge(connection,'recover_media',{source_number:account.phone})}catch{/* The next scheduled run retries pending media. */}}
   return {ok:true,imported};
  }catch(error){await db.from('agency_whatsapp_connections').update({sync_error:'A sincronização automática será tentada novamente.'}).eq('user_id',connection.user_id);throw error;}
  finally{await db.from('agency_whatsapp_connections').update({sync_lease_until:null}).eq('user_id',connection.user_id);}

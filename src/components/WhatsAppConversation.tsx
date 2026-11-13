@@ -1,3 +1,4 @@
+import WhatsAppMedia from './WhatsAppMedia';
 import {useWhatsAppAccount} from '@/hooks/useWhatsAppAccount';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
@@ -37,7 +38,8 @@ export default function WhatsAppConversation({cardId,phone,onChanged,fullHeight=
    {loading&&<p role="status" className="text-center text-sm text-muted-foreground">Carregando mensagens…</p>}
    {messages.map((m,i)=><div key={m.id}>{(!i||day(m.created_at)!==day(messages[i-1].created_at))&&<div className="text-center my-5"><span className="rounded-md border bg-background px-3 py-1 text-xs text-muted-foreground">{day(m.created_at)===day(new Date().toISOString())?'Hoje':day(m.created_at)}</span></div>}<div className={`flex mb-2 ${m.direction==='saida'?'justify-end':'justify-start'}`}><article className={`max-w-[88%] sm:max-w-[75%] xl:max-w-[65%] rounded-xl px-3 py-2 shadow-sm border ${m.direction==='saida'?'bg-primary/10 border-primary/15 rounded-tr-sm':'bg-background rounded-tl-sm'}`}>
     {isGroup&&m.direction==='entrada'&&m.sender_name&&<p className="text-xs font-semibold text-primary mb-1">{m.sender_name}</p>}
-    <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-relaxed">{m.body}</p><div className="flex gap-1 justify-end items-center mt-1 text-[10px] text-muted-foreground"><time dateTime={m.created_at}>{new Date(m.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</time>{m.direction==='saida'&&(m.status==='enviado'?<CheckCheck size={13}/>:m.status==='erro'?<span className="text-destructive">Não confirmado</span>:<Check size={12}/>)}</div>
+    {m.kind!=='texto'&&<WhatsAppMedia id={m.id} kind={m.kind} accountId={accountId} caption={m.body===`[${m.kind}]`?'':m.body}/>}
+    {m.body!==`[${m.kind}]`&&<p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-relaxed">{m.body}</p>}<div className="flex gap-1 justify-end items-center mt-1 text-[10px] text-muted-foreground"><time dateTime={m.created_at}>{new Date(m.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</time>{m.direction==='saida'&&(m.status==='enviado'?<CheckCheck size={13}/>:m.status==='erro'?<span className="text-destructive">Não confirmado</span>:<Check size={12}/>)}</div>
    </article></div></div>)}
    {!loading&&!messages.length&&<p className="text-center text-sm text-muted-foreground py-12">Nenhuma mensagem registrada nesta conversa.</p>}
   </div>
