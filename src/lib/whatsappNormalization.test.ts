@@ -6,6 +6,9 @@ import {
 } from "../../supabase/functions/_shared/agency-whatsapp";
 
 describe("WhatsApp contacts and inbound events", () => {
+ it('retains full WhatsApp LID identities for phone sends instead of discarding them or treating them as phone numbers',()=>{
+  expect(whatsappPhone('123456789012345@lid')).toBe('123456789012345@lid');expect(whatsappPhoneKey('123456789012345@lid')).toBe('123456789012345@lid');expect(normalizeWhatsappEvent({event:'webhookDelivery',fromApi:false,fromMe:true,messageId:'lid-send',chat:{id:'123456789012345@lid'},msgContent:{conversation:'Celular'}})).toMatchObject({phone:'123456789012345@lid',direction:'saida',body:'Celular'});
+ });
  it('stores content-bearing delivery events from phones, including nested keys, while ignoring delivery receipts',()=>{
   expect(normalizeWhatsappEvent({event:'webhookDelivery',instanceId:'same',connectedPhone:'553171789803',fromMe:true,messageId:'phone-1',chat:{id:'5511999990000'},msgContent:{conversation:'Enviada pelo telefone'}})).toMatchObject({direction:'saida',providerId:'phone-1',phone:'5511999990000',body:'Enviada pelo telefone'});
   expect(normalizeWhatsappEvent({event:'webhookDelivery',data:{message:{key:{id:'phone-2',fromMe:true,remoteJid:'5511999990000@s.whatsapp.net'},message:{extendedTextMessage:{text:'Texto longo'}}}}})).toMatchObject({direction:'saida',providerId:'phone-2',body:'Texto longo'});

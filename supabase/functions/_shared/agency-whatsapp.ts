@@ -1,13 +1,14 @@
 export function whatsappPhone(value: unknown): string {
  const raw=String(value||'').trim();
  if(/^[0-9-]{5,40}@g\.us$/.test(raw))return raw;
+ if(/^[0-9]{5,40}@lid$/.test(raw))return raw;
  if(raw.includes('@lid'))return '';
  let phone=raw.replace(/\D/g,'');if(phone.length===10||phone.length===11)phone='55'+phone;return phone;
 }
 export function whatsappPhoneKey(value:unknown):string{
  const phone=whatsappPhone(value);return /^55\d{10,11}$/.test(phone)?phone.slice(2,4)+phone.slice(-8):phone;
 }
-export function validWhatsappAddress(value:string){return /^\d{10,15}$/.test(value)||/^[0-9-]{5,40}@g\.us$/.test(value)}
+export function validWhatsappAddress(value:string){return /^\d{10,15}$/.test(value)||/^[0-9-]{5,40}@g\.us$/.test(value)||/^[0-9]{5,40}@lid$/.test(value)}
 export function normalizeWhatsappEvent(payload:Record<string,unknown>){
  const record=(v:unknown):Record<string,unknown>=>v&&typeof v==='object'&&!Array.isArray(v)?v as Record<string,unknown>:{};
  const data=payload.data&&typeof payload.data==='object'?record(payload.data):payload;

@@ -318,3 +318,9 @@ Deno.test('Central mirrors confirmed sends to Vértice without sending WhatsApp 
   await flushMirrors(db,conn);check(accepted&&deliveries===2,'retry delivers the history record without another WhatsApp send');
  }finally{globalThis.fetch=originalFetch}
 });
+
+Deno.test('provider-ID recovery replaces a LID only inside its verified sender account',async()=>{
+ const {ingestWhatsapp}=await import('../_shared/agency-whatsapp-sync.ts');const updates:any[]=[];
+ const db:any={from(table:string){const q:any={upsert(){return q},select(){return q},single:async()=>({data:{id:'account',phone:'553171789803'},error:null}),insert:async()=>({error:{code:'23505'}}),update(value:any){updates.push({table,value,filters:[]});return q},eq(k:string,v:any){updates.at(-1)?.filters.push([k,v]);return q},is(){return q},like(k:string,v:string){updates.at(-1)?.filters.push([k,v]);return q},neq(){return q},then(resolve:any){return Promise.resolve({error:null}).then(resolve)}};return q},rpc:async()=>({error:null})};
+ await ingestWhatsapp(db,{user_id:'owner',instance_id:'shared'},{event:'webhookDelivery',instanceId:'shared',connectedPhone:'553171789803',messageId:'provider',fromMe:true,chat:{id:'5511999990000'},msgContent:{conversation:'Recuperada'}});const fix=updates.find(u=>u.value.phone==='5511999990000');check(fix,'LID correction emitted');check(fix.filters.some(([k,v]:any)=>k==='user_id'&&v==='owner')&&fix.filters.some(([k,v]:any)=>k==='account_id'&&v==='account')&&fix.filters.some(([k,v]:any)=>k==='provider_message_id'&&v==='provider')&&fix.filters.some(([k,v]:any)=>k==='phone'&&v==='%@lid'),'correction requires matching owner/account/provider and prior LID');
+});
