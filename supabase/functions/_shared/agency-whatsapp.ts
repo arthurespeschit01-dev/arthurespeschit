@@ -27,7 +27,7 @@ export function normalizeWhatsappEvent(payload:Record<string,unknown>){
  const kind=message.imageMessage||message.stickerMessage?'imagem':message.audioMessage?'audio':message.videoMessage?'video':message.documentMessage||message.documentWithCaptionMessage?'documento':'texto';
  const providerId=data.messageId||key.id;if(typeof providerId!=='string'||!providerId||providerId.length>200||(!text&&kind==='texto'))return null;
  const savedName=String(chat.subject||chat.name||record(data.groupMetadata).subject||'').trim();
- const pushName=!fromMe?String(record(data.sender).pushName||data.pushName||'').trim():'';
+ const pushName=!fromMe?String(record(data.sender).pushName||record(data.sender).name||data.pushName||'').trim():'';
  const n=Number(data.moment||data.timestamp),date=new Date(n*(n>1e12?1:1000));
  return {phone,providerId,isGroup,direction:fromMe?'saida':'entrada',contactName:(savedName||(!isGroup?pushName:'' )).slice(0,200)||null,nameSource:isGroup?'group':savedName?'contact':'push',senderName:!fromMe?pushName.slice(0,160)||null:null,createdAt:n&&Number.isFinite(date.getTime())&&date.getTime()<Date.now()+300000?date.toISOString():new Date().toISOString(),body:text.slice(0,10000)||`[${kind}]`,kind};
 }

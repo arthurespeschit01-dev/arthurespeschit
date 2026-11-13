@@ -16,6 +16,7 @@ export async function ingestWhatsapp(db:any,connection:any,payload:any){
  const {error}=await db.from('agency_whatsapp_messages').insert({user_id:connection.user_id,account_id:account.id,phone:event.phone,provider_message_id:event.providerId,body:event.body,kind:event.kind,direction:event.direction,status:event.direction==='saida'?'enviado':'recebido',contact_name:event.contactName,sender_name:event.senderName,created_at:event.createdAt});
  if(error&&error.code!=='23505')throw error;
  if(error?.code==='23505'&&!event.phone.endsWith('@lid')){const {error:resolution}=await db.from('agency_whatsapp_messages').update({phone:event.phone}).eq('user_id',connection.user_id).eq('provider_message_id',event.providerId).eq('account_id',account.id).like('phone','%@lid');if(resolution)throw resolution;}
+ if(error?.code==='23505'&&event.isGroup&&event.senderName){const {error:senderError}=await db.from('agency_whatsapp_messages').update({sender_name:event.senderName}).eq('user_id',connection.user_id).eq('account_id',account.id).eq('provider_message_id',event.providerId).is('sender_name',null);if(senderError)throw senderError;}
  if(error?.code==='23505'&&event.isGroup){
   const {error:correction}=await db.from('agency_whatsapp_messages').update({phone:event.phone,contact_name:event.contactName,sender_name:event.senderName}).eq('user_id',connection.user_id).eq('provider_message_id',event.providerId).eq('account_id',account.id).neq('phone',event.phone);if(correction)throw correction;
  }
@@ -63,7 +64,7 @@ export async function reconcileWhatsapp(db:any,connection:any){
    const verified=(result.messages||[]).filter((m:any)=>m.source_number===account.phone);
    for(const m of verified){const {error}=await db.from('agency_whatsapp_messages').update({account_id:account.id}).eq('user_id',connection.user_id).eq('provider_message_id',m.provider_id).is('account_id',null);if(error)throw error;}
    for(const m of verified){if(!String(m.phone).endsWith('@lid')){const {error}=await db.from('agency_whatsapp_messages').update({phone:whatsappPhone(m.phone)}).eq('user_id',connection.user_id).eq('account_id',account.id).eq('provider_message_id',m.provider_id).like('phone','%@lid');if(error)throw error;}}
-   const rows=verified.map((m:any)=>({user_id:connection.user_id,account_id:account.id,provider_message_id:m.provider_id,phone:whatsappPhone(m.phone),body:String(m.body||`[${m.kind}]`).slice(0,10000),kind:m.kind,direction:m.direction,status:m.status,created_at:m.created_at})).filter((m:any)=>validWhatsappAddress(m.phone));
+   const rows=verified.map((m:any)=>({user_id:connection.user_id,account_id:account.id,provider_message_id:m.provider_id,phone:whatsappPhone(m.phone),body:String(m.body||`[${m.kind}]`).slice(0,10000),kind:m.kind,direction:m.direction,status:m.status,created_at:m.created_at,sender_name:m.sender_name||null})).filter((m:any)=>validWhatsappAddress(m.phone));
    if(rows.length){const {error}=await db.from('agency_whatsapp_messages').upsert(rows,{onConflict:'user_id,account_id,provider_message_id',ignoreDuplicates:true});if(error)throw error;imported+=rows.length;}
    offset+=(result.messages||[]).length;if(!result.has_more)break;
    if(page===19)throw new Error('Há mensagens pendentes; a sincronização continuará automaticamente.');
