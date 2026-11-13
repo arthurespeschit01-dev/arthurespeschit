@@ -33,6 +33,9 @@ export interface WorkspaceLead {
   email: string;
   value: number;
   notes: string;
+  tags?: string[];
+  assignee_user_id?: string | null;
+  source_type?: string;
   created_at: string;
 }
 export const workspaceKey = (user: string | undefined, id?: string) => [
@@ -55,7 +58,7 @@ export function workspaceError(error: unknown) {
   if (e.code === "23505")
     return "Existe um registro duplicado. Confira as etapas e tente novamente.";
   return e.message?.match(
-    /^(Área piloto|Sem permissão|Informe entre|Etapa não|Etapa repetida|Pipeline não|A agência|Os registros)/,
+    /^(Área piloto|Sem permissão|Informe entre|O fluxo|O responsável|O proprietário|Conecte|Este horário|Disponibilidade|Fuso horário|Confira|Bloco|Conexão inválida|Cada saída|Há blocos|Escolha|Somente condições|Conecte todos|Preencha|Etapa não|Etapa repetida|Pipeline não|A agência|Os registros)/,
   )
     ? e.message
     : "Não foi possível concluir. Tente novamente.";
@@ -70,6 +73,7 @@ export async function workspaceList() {
 }
 export async function workspaceData(id: string) {
   const results = await Promise.all([
+    workspaceDb.rpc("agency_workspace_permissions", { p_workspace: id }),
     workspaceDb
       .from("agency_client_workspaces")
       .select("*")
@@ -93,9 +97,15 @@ export async function workspaceData(id: string) {
   ]);
   for (const r of results) if (r.error) throw r.error;
   return {
-    workspace: results[0].data as ClientWorkspace | null,
-    pipelines: results[1].data as WorkspacePipeline[],
-    stages: results[2].data as WorkspaceStage[],
-    leads: results[3].data as WorkspaceLead[],
+    permissions: results[0].data as {
+      can_read: boolean;
+      can_write: boolean;
+      can_manage: boolean;
+      pilot_owner: boolean;
+    },
+    workspace: results[1].data as ClientWorkspace | null,
+    pipelines: results[2].data as WorkspacePipeline[],
+    stages: results[3].data as WorkspaceStage[],
+    leads: results[4].data as WorkspaceLead[],
   };
 }

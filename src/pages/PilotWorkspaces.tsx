@@ -1,3 +1,4 @@
+import WorkspaceCommercial from "@/components/pilot/WorkspaceCommercial";
 import { useState } from "react";
 import {
   Link,
@@ -130,6 +131,14 @@ function WorkspaceList() {
     queryFn: workspaceList,
     refetchOnMount: "always",
   });
+  const identity = useQuery({
+    queryKey: ["workspace-identity", user?.id],
+    queryFn: async () => {
+      const r = await workspaceDb.rpc("agency_workspace_identity");
+      if (r.error) throw r.error;
+      return r.data as { pilot_owner: boolean };
+    },
+  });
   const [dialog, setDialog] = useState<ClientWorkspace | "new" | null>(null),
     [filter, setFilter] = useState("active"),
     [search, setSearch] = useState(""),
@@ -177,14 +186,17 @@ function WorkspaceList() {
             trabalhar.
           </p>
         </div>
-        <Button onClick={() => setDialog("new")}>
-          <Plus size={16} />
-          Nova subconta
-        </Button>
+        {identity.data?.pilot_owner && (
+          <Button onClick={() => setDialog("new")}>
+            <Plus size={16} />
+            Nova subconta
+          </Button>
+        )}
       </div>
       <div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
-        Esta área piloto está liberada somente para sua conta de testes. Nenhum
-        cliente, tarefa ou conversa da agência é copiado para as subcontas.
+        Esta área está disponível ao piloto e aos membros convidados para cada
+        empresa. Nenhum cliente, tarefa ou conversa da agência é copiado para as
+        subcontas.
       </div>
       <div className="flex gap-3 flex-wrap">
         <Input
@@ -227,27 +239,29 @@ function WorkspaceList() {
               >
                 <div className="flex gap-2 justify-between items-start">
                   <Building2 className="text-primary shrink-0" size={28} />
-                  <Menu label={`Opções da subconta ${w.name}`}>
-                    <DropdownMenuItem
-                      disabled={busy}
-                      onSelect={() => setDialog(w)}
-                    >
-                      Editar subconta
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      disabled={busy}
-                      onSelect={() => void change(w)}
-                    >
-                      {w.status === "active" ? "Arquivar" : "Reativar"}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      disabled={busy}
-                      className="text-destructive"
-                      onSelect={() => void change(w, true)}
-                    >
-                      Excluir subconta
-                    </DropdownMenuItem>
-                  </Menu>
+                  {w.owner_user_id === user?.id && (
+                    <Menu label={`Opções da subconta ${w.name}`}>
+                      <DropdownMenuItem
+                        disabled={busy}
+                        onSelect={() => setDialog(w)}
+                      >
+                        Editar subconta
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        disabled={busy}
+                        onSelect={() => void change(w)}
+                      >
+                        {w.status === "active" ? "Arquivar" : "Reativar"}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        disabled={busy}
+                        className="text-destructive"
+                        onSelect={() => void change(w, true)}
+                      >
+                        Excluir subconta
+                      </DropdownMenuItem>
+                    </Menu>
+                  )}
                 </div>
                 <h2 className="font-semibold break-words">{w.name}</h2>
                 <p className="text-xs text-muted-foreground">
@@ -300,6 +314,8 @@ function WorkspaceView() {
   const query = useQuery({
       queryKey: workspaceKey(user?.id, workspaceId),
       queryFn: () => workspaceData(workspaceId),
+      refetchInterval: 10000,
+      refetchOnWindowFocus: true,
       refetchOnMount: "always",
     }),
     all = useQuery({
@@ -325,12 +341,16 @@ function WorkspaceView() {
     stages = data?.stages.filter((s) => s.pipeline_id === pipeline?.id) || [],
     leads = data?.leads.filter((l) => l.pipeline_id === pipeline?.id) || [];
   const base = `/laboratorio/subcontas/${workspaceId}`,
-    section = location.pathname.endsWith("/crm")
-      ? "crm"
-      : location.pathname.endsWith("/configuracoes")
-        ? "settings"
-        : "dashboard";
-  const enabled = !!w && w.status === "active" && !query.isFetching;
+    section =
+      location.pathname.split("/").pop() === workspaceId
+        ? "dashboard"
+        : location.pathname.endsWith("/crm")
+          ? "crm"
+          : location.pathname.endsWith("/configuracoes")
+            ? "settings"
+            : location.pathname.split("/").pop() || "dashboard";
+  const enabled = !!w && w.status === "active" && !!data?.permissions.can_write;
+  const manage = !!data?.permissions.can_manage && w?.status === "active";
   const operation = async (action: () => PromiseLike<{ error: unknown }>) => {
     setBusy(true);
     setError("");
@@ -407,7 +427,25 @@ function WorkspaceView() {
         <nav className="flex lg:flex-col gap-1 overflow-x-auto">
           {[
             { to: base, label: "Dashboard", icon: LayoutDashboard },
+            { to: base + "/conversas", label: "Conversas", icon: Columns3 },
             { to: base + "/crm", label: "CRM", icon: Columns3 },
+            { to: base + "/formularios", label: "Formulários", icon: Columns3 },
+            {
+              to: base + "/agendamentos",
+              label: "Agendamentos",
+              icon: Columns3,
+            },
+            {
+              to: base + "/funis",
+              label: "Funis e automações",
+              icon: Columns3,
+            },
+            {
+              to: base + "/equipe",
+              label: "Pessoas e permissões",
+              icon: Settings,
+            },
+            { to: base + "/integracoes", label: "Integrações", icon: Settings },
             {
               to: base + "/configuracoes",
               label: "Configurações",
@@ -442,10 +480,19 @@ function WorkspaceView() {
               ? "CRM da empresa"
               : section === "settings"
                 ? "Configurações da subconta"
-                : "Dashboard da empresa"}
+                : (
+                    {
+                      formularios: "Formulários e respostas",
+                      agendamentos: "Agenda da empresa",
+                      funis: "Funis e automações",
+                      equipe: "Pessoas e permissões",
+                      integracoes: "Integrações",
+                      conversas: "Conversas",
+                    } as Record<string, string>
+                  )[section] || "Dashboard da empresa"}
           </p>
         </div>
-        {!enabled && (
+        {w.status === "archived" && (
           <p className="border rounded-lg p-3 text-sm text-muted-foreground">
             Subconta arquivada. Os dados continuam disponíveis para consulta.
           </p>
@@ -455,7 +502,7 @@ function WorkspaceView() {
             {error}
           </p>
         )}
-        {section !== "settings" && (
+        {["crm", "dashboard"].includes(section) && (
           <div className="flex flex-wrap gap-2 items-center">
             <select
               aria-label="Pipeline da subconta"
@@ -471,20 +518,20 @@ function WorkspaceView() {
             </select>
             <Menu label="Opções da pipeline">
               <DropdownMenuItem
-                disabled={!enabled || busy}
+                disabled={!manage || busy}
                 onSelect={() => setPipelineDialog("new")}
               >
                 Nova pipeline
               </DropdownMenuItem>
               <DropdownMenuItem
-                disabled={!enabled || !pipeline || busy}
+                disabled={!manage || !pipeline || busy}
                 onSelect={() => setPipelineDialog("edit")}
               >
                 Configurar pipeline
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-destructive"
-                disabled={!enabled || !pipeline || !!leads.length || busy}
+                disabled={!manage || !pipeline || !!leads.length || busy}
                 onSelect={() => {
                   if (
                     pipeline &&
@@ -512,6 +559,17 @@ function WorkspaceView() {
               </Button>
             )}
           </div>
+        )}
+        {!["settings", "crm"].includes(section) && (
+          <WorkspaceCommercial
+            key={workspaceId + section}
+            workspace={workspaceId}
+            owner={w.owner_user_id}
+            section={section}
+            stages={data?.stages || []}
+            manage={manage}
+            write={enabled}
+          />
         )}
         {section === "dashboard" && (
           <>
@@ -672,6 +730,31 @@ function WorkspaceView() {
                             </p>
                           )}
                           <p className="text-sm">{money(l.value)}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Origem:{" "}
+                            {(
+                              {
+                                form: "Formulário",
+                                appointment: "Agendamento",
+                                whatsapp: "WhatsApp",
+                                manual: "Manual",
+                                meta: "Meta Ads",
+                                import: "Importação",
+                              } as Record<string, string>
+                            )[l.source_type || "manual"] || l.source_type}
+                          </p>
+                          {!!l.tags?.length && (
+                            <div className="flex flex-wrap gap-1">
+                              {l.tags.map((t) => (
+                                <span
+                                  className="text-xs bg-primary/10 text-foreground px-2 py-1 rounded"
+                                  key={t}
+                                >
+                                  {t}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                           <select
                             aria-label={`Etapa de ${l.name}`}
                             className="w-full h-10 rounded-md border bg-background px-2 text-xs"
@@ -702,27 +785,11 @@ function WorkspaceView() {
               </p>
               <Button
                 variant="outline"
+                disabled={!manage}
                 onClick={() => setWorkspaceDialog(true)}
               >
                 Editar subconta
               </Button>
-            </section>
-            <section className="border rounded-xl p-4 space-y-3 bg-card">
-              <h2 className="font-semibold">Equipe e acesso</h2>
-              <p className="text-sm">Você · Proprietário</p>
-              <p className="text-sm text-muted-foreground">
-                Neste piloto, o acesso fica restrito à conta de testes. Convites
-                para clientes e outros membros serão liberados em uma próxima
-                etapa.
-              </p>
-            </section>
-            <section className="border rounded-xl p-4 space-y-2 bg-card">
-              <h2 className="font-semibold">Próximas integrações</h2>
-              <p className="text-sm text-muted-foreground">
-                WhatsApp, formulários, agendamentos e automações serão
-                conectados por subconta. As conexões da sua agência continuam na
-                Central.
-              </p>
             </section>
           </>
         )}

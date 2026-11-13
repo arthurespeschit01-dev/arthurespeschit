@@ -10,7 +10,9 @@ await db.exec(
     "utf8",
   ),
 );
-await db.exec("create role service_role bypassrls");
+await db.exec(
+  "create role service_role bypassrls;alter table auth.users add column email_confirmed_at timestamptz default now()",
+);
 const pilot = randomUUID(),
   other = randomUUID();
 for (const id of [pilot, other])
@@ -27,6 +29,15 @@ await db.exec(
   await readFile(
     new URL(
       "../supabase/migrations/20261113190913_pilot_client_workspaces.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  ),
+);
+await db.exec(
+  await readFile(
+    new URL(
+      "../supabase/migrations/20261113215540_workspace_commercial_modules.sql",
       import.meta.url,
     ),
     "utf8",
@@ -111,6 +122,19 @@ async function contextFor(id) {
         );
         return reply(r.rows[0].allowed);
       }
+      if (
+        table === "agency_workspace_identity" ||
+        table === "agency_workspace_permissions"
+      ) {
+        const r = await run(id, () =>
+          table === "agency_workspace_identity"
+            ? db.query("select agency_workspace_identity() result")
+            : db.query("select agency_workspace_permissions($1) result", [
+                body.p_workspace,
+              ]),
+        );
+        return reply(r.rows[0].result);
+      }
       if (table === "agency_workspace_create") {
         const r = await run(id, () =>
           db.query("select agency_workspace_create($1,$2) id", [
@@ -138,6 +162,19 @@ async function contextFor(id) {
           "agency_workspace_stages",
           "agency_workspace_leads",
           "agency_workspace_members",
+          ...[
+            "forms",
+            "form_submissions",
+            "form_views",
+            "calendars",
+            "appointments",
+            "flows",
+            "flow_runs",
+            "flow_steps",
+            "tasks",
+            "notifications",
+            "invitations",
+          ].map((t) => "agency_workspace_" + t),
         ].includes(table)
       )
         return reply([]);
@@ -177,12 +214,23 @@ async function contextFor(id) {
         if (req.method() === "POST")
           return db.query(
             `insert into public."${table}"(${fields.map((k) => '"' + k + '"').join(",")}) values(${fields.map((_, i) => "$" + (i + 1)).join(",")}) returning *`,
-            Object.values(body),
+            Object.values(body).map((v) =>
+              v && typeof v === "object" && !Array.isArray(v)
+                ? JSON.stringify(v)
+                : v,
+            ),
           );
         if (req.method() === "PATCH")
           return db.query(
             `update public."${table}" set ${fields.map((k, i) => '"' + k + '"=$' + (i + 1)).join(",")}${where.replace(/\$(\d+)/g, (_, n) => "$" + (Number(n) + fields.length))} returning *`,
-            [...Object.values(body), ...values],
+            [
+              ...Object.values(body).map((v) =>
+                v && typeof v === "object" && !Array.isArray(v)
+                  ? JSON.stringify(v)
+                  : v,
+              ),
+              ...values,
+            ],
           );
         throw Error("Unsupported method");
       });
@@ -220,6 +268,69 @@ try {
     .getByRole("heading", { name: "Empresa Alpha", exact: true })
     .waitFor();
   const alpha = page.url().split("/subcontas/")[1];
+  // Real module definitions and visual canvas, without provider sends.
+  await page.getByRole("link", { name: "Formulários", exact: true }).click();
+  await page
+    .getByRole("heading", { name: "Captação de contatos", exact: true })
+    .waitFor();
+  await page
+    .getByRole("button", { name: "Novo formulário", exact: true })
+    .click();
+  await page.getByLabel("Título", { exact: true }).fill("Briefing de teste");
+  await page
+    .getByRole("button", { name: "Adicionar campo", exact: true })
+    .click();
+  await page.getByLabel("Título do campo 4").fill("Objetivo");
+  await page.getByLabel("Condição do campo 4").selectOption("name");
+  await page.getByLabel("Valor da condição").fill("Carla");
+  await page
+    .getByRole("button", { name: "Salvar formulário", exact: true })
+    .click();
+  await page
+    .getByRole("heading", { name: "Briefing de teste", exact: true })
+    .waitFor();
+  await page
+    .getByRole("link", { name: "Funis e automações", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Abrir editor", exact: true }).click();
+  await page
+    .locator(".react-flow")
+    .waitFor()
+    .catch(async (e) => {
+      console.error((await page.locator("body").innerText()).slice(-3000));
+      await page.screenshot({
+        path: "/workspace/work/commercial-flow-failed.png",
+      });
+      throw e;
+    });
+  assert.equal(await page.locator(".react-flow__node").count(), 4);
+  await page.screenshot({
+    path: "/workspace/work/workspace-flow-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  );
+  await page.screenshot({
+    path: "/workspace/work/workspace-flow-mobile.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page
+    .getByRole("button", { name: "Fechar editor", exact: true })
+    .click();
+  await page
+    .getByRole("link", { name: "Pessoas e permissões", exact: true })
+    .click();
+  await page.getByLabel("E-mail do convidado").fill("member@example.invalid");
+  await page.getByLabel("Nome do convidado").fill("Atendente");
+  await page
+    .getByRole("button", { name: "Criar convite", exact: true })
+    .click();
+  await page.getByText("Atendente · Atendente", { exact: false }).waitFor();
   await page.getByRole("link", { name: "CRM", exact: true }).click();
   await page.getByRole("button", { name: "Novo lead", exact: true }).click();
   await page.getByLabel("Nome", { exact: true }).fill("Carla piloto");
@@ -388,6 +499,7 @@ try {
   );
 } catch (e) {
   console.error(e);
+  console.error("PAGE_ERRORS", errors);
   throw e;
 } finally {
   await browser.close();

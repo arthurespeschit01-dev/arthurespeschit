@@ -17,6 +17,8 @@ import ScrollToTop from "./components/ScrollToTop";
 const PilotWorkspaces = lazy(() => import("./pages/PilotWorkspaces"));
 const Chamados = lazy(() => import("./pages/Chamados"));
 const ClientPortal = lazy(() => import("./pages/ClientPortal"));
+const WorkspacePublic = lazy(() => import("./pages/WorkspacePublic"));
+const WorkspaceInvitation = lazy(() => import("./pages/WorkspacePublic").then(m=>({default:m.WorkspaceInvitation})));
 const PublicForm = lazy(() => import("./pages/PublicForm"));
 const Comercial = lazy(() => import("./pages/Comercial"));
 const Operacao = lazy(() => import("./pages/Operacao"));
@@ -99,6 +101,7 @@ function ProtectedRoutes() {
   if (!user) return <AuthPage />;
   return (
     <Routes>
+      <Route path="/convite-equipe/:token" element={<Suspense fallback={<PageFallback />}><WorkspaceInvitation /></Suspense>} />
       <Route
         path="/laboratorio/*"
         element={<RouteBoundary><Suspense fallback={<PageFallback />}><PilotWorkspaces /></Suspense></RouteBoundary>}
@@ -196,6 +199,8 @@ const App = () => (
         <Routes>
           <Route path="/portal/:token" element={<ClientPortal />} />
           <Route path="/formulario/:token" element={<PublicForm />} />
+          <Route path="/captura/:token" element={<WorkspacePublic />} />
+          <Route path="/reservar/:token" element={<WorkspacePublic />} />
           <Route path="/*" element={<AuthProvider><Routes>
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/*" element={<ProtectedRoutes />} />

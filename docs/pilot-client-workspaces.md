@@ -2,7 +2,7 @@
 
 ## Availability
 
-`/laboratorio/subcontas` is a restricted product pilot. The menu is visible only when `agency_pilot_status()` returns true. Direct URLs are guarded too. Enrollment lives in `agency_private.pilot_accounts`, which has no browser grants. End users cannot enable themselves via profile metadata, workspace membership or request parameters. Enrollment is per user, not per agency. Do not publish the actual enrolled identity here.
+`/laboratorio/subcontas` is a restricted product pilot. The menu is visible only when `agency_pilot_status()` returns true. Direct URLs are guarded too. Enrollment lives in `agency_private.pilot_accounts`, which has no browser grants. End users cannot enable global enrollment via profile metadata, arbitrary membership writes or request parameters; explicit workspace invitations grant only that workspace. Enrollment is per user, not per agency. Do not publish the actual enrolled identity here.
 
 The database checks the allowlist on every workspace operation. Disabling an enrollment immediately denies data access even if a browser still has a cached menu. The public status RPC returns only the requesting user's boolean. Privileged policy helpers live in the unexposed `agency_private` schema, have fixed search paths, check `auth.uid()` and accept no arbitrary acting-user parameter.
 
@@ -31,17 +31,15 @@ The database checks the allowlist on every workspace operation. Disabling an enr
 
 The organization is derived from the authenticated owner when creating a subaccount. Workspace owner and organization cannot be reassigned by editing a row. Leads, stages and pipelines cannot be transferred between workspaces by changing `workspace_id`. Composite foreign keys reject leads linked to another workspace's stage or pipeline.
 
-Roles `owner`, `admin`, `agent` and `viewer` are modeled in `agency_workspace_members`. A viewer is read-only and still needs separate pilot enrollment. Member invitations and client logins are not released in this delivery; the product explicitly identifies the current single-account pilot.
+Roles `owner`, `admin`, `agent` and `viewer` are modeled in `agency_workspace_members`. A viewer is read-only. The product owner explicitly authorized workspace-scoped invitations: a confirmed invited email may accept access to that workspace without being enrolled in the private pilot allowlist. Disabling the owning pilot still removes access for its workspace members. Removing a membership immediately removes that scope. Invitations cannot grant access to another workspace or the agency.
 
-## Next phases
+## Connected commercial modules
 
-1. Agency-to-client invitations, acceptance, member administration and per-role UI.
-2. Workspace-owned WhatsApp accounts, providers, webhooks and message queues. Existing agency WhatsApp routing stays independent.
-3. Workspace-owned forms, submissions and scheduling, then OAuth connections.
-4. Durable automation events, idempotent executions/retries and a visual flow editor.
-5. Broader security/performance review, recovery drills and commercial rollout controls.
+See [the reference and implementation map](chronos-reference-map.md) for scope, current behavior and provider prerequisites. Public workspace forms use `/captura/:token`, booking uses `/reservar/:token`, and authenticated invitation acceptance uses `/convite-equipe/:token`. Legacy forms and agency endpoints are unchanged.
 
-Google/Meta integrations require their own provider setup and review; this pilot does not claim those integrations are delivered. Known legacy database advisor findings must be assessed before commercialization; this additive delivery does not change legacy public branding or organization helpers.
+Module source: `src/components/pilot/WorkspaceCommercial.tsx`, `WorkspaceForms.tsx`, `WorkspaceScheduling.tsx`, `WorkspaceFlows.tsx`, `WorkspaceTeam.tsx`, `WorkspaceConversations.tsx`, `WorkspaceIntegrations.tsx`; `src/lib/workspaceCommercial.ts`; `src/pages/WorkspacePublic.tsx`. The Edge entry point is `supabase/functions/workspace-operations/index.ts`. Database changes are in the additive workspace commercial/integrations/scheduler migrations.
+
+Timers and internal actions run each minute through `pilot-workspace-automations`. The separate workspace outbox worker sends queued WhatsApp messages only for the enabled pilot owner's active workspace and bound connected number. Provider ambiguity is marked uncertain and never blindly retried. Google sync has its own scoped worker capability and job. These jobs do not call or modify the legacy agency/Vértice message bridge.
 
 ## Operations
 

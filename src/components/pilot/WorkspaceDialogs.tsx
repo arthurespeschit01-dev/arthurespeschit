@@ -132,6 +132,7 @@ export function LeadDialog({
       email: lead?.email || "",
       value: String(lead?.value || 0),
       notes: lead?.notes || "",
+      tags: lead?.tags?.join(", ") || "",
       stage_id: lead?.stage_id || stages[0]?.id || "",
     }),
     [busy, setBusy] = useState(false),
@@ -161,6 +162,10 @@ export function LeadDialog({
                 ...form,
                 name: form.name.trim(),
                 value: Number(form.value),
+                tags: form.tags
+                  .split(",")
+                  .map((t) => t.trim())
+                  .filter(Boolean),
               };
               const result = lead
                 ? await workspaceDb
@@ -168,13 +173,11 @@ export function LeadDialog({
                     .update(row)
                     .eq("id", lead.id)
                     .eq("workspace_id", workspace)
-                : await workspaceDb
-                    .from("agency_workspace_leads")
-                    .insert({
-                      ...row,
-                      workspace_id: workspace,
-                      pipeline_id: pipeline,
-                    });
+                : await workspaceDb.from("agency_workspace_leads").insert({
+                    ...row,
+                    workspace_id: workspace,
+                    pipeline_id: pipeline,
+                  });
               if (result.error) throw result.error;
               onSaved();
               onClose();
@@ -247,6 +250,8 @@ export function LeadDialog({
             </div>
           </div>
           <div>
+            <Label htmlFor="lead-tags">Etiquetas (separadas por vírgula)</Label>
+            <Input id="lead-tags" value={form.tags} onChange={field("tags")} />
             <Label htmlFor="lead-notes">Observações</Label>
             <Textarea
               id="lead-notes"
