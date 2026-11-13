@@ -19,7 +19,7 @@ export async function resolveWhatsappAccount(db:any,connection:any,force=false){
  }catch(error){await db.from('agency_whatsapp_account_state').upsert({user_id:connection.user_id,account_id:null,connected:false,checked_at:new Date().toISOString()});throw error;}
  const account=info.connected?await accountForNumber(db,connection.user_id,info.connectedPhone):null;
  if((state?.account_id||null)!==(account?.id||null)){
-  await db.from('agency_whatsapp_connections').update({active_account_id:account?.id||null,reconciled_at:null,directory_synced_at:null,sync_error:null,directory_warning:null}).eq('user_id',connection.user_id).eq('instance_id',connection.instance_id);
+  await db.from('agency_whatsapp_connections').update({active_account_id:account?.id||null,reconciled_at:null,replay_offset:0,directory_synced_at:null,sync_error:null,directory_warning:null}).eq('user_id',connection.user_id).eq('instance_id',connection.instance_id);
  }
  const {error}=await db.from('agency_whatsapp_account_state').upsert({user_id:connection.user_id,account_id:account?.id||null,connected:!!account,checked_at:new Date().toISOString()});if(error)throw error;
  return {connected:!!account,account_id:account?.id||null,phone:account?.phone||null};

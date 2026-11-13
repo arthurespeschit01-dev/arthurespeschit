@@ -136,7 +136,7 @@ Deno.serve(async (request) => {
                 receiving_enabled: false,
                 bridge_url: null,
                 active_account_id:null,
-                reconciled_at:null,
+                reconciled_at:null,replay_offset:0,
                 directory_synced_at:null,
                 delivery_configured_at:null,delivery_error:null,
                 webhook_secret:

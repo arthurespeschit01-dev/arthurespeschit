@@ -1,3 +1,4 @@
+import {replayHistoryPage} from './agency-whatsapp-replay.ts';
 import {ensureDeliveryWebhook} from './agency-whatsapp-delivery.ts';
 import {accountForNumber,resolveWhatsappAccount,flushMirrors} from './agency-whatsapp-accounts.ts';
 import {normalizeWhatsappEvent,whatsappPhone,validWhatsappAddress} from './agency-whatsapp.ts';
@@ -31,7 +32,7 @@ export async function reconcileWhatsapp(db:any,connection:any){
  const active=await resolveWhatsappAccount(db,connection,true);
  if(!active.connected)return {ok:true,connected:false};
  const account={id:active.account_id,phone:active.phone};
- if(connection.active_account_id!==account.id){connection.reconciled_at=null;connection.directory_synced_at=null;}
+ if(connection.active_account_id!==account.id){connection.reconciled_at=null;connection.directory_synced_at=null;connection.replay_offset=0;}
  const now=new Date();
  const {data:claimed,error:claimError}=await db.from('agency_whatsapp_connections').update({sync_lease_until:new Date(Date.now()+110000).toISOString()}).eq('user_id',connection.user_id).or(`sync_lease_until.is.null,sync_lease_until.lt.${now.toISOString()}`).select('user_id');
  if(claimError)throw claimError;if(!claimed?.length)return {busy:true};
@@ -39,8 +40,8 @@ export async function reconcileWhatsapp(db:any,connection:any){
  try{
   await ensureDeliveryWebhook(db,connection,Deno.env.get('SUPABASE_URL')||'');
   if(!connection.reconciled_at){
-   let offset=0;
-   for(let page=0;page<30;page++){const history=await bridge(connection,'events',{include_delivered:true,source_number:account.phone,offset});for(const event of history.events||[])await ingestWhatsapp(db,connection,event.payload);if(!history.has_more)break;offset=history.next_offset;}
+   const replay=await replayHistoryPage(db,connection,account,offset=>bridge(connection,'events',{include_delivered:true,source_number:account.phone,offset}),payload=>ingestWhatsapp(db,connection,payload));
+   if(!replay.done)return {ok:true,replaying:true,processed:replay.processed};
   }
   const pending=await bridge(connection,'events');const keys=[];
   for(const event of pending.events||[]){await ingestWhatsapp(db,connection,event.payload);keys.push(event.event_key);}
