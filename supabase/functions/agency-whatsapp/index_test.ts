@@ -308,13 +308,13 @@ Deno.test(
 Deno.test('Central mirrors confirmed sends to Vértice without sending WhatsApp twice; failures stay queued',async()=>{
  const {mirrorToVertice,flushMirrors}=await import('../_shared/agency-whatsapp-accounts.ts');
  const originalFetch=globalThis.fetch;let deliveries=0;let accepted=false;let pending:any=null;
- const db:any={from(table:string){check(table==='agency_whatsapp_mirror_events','only private delivery outbox is used');return {async upsert(value:any){pending=value;return {error:null}},select(){return this},eq(){return this},is(){return this},order(){return this},limit(){return Promise.resolve({data:pending&&!accepted?[{message_id:pending.message_id,payload:pending.payload}]:[],error:null})},update(){accepted=true;return this},then(resolve:any){return Promise.resolve({error:null}).then(resolve)}}}};
+ const db:any={from(table:string){check(table==='agency_whatsapp_mirror_events','only private delivery outbox is used');return {async upsert(value:any){pending=value;return {error:null}},select(){return this},eq(){return this},is(){return this},order(){return this},limit(){return Promise.resolve({data:pending&&!accepted?[{message_id:pending.message_id,payload:pending.payload}]:[],error:null})},update(value:any){if(value.delivered_at)accepted=true;return this},then(resolve:any){return Promise.resolve({error:null}).then(resolve)}}}};
  globalThis.fetch=((input:RequestInfo|URL,init?:RequestInit)=>{const url=new URL(String(input));check(url.hostname==='vertice-gmn.vercel.app','mirror never calls W-API send endpoint');deliveries++;const body=JSON.parse(String(init?.body));check(body.action==='receive'&&body.message.source_number==='553171789803','captured sender number accompanies the mirror');return Promise.resolve(json({},deliveries===1?503:200))}) as typeof fetch;
  try{
   const conn={user_id:'owner-a',instance_id:'same',bridge_url:'https://vertice-gmn.vercel.app/api/central-whatsapp',webhook_secret:secret};
   const message={id:'message-a',account_id:'account-a',provider_message_id:'provider-a',phone:'5511999990000',body:'Confirmada',created_at:new Date().toISOString()};
   check(!(await mirrorToVertice(db,conn,message,'553171789803')).delivered,'failed mirror does not pretend success');
-  check(!!pending,'confirmed message remains in durable outbox');
+  check(!!pending&&!accepted,'confirmed message remains pending after a failed attempt');
   await flushMirrors(db,conn);check(accepted&&deliveries===2,'retry delivers the history record without another WhatsApp send');
  }finally{globalThis.fetch=originalFetch}
 });

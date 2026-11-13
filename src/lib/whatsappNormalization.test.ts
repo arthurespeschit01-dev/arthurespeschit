@@ -6,6 +6,12 @@ import {
 } from "../../supabase/functions/_shared/agency-whatsapp";
 
 describe("WhatsApp contacts and inbound events", () => {
+ it('stores content-bearing delivery events from phones, including nested keys, while ignoring delivery receipts',()=>{
+  expect(normalizeWhatsappEvent({event:'webhookDelivery',instanceId:'same',connectedPhone:'553171789803',fromMe:true,messageId:'phone-1',chat:{id:'5511999990000'},msgContent:{conversation:'Enviada pelo telefone'}})).toMatchObject({direction:'saida',providerId:'phone-1',phone:'5511999990000',body:'Enviada pelo telefone'});
+  expect(normalizeWhatsappEvent({event:'webhookDelivery',data:{message:{key:{id:'phone-2',fromMe:true,remoteJid:'5511999990000@s.whatsapp.net'},message:{extendedTextMessage:{text:'Texto longo'}}}}})).toMatchObject({direction:'saida',providerId:'phone-2',body:'Texto longo'});
+  expect(normalizeWhatsappEvent({event:'messageDelivered',data:{messageId:'receipt',fromMe:true,phone:'5511999990000',msgContent:{conversation:'receipt'}}})).toBeNull();
+  expect(normalizeWhatsappEvent({event:'webhookDelivery',data:{messageId:'receipt',fromMe:true,phone:'5511999990000',status:'DELIVERED'}})).toBeNull();
+ });
   it("matches Brazilian numbers with and without DDI and ninth digit", () => {
     expect(whatsappPhone("(11) 99999-0000")).toBe("5511999990000");
     expect(whatsappPhoneKey("5511999990000")).toBe(

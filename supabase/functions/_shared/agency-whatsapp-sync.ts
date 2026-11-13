@@ -1,3 +1,4 @@
+import {ensureDeliveryWebhook} from './agency-whatsapp-delivery.ts';
 import {accountForNumber,resolveWhatsappAccount,flushMirrors} from './agency-whatsapp-accounts.ts';
 import {normalizeWhatsappEvent,whatsappPhone,validWhatsappAddress} from './agency-whatsapp.ts';
 // Service-side helpers. No provider token or bridge capability is exposed to the browser.
@@ -25,7 +26,7 @@ async function bridge(connection:any,action:string,payload:any={}){
  if(!response.ok)throw new Error('A sincronização automática não foi confirmada pelo Vértice.');return response.json();
 }
 export async function reconcileWhatsapp(db:any,connection:any){
- await flushMirrors(db,connection);
+ const mirrors=await flushMirrors(db,connection);
  const active=await resolveWhatsappAccount(db,connection,true);
  if(!active.connected)return {ok:true,connected:false};
  const account={id:active.account_id,phone:active.phone};
@@ -35,6 +36,7 @@ export async function reconcileWhatsapp(db:any,connection:any){
  if(claimError)throw claimError;if(!claimed?.length)return {busy:true};
  let imported=0;
  try{
+  await ensureDeliveryWebhook(db,connection,Deno.env.get('SUPABASE_URL')||'');
   if(!connection.reconciled_at){
    let offset=0;
    for(let page=0;page<30;page++){const history=await bridge(connection,'events',{include_delivered:true,source_number:account.phone,offset});for(const event of history.events||[])await ingestWhatsapp(db,connection,event.payload);if(!history.has_more)break;offset=history.next_offset;}
@@ -61,7 +63,7 @@ export async function reconcileWhatsapp(db:any,connection:any){
    offset+=(result.messages||[]).length;if(!result.has_more)break;
    if(page===19)throw new Error('Há mensagens pendentes; a sincronização continuará automaticamente.');
   }
-  await db.from('agency_whatsapp_connections').update({reconciled_at:now.toISOString(),sync_error:null}).eq('user_id',connection.user_id).eq('active_account_id',account.id);
+  await db.from('agency_whatsapp_connections').update({reconciled_at:now.toISOString(),sync_error:mirrors.failed?'Há mensagens enviadas aguardando sincronização com o Vértice.':null}).eq('user_id',connection.user_id).eq('active_account_id',account.id);
   if(!connection.directory_synced_at||Date.now()-new Date(connection.directory_synced_at).getTime()>900000){
    let directoryError=false;
    for(const kind of ['groups','known','contacts','chats']){

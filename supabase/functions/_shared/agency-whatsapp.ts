@@ -11,15 +11,15 @@ export function validWhatsappAddress(value:string){return /^\d{10,15}$/.test(val
 export function normalizeWhatsappEvent(payload:Record<string,unknown>){
  const record=(v:unknown):Record<string,unknown>=>v&&typeof v==='object'&&!Array.isArray(v)?v as Record<string,unknown>:{};
  const data=payload.data&&typeof payload.data==='object'?record(payload.data):payload;
- const content=record(data.msgContent||data.message),message=record(content.message||content),chat=record(data.chat),key=record(data.key);
- const fromMe=data.fromMe===true||data.fromMe==='true'||key.fromMe===true;
+ const content=record(data.msgContent||data.message),message=record(content.message||content),chat=record(data.chat),key=record(data.key||content.key);
+ const event=String(payload.event||data.event||'');
+ const fromMe=data.fromMe===true||data.fromMe==='true'||key.fromMe===true||key.fromMe==='true'||/^webhookDelivery$/i.test(event);
  const rawChat=String(chat.id||key.remoteJid||data.phone||data.to||'');
  const isGroup=data.isGroup===true||data.isGroup==='true'||rawChat.endsWith('@g.us');
  let address=isGroup?rawChat:fromMe?rawChat:String(record(data.sender).id||data.phone||chat.id||data.from||key.remoteJid||'');
  if(isGroup&&!address.includes('@'))address+='@g.us';
  const phone=whatsappPhone(address);if(!validWhatsappAddress(phone))return null;
- const event=String(payload.event||data.event||'');
- if(/status|ack|deliver|read|receipt|presence|connect/i.test(event)&&!/received/i.test(event))return null;
+ if(/status|ack|deliver|read|receipt|presence|connect/i.test(event)&&!/received/i.test(event)&&!/^webhookDelivery$/i.test(event))return null;
  const doc=record(message.documentMessage||record(record(message.documentWithCaptionMessage).message).documentMessage);
  const raw=message.conversation||record(message.extendedTextMessage).text||record(message.imageMessage).caption||record(message.videoMessage).caption||doc.caption||message.text||'';
  const text=typeof raw==='string'?raw:'';

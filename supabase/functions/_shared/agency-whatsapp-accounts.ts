@@ -33,12 +33,12 @@ export async function mirrorToVertice(db:any,connection:any,message:any,sourcePh
 async function deliverMirror(db:any,connection:any,id:string,payload:any){
  try{
   const response=await fetch(connection.bridge_url,{method:'POST',headers:{'content-type':'application/json','x-central-secret':connection.webhook_secret},body:JSON.stringify({action:'receive',instance_id:connection.instance_id,message:payload}),signal:AbortSignal.timeout(15000)});
-  if(!response.ok)return {delivered:false};
-  const {error}=await db.from('agency_whatsapp_mirror_events').update({delivered_at:new Date().toISOString()}).eq('message_id',id).eq('user_id',connection.user_id);if(error)throw error;return {delivered:true};
- }catch{return {delivered:false};}
+  if(!response.ok){await db.from('agency_whatsapp_mirror_events').update({attempted_at:new Date().toISOString(),last_error:`Ponte respondeu HTTP ${response.status}`}).eq('message_id',id).eq('user_id',connection.user_id);return {delivered:false};}
+  const {error}=await db.from('agency_whatsapp_mirror_events').update({delivered_at:new Date().toISOString(),attempted_at:new Date().toISOString(),last_error:null}).eq('message_id',id).eq('user_id',connection.user_id);if(error)throw error;return {delivered:true};
+ }catch{await db.from('agency_whatsapp_mirror_events').update({attempted_at:new Date().toISOString(),last_error:'Não foi possível confirmar a entrega ao Vértice.'}).eq('message_id',id).eq('user_id',connection.user_id);return {delivered:false};}
 }
 export async function flushMirrors(db:any,connection:any){
- if(!connection.bridge_url)return;
+ if(!connection.bridge_url)return {failed:0,delivered:0};
  const {data,error}=await db.from('agency_whatsapp_mirror_events').select('message_id,payload').eq('user_id',connection.user_id).is('delivered_at',null).order('created_at').limit(50);if(error)throw error;
- for(const entry of data||[])await deliverMirror(db,connection,entry.message_id,entry.payload);
+ let failed=0,delivered=0;for(const entry of data||[]){if((await deliverMirror(db,connection,entry.message_id,entry.payload)).delivered)delivered++;else failed++;}return {failed,delivered};
 }

@@ -3,7 +3,7 @@ import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {useAuth} from '@/contexts/AuthContext';
 import {supabase} from '@/integrations/supabase/client';
 import {whatsappRequest} from '@/lib/whatsapp';
-export interface WhatsAppAccountStatus{configured:boolean;connected:boolean;phone?:string|null;account_id?:string|null;sync_error?:string|null;legacy_count?:number}
+export interface WhatsAppAccountStatus{configured:boolean;connected:boolean;phone?:string|null;account_id?:string|null;sync_error?:string|null;delivery_error?:string|null;delivery_enabled?:boolean;legacy_count?:number}
 export function useWhatsAppAccount(){
  const {user}=useAuth(),client=useQueryClient();
  const key=['whatsapp-active-account',user?.id];

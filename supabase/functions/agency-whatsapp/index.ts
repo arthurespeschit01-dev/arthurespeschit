@@ -138,6 +138,7 @@ Deno.serve(async (request) => {
                 active_account_id:null,
                 reconciled_at:null,
                 directory_synced_at:null,
+                delivery_configured_at:null,delivery_error:null,
                 webhook_secret:
                   crypto.randomUUID().replace(/-/g, "") +
                   crypto.randomUUID().replace(/-/g, ""),
@@ -209,6 +210,7 @@ Deno.serve(async (request) => {
         account_id:connection.active_account_id,
         receiving_enabled: connection.receiving_enabled,
         shared: !!connection.bridge_url,
+        delivery_enabled:!!connection.delivery_configured_at,delivery_error:connection.delivery_error||null,
         last_webhook_at: connection.last_webhook_at || null,
         reconciled_at:connection.reconciled_at || null,
         sync_error:connection.sync_error || null,
@@ -224,12 +226,13 @@ Deno.serve(async (request) => {
       } else {
         const info=await provider(connection,'GET','instance/fetch-instance');
         const current=String(info.webhookReceivedUrl || '');
-        if(current && current!==callback) return respond({error:'Esta instância já usa outro webhook. Configure o compartilhamento antes de alterar o recebimento.'},409);
+        if((current && current!==callback)||(info.webhookDeliveryUrl&&info.webhookDeliveryUrl!==callback)) return respond({error:'Esta instância já usa outro webhook. Configure o compartilhamento antes de alterar o recebimento.'},409);
         await provider(connection, "PUT", "webhook/update-webhook-received", {value: callback, enabled:true});
+        await provider(connection, "PUT", "webhook/update-webhook-delivery", {value: callback, enabled:true});
       }
       const { error } = await db
         .from("agency_whatsapp_connections")
-        .update({ receiving_enabled: true })
+        .update({ receiving_enabled: true,delivery_configured_at:new Date().toISOString(),delivery_error:null })
         .eq("user_id", user.id);
       if (error) throw error;
       const connected=await provider(connection,"GET","instance/fetch-instance");

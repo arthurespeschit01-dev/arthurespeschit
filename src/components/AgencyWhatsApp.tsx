@@ -18,6 +18,7 @@ interface Status {
   instance_id?: string;
   receiving_enabled?: boolean;
   shared?: boolean;
+  delivery_enabled?:boolean;delivery_error?:string|null;
   last_webhook_at?: string;
   webhook_url?: string;
 }
@@ -138,7 +139,7 @@ export default function AgencyWhatsApp() {
           </Button>
         </div>
       </div>
-      {status?.configured && <div className="rounded-lg border p-3 space-y-2 text-sm"><p>{status.shared ? 'Webhook compartilhado com Vértice. O encaminhamento existente da automação é preservado.' : 'Recebimento pela instância configurada.'}</p><p className="text-muted-foreground">{status.last_webhook_at ? `Última mensagem recebida pelo webhook: ${new Date(status.last_webhook_at).toLocaleString('pt-BR')}` : 'Nenhuma mensagem confirmada pelo webhook ainda.'}</p><Button variant="outline" disabled={busy} onClick={async()=>{setBusy(true);try{await whatsappRequest('connect');await refresh();}catch(e){setError((e as Error).message)}finally{setBusy(false)}}}>Ativar recebimento de mensagens</Button>{status.webhook_url && <><Label htmlFor="whatsapp-webhook">Webhook da Central (link privado)</Label><Input id="whatsapp-webhook" type="password" readOnly value={status.webhook_url}/><Button variant="ghost" onClick={()=>navigator.clipboard.writeText(status.webhook_url!)}>Copiar webhook</Button></>}</div>}
+      {status?.configured && <div className="rounded-lg border p-3 space-y-2 text-sm"><p>{status.shared ? 'Webhook compartilhado com Vértice. As mensagens recebidas continuam encaminhadas à automação existente.' : 'Recebimento pela instância configurada.'}</p><p className="text-muted-foreground">{status.last_webhook_at ? `Última mensagem recebida pelo webhook: ${new Date(status.last_webhook_at).toLocaleString('pt-BR')}` : 'Nenhuma mensagem confirmada pelo webhook ainda.'}</p><p className="text-muted-foreground">{status.delivery_enabled?'Envios pelo telefone: sincronização ativada.':'Envios pelo telefone: ativação pendente.'}</p>{status.delivery_error&&<p role="alert" className="text-destructive">{status.delivery_error}</p>}<Button variant="outline" disabled={busy} onClick={async()=>{setBusy(true);try{await whatsappRequest('connect');await refresh();}catch(e){setError((e as Error).message)}finally{setBusy(false)}}}>Ativar recebimento e envios do telefone</Button>{status.webhook_url && <><Label htmlFor="whatsapp-webhook">Webhook da Central (link privado)</Label><Input id="whatsapp-webhook" type="password" readOnly value={status.webhook_url}/><Button variant="ghost" onClick={()=>navigator.clipboard.writeText(status.webhook_url!)}>Copiar webhook</Button></>}</div>}
       {error && !open && (
         <p role="alert" className="text-sm text-destructive">
           {error}
