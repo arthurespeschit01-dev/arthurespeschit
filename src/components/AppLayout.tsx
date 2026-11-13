@@ -1,3 +1,4 @@
+import {usePilotAccess} from '@/hooks/usePilotAccess';
 import {supabase} from '@/integrations/supabase/client';
 import {settingsResources} from '@/lib/navigation';
 import { useEffect, useState } from 'react';
@@ -71,6 +72,7 @@ function SidebarIcon({ icon: Icon }: { icon: LucideIcon }) {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuth();
+  const pilot = usePilotAccess();
   const { pathname } = useLocation();
   const [canAccessProspecting,setCanAccessProspecting]=useState(false);
   useEffect(()=>{let alive=true;setCanAccessProspecting(false);if(user?.id)void supabase.auth.getUser().then(({data,error})=>{if(alive&&!error&&data.user?.id===user.id)setCanAccessProspecting(data.user.app_metadata?.central_prospecting===true)}).catch(()=>{});return()=>{alive=false}},[user?.id]);
@@ -184,6 +186,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               return item.to === '/comercial/conversas' ? <div key={item.to}>{wrapped}{renderNavGroup({ name: 'Operações', id: 'operacoes', items: operacoesSubItems, open: operacoesOpen, setOpen: setOperacoesOpen })}{renderNavGroup({ name: 'Comercial', id: 'comercial', items: comercialSubItems, open: comercialOpen, setOpen: setComercialOpen })}</div> : wrapped;
             })}
 
+            {pilot.data===true&&<NavLink to="/laboratorio/subcontas" aria-label="Subcontas de clientes (piloto)" className={`${collapsed?SIDEBAR_ICON_BUTTON_CLASS:'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm'} text-sidebar-foreground hover:bg-sidebar-accent`}><SidebarIcon icon={Users}/>{!collapsed&&<span>Subcontas · piloto</span>}</NavLink>}
             {renderNavGroup({name:'Gestão',id:'gestao',items:gestaoSubItems,open:gestaoOpen,setOpen:setGestaoOpen})}
             {renderNavGroup({name:'Ferramentas',id:'ferramentas',items:ferramentasSubItems,open:ferramentasOpen,setOpen:setFerramentasOpen})}
             {(!navSearch||'configurações'.includes(navSearch.toLocaleLowerCase('pt-BR')))&&<NavLink to="/configuracoes" data-tour-id="nav-config" aria-label="Configurações" className={({isActive})=>`${collapsed?SIDEBAR_ICON_BUTTON_CLASS:'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm'} mt-3 border-t border-sidebar-border ${isActive||settingsResources.some(item=>item.to===pathname)?'bg-primary/15 text-primary':'text-sidebar-foreground hover:bg-sidebar-accent'}`}><SidebarIcon icon={Settings}/>{!collapsed&&<span>Configurações</span>}</NavLink>}

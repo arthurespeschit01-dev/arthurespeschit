@@ -14,6 +14,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import ScrollToTop from "./components/ScrollToTop";
 
 // Lazy load pages so a single failing chunk doesn't blank the app
+const PilotWorkspaces = lazy(() => import("./pages/PilotWorkspaces"));
 const Chamados = lazy(() => import("./pages/Chamados"));
 const ClientPortal = lazy(() => import("./pages/ClientPortal"));
 const PublicForm = lazy(() => import("./pages/PublicForm"));
@@ -98,6 +99,10 @@ function ProtectedRoutes() {
   if (!user) return <AuthPage />;
   return (
     <Routes>
+      <Route
+        path="/laboratorio/*"
+        element={<RouteBoundary><Suspense fallback={<PageFallback />}><PilotWorkspaces /></Suspense></RouteBoundary>}
+      />
       <Route path="/bloqueado" element={<Navigate to="/" replace />} />
       <Route path="*" element={
         <AppLayout key={user.id}>
