@@ -26,6 +26,11 @@ export async function ensureMedia(db:any,connection:any,message:any,source:strin
 }
 export async function recoverMedia(db:any,connection:any,account:any){
  if(!account?.id||!account.phone)return;const {error:enqueued}=await db.rpc('agency_enqueue_media',{p_user:connection.user_id,p_account:account.id});if(enqueued)throw enqueued;
- const {data,error}=await db.from('agency_whatsapp_media').select('message_id').eq('user_id',connection.user_id).eq('account_id',account.id).is('storage_path',null).or(`attempted_at.is.null,attempted_at.lt.${new Date(Date.now()-300000).toISOString()}`).order('attempted_at',{ascending:true,nullsFirst:true}).order('created_at',{ascending:false}).limit(3);if(error)throw error;
- return Promise.all((data||[]).map(async(entry:any)=>{const {data:message}=await db.from('agency_whatsapp_messages').select('*').eq('id',entry.message_id).eq('user_id',connection.user_id).eq('account_id',account.id).maybeSingle();return ensureMedia(db,connection,message,account.phone)}));
+ const {data,error}=await db.from('agency_whatsapp_media').select('message_id').eq('user_id',connection.user_id).eq('account_id',account.id).is('storage_path',null).or(`attempted_at.is.null,attempted_at.lt.${new Date(Date.now()-300000).toISOString()}`).order('attempted_at',{ascending:true,nullsFirst:true}).order('created_at',{ascending:false}).limit(100);if(error)throw error;
+ if(!data?.length)return [];
+ const {data:messages,error:readError}=await db.from('agency_whatsapp_messages').select('*').eq('user_id',connection.user_id).eq('account_id',account.id).in('id',data.map((e:any)=>e.message_id));if(readError)throw readError;
+ const byId=new Map((messages||[]).map((m:any)=>[m.id,m]));const candidates=data.map((e:any)=>byId.get(e.message_id)).filter(Boolean) as any[];const chosen:any[]=[];
+ for(const kind of ['imagem','audio','video','documento']){const next=candidates.find(m=>m.kind===kind);if(next&&chosen.length<3)chosen.push(next);}
+ for(const m of candidates){if(chosen.length>=3)break;if(!chosen.some(c=>c.id===m.id))chosen.push(m);}
+ return Promise.all(chosen.map(message=>ensureMedia(db,connection,message,account.phone)));
 }
