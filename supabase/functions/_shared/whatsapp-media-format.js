@@ -17,7 +17,7 @@ export function trustedMediaUrl(value){let u;try{u=new URL(value)}catch{throw Er
 export async function fetchMediaFile(providerResult,descriptor,fetcher=fetch){
  const r=providerResult?.data||providerResult;const b64=providerResult?.base64||r?.base64;let bytes;
  if(typeof b64==='string'){const value=b64.replace(/^data:[^,]+,/,'');if(value.length>Math.ceil(MEDIA_LIMIT*4/3)+4)throw Error('Arquivo excede 32 MB');const binary=atob(value);bytes=Uint8Array.from(binary,c=>c.charCodeAt(0));}
- else {const raw=typeof r==='string'?r:r?.url||r?.fileUrl||r?.downloadUrl||r?.mediaUrl||r?.link||providerResult?.url;if(!raw)throw Error('Provedor não disponibilizou o arquivo');let url=trustedMediaUrl(raw),response;
+ else {const raw=typeof r==='string'?r:r?.url||r?.fileLink||r?.fileUrl||r?.downloadUrl||r?.mediaUrl||r?.link||providerResult?.url;if(!raw)throw Error('Provedor não disponibilizou o arquivo');let url=trustedMediaUrl(raw),response;
   for(let i=0;i<3;i++){response=await fetcher(url,{redirect:'manual',signal:AbortSignal.timeout(20000)});if(response.status>=300&&response.status<400){url=trustedMediaUrl(new URL(response.headers.get('location')||'',url).href);continue;}break;}
   if(!response?.ok)throw Error('Arquivo indisponível no provedor');if(Number(response.headers.get('content-length'))>MEDIA_LIMIT)throw Error('Arquivo excede 32 MB');const reader=response.body?.getReader();if(!reader)throw Error('Arquivo vazio');const chunks=[];let size=0;while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>MEDIA_LIMIT){await reader.cancel();throw Error('Arquivo excede 32 MB')}chunks.push(value)}bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
  }
