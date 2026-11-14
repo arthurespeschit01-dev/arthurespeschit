@@ -136,7 +136,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <TooltipProvider delayDuration={0}>
       <OnboardingTour />
-      <div className="min-h-screen flex bg-background">
+      <div className="agency-shell min-h-screen flex bg-background">
         {sidebarOpen && (
           <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
         )}
@@ -242,7 +242,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </aside>
 
         <div className="flex-1 flex flex-col min-h-screen min-w-0">
-          <header className="sticky top-0 z-30 h-14 flex items-center px-4 lg:px-6 border-b border-border bg-background/80 backdrop-blur-xl">
+          <header className="agency-toolbar sticky top-0 z-30 h-14 flex items-center px-4 lg:px-6 border-b border-border bg-background/80 backdrop-blur-xl">
             <button
               onClick={() => {setCollapsed(false);setSidebarOpen(true)}}
               className="flex lg:hidden mr-3 text-muted-foreground hover:text-foreground items-center justify-center w-11 h-11 rounded-md hover:bg-accent"
@@ -272,7 +272,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </header>
           {pathname!=='/comercial/conversas'&&<div aria-label="Localização atual" className="px-4 lg:px-6 pt-3 text-xs text-muted-foreground flex items-center gap-2 min-w-0"><NavLink to="/" className="hover:text-foreground shrink-0">Início</NavLink>{currentGroup&&<><span>/</span><span>{currentGroup.name}</span></>}<span>/</span><span className="text-foreground truncate">{currentPage}</span></div>}
-          <main className="flex-1 min-w-0 p-4 lg:p-6">
+          <main className="agency-content flex-1 min-w-0 p-4 lg:p-6">
             {children}
           </main>
         </div>

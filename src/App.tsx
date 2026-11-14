@@ -1,3 +1,4 @@
+import PilotVisualTheme from "./components/PilotVisualTheme";
 import { Suspense, useEffect } from "react";
 import { lazyWithRetry as lazy } from "@/lib/lazyWithRetry";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -201,7 +202,7 @@ const App = () => (
           <Route path="/formulario/:token" element={<PublicForm />} />
           <Route path="/captura/:token" element={<WorkspacePublic />} />
           <Route path="/reservar/:token" element={<WorkspacePublic />} />
-          <Route path="/*" element={<AuthProvider><Routes>
+          <Route path="/*" element={<AuthProvider><PilotVisualTheme/><Routes>
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/*" element={<ProtectedRoutes />} />
           </Routes></AuthProvider>} />

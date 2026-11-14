@@ -491,7 +491,7 @@ function KpiCard({ icon: Icon, label, value, sub, accent, onClick }: {
   return (
     <div
       onClick={onClick}
-      className={`glass-surface rounded-xl p-5 transition-colors ${onClick ? 'cursor-pointer hover:border-primary/40' : 'hover:border-primary/20'}`}
+      className={`dashboard-metric glass-surface rounded-xl p-5 transition-colors ${onClick ? 'cursor-pointer hover:border-primary/40' : 'hover:border-primary/20'}`}
     >
       <div className="flex items-center justify-between mb-3">
         <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{label}</span>

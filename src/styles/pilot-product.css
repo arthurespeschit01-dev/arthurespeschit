@@ -1,0 +1,271 @@
+/* Owner-only presentation layer. Never changes routes, data, sections or controls. */
+html[data-product-skin="pilot"] {
+  --radius: 0.25rem;
+  --primary: 265 48% 46%;
+  --primary-foreground: 0 0% 100%;
+  --ring: 265 48% 46%;
+  --sidebar-background: 232 9% 15%;
+  --sidebar-foreground: 220 9% 87%;
+  --sidebar-accent: 232 8% 22%;
+  --sidebar-accent-foreground: 0 0% 100%;
+  --sidebar-border: 232 7% 27%;
+  --sidebar-primary: 265 48% 65%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-ring: 265 60% 73%;
+}
+html[data-product-skin="pilot"].light {
+  --background: 60 8% 96%;
+  --foreground: 230 8% 14%;
+  --card: 0 0% 100%;
+  --card-foreground: 230 8% 14%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 230 8% 14%;
+  --accent: 60 5% 92%;
+  --accent-foreground: 230 8% 14%;
+  --secondary: 60 5% 93%;
+  --secondary-foreground: 230 8% 20%;
+  --muted: 60 5% 93%;
+  --muted-foreground: 228 5% 39%;
+  --border: 60 3% 85%;
+  --input: 60 3% 80%;
+  --surface: 60 6% 95%;
+  --surface-hover: 60 5% 92%;
+  --neon-purple: 265 48% 46%;
+  --neon-purple-light: 265 48% 46%;
+  --neon-blue: 214 65% 40%;
+  --neon-blue-light: 207 75% 35%;
+}
+html[data-product-skin="pilot"].dark {
+  --background: 228 12% 11%;
+  --foreground: 220 10% 93%;
+  --card: 228 11% 14%;
+  --card-foreground: 220 10% 93%;
+  --popover: 228 11% 16%;
+  --popover-foreground: 220 10% 93%;
+  --primary: 265 52% 55%;
+  --accent: 228 10% 20%;
+  --accent-foreground: 220 10% 93%;
+  --secondary: 228 10% 18%;
+  --secondary-foreground: 220 10% 91%;
+  --muted: 228 10% 18%;
+  --muted-foreground: 220 9% 71%;
+  --border: 228 9% 27%;
+  --input: 228 9% 34%;
+  --ring: 265 65% 75%;
+  --surface: 228 11% 15%;
+  --surface-hover: 228 10% 19%;
+  --neon-purple: 265 52% 55%;
+  --neon-purple-light: 265 65% 78%;
+}
+html[data-product-skin="pilot"] body {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  -webkit-font-smoothing: antialiased;
+}
+html[data-product-skin="pilot"]
+  :is(.glass-surface, .neon-glow, .neon-glow-blue) {
+  box-shadow: none;
+}
+html[data-product-skin="pilot"] .glass-surface {
+  background: hsl(var(--card));
+  border-color: hsl(var(--border));
+  backdrop-filter: none;
+  border-radius: 4px;
+}
+html[data-product-skin="pilot"] .gradient-text {
+  background: none;
+  background-clip: border-box;
+  color: hsl(var(--foreground));
+  -webkit-text-fill-color: currentColor;
+}
+html[data-product-skin="pilot"] :is(.rounded-xl, .rounded-2xl, .rounded-lg) {
+  border-radius: 4px;
+}
+html[data-product-skin="pilot"]
+  :is(button, input, select, textarea, [role="combobox"]) {
+  border-radius: 3px;
+}
+html[data-product-skin="pilot"] :is(button, a) {
+  transition-duration: 120ms;
+}
+html[data-product-skin="pilot"] :focus-visible {
+  outline-color: hsl(var(--ring));
+  outline-offset: 2px;
+}
+html[data-product-skin="pilot"] .agency-shell > aside {
+  background: hsl(var(--sidebar-background));
+  color: hsl(var(--sidebar-foreground));
+}
+html[data-product-skin="pilot"] .agency-shell > aside > div:first-child {
+  padding: 12px;
+}
+html[data-product-skin="pilot"] .agency-shell > aside > div:first-child img {
+  max-height: 42px;
+}
+html[data-product-skin="pilot"] .agency-shell > aside nav {
+  padding: 12px 10px;
+}
+html[data-product-skin="pilot"] .agency-shell > aside :is(a, button) {
+  border-radius: 2px;
+  font-size: 13px;
+}
+html[data-product-skin="pilot"] .agency-shell > aside nav :is(a, button) {
+  min-height: 38px;
+}
+html[data-product-skin="pilot"] .agency-shell > aside nav svg {
+  width: 17px;
+  height: 17px;
+}
+html[data-product-skin="pilot"]
+  .agency-shell
+  > aside
+  :is(.text-muted-foreground, input) {
+  color: hsl(var(--sidebar-foreground));
+}
+html[data-product-skin="pilot"] .agency-shell > aside input {
+  border-color: hsl(var(--sidebar-border));
+}
+html[data-product-skin="pilot"]
+  .agency-shell
+  > aside
+  :is(a[aria-current="page"], button.bg-primary\/15) {
+  background: hsl(var(--sidebar-accent));
+  color: hsl(var(--sidebar-accent-foreground));
+  box-shadow: inset 2px 0 0 hsl(var(--sidebar-primary));
+}
+html[data-product-skin="pilot"]
+  .agency-shell
+  > aside
+  > div:last-child
+  :is(button, a) {
+  color: hsl(var(--sidebar-foreground));
+}
+html[data-product-skin="pilot"] .agency-shell .agency-toolbar {
+  background: hsl(var(--card));
+  backdrop-filter: none;
+}
+html[data-product-skin="pilot"] .agency-shell .agency-content h1 {
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  line-height: 1.3;
+}
+html[data-product-skin="pilot"] .agency-shell .agency-content h2 {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+html[data-product-skin="pilot"] .agency-shell .agency-content table {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+html[data-product-skin="pilot"] .agency-shell .agency-content :is(th, td) {
+  border-color: hsl(var(--border));
+}
+html[data-product-skin="pilot"] .agency-shell .agency-content th {
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted) / 0.45);
+}
+html[data-product-skin="pilot"] .agency-shell .agency-content tbody tr:hover {
+  background: hsl(var(--muted) / 0.45);
+}
+html[data-product-skin="pilot"] .dashboard-metric {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid hsl(var(--border));
+  border-radius: 0;
+  padding: 16px;
+  box-shadow: none;
+}
+html[data-product-skin="pilot"] .dashboard-metric svg {
+  color: hsl(var(--muted-foreground));
+}
+html[data-product-skin="pilot"] .dashboard-metric .tracking-wider {
+  letter-spacing: 0.035em;
+}
+html[data-product-skin="pilot"] .dashboard-metric .font-bold {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+html[data-product-skin="pilot"] [data-task-workspace] [role="tablist"] {
+  background: transparent;
+  border-radius: 0;
+  border-bottom: 1px solid hsl(var(--border));
+  padding: 0;
+}
+html[data-product-skin="pilot"] [data-task-workspace] [role="tab"] {
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  border-bottom: 2px solid transparent;
+}
+html[data-product-skin="pilot"]
+  [data-task-workspace]
+  [role="tab"][aria-selected="true"] {
+  border-bottom-color: hsl(var(--primary));
+  color: hsl(var(--primary));
+}
+html[data-product-skin="pilot"].dark
+  [data-task-workspace]
+  [role="tab"][aria-selected="true"] {
+  color: hsl(var(--neon-purple-light));
+}
+@media (min-width: 1024px) {
+  html[data-product-skin="pilot"] .agency-shell > aside.w-64 {
+    width: 224px;
+  }
+  html[data-product-skin="pilot"] .agency-shell .agency-toolbar {
+    height: 48px;
+  }
+  html[data-product-skin="pilot"] .agency-shell .agency-content {
+    padding: 20px 28px 28px;
+  }
+  html[data-product-skin="pilot"]
+    .agency-shell
+    .agency-content
+    :is(button.h-10, input.h-10, select.h-10) {
+    height: 36px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-product-skin="pilot"] * {
+    transition-duration: 0ms !important;
+  }
+}
+/* Semantic colors retain their meaning with readable light-theme contrast. */
+html[data-product-skin="pilot"].light
+  :is(.text-emerald-400, .text-emerald-500, .text-green-400, .text-green-500) {
+  color: hsl(153 58% 28%);
+}
+html[data-product-skin="pilot"].light
+  :is(.text-amber-400, .text-amber-500, .text-yellow-400) {
+  color: hsl(32 85% 32%);
+}
+html[data-product-skin="pilot"].light
+  :is(.text-red-400, .text-rose-400, .text-rose-500) {
+  color: hsl(0 65% 40%);
+}
+html[data-product-skin="pilot"].light
+  :is(.text-blue-400, .text-sky-400, .text-cyan-400) {
+  color: hsl(214 65% 36%);
+}
+
+html[data-product-skin="pilot"] .agency-shell > aside input::placeholder {
+  color: hsl(var(--sidebar-foreground) / 0.75);
+}
+@media (max-width: 1023px) {
+  html[data-product-skin="pilot"] .agency-shell > aside nav :is(a, button) {
+    min-height: 44px;
+  }
+}
+html[data-product-skin="pilot"] .agency-content .recharts-cartesian-grid line {
+  stroke: hsl(var(--border));
+  stroke-opacity: 0.7;
+}
+html[data-product-skin="pilot"]
+  .agency-content
+  .recharts-cartesian-axis-tick-value {
+  fill: hsl(var(--muted-foreground));
+}
