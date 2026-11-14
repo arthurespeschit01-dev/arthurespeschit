@@ -406,6 +406,11 @@ try {
     .getByRole("button", { name: "Novo formulário", exact: true })
     .click();
   await page.getByLabel("Título", { exact: true }).fill("Briefing de teste");
+  await page.getByRole('button',{name:'Negrito',exact:true}).click();
+  assert.equal(await page.locator('[aria-label="Editor de formulário"] main strong').count(),1);
+  await page.getByRole('button',{name:'Riscado',exact:true}).click();
+  assert.equal(await page.locator('[aria-label="Editor de formulário"] main del').count(),1);
+  await page.getByLabel('Título do campo 1',{exact:true}).fill('Nome');
   await page
     .getByRole("button", { name: "Adicionar campo", exact: true })
     .click();

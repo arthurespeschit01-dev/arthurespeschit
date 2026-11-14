@@ -1,4 +1,5 @@
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { presentationStyle } from "@/lib/workspaceFormPresentation";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -43,6 +44,7 @@ export function WorkspaceQuestion({
         className="block text-xl font-medium whitespace-pre-wrap"
       >
         <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
           skipHtml
           allowedElements={["p", "strong", "em", "del", "a", "code", "br"]}
           components={{
