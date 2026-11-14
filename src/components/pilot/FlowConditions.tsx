@@ -1,3 +1,4 @@
+import type { WorkspaceStage } from "@/lib/clientWorkspaces";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { selectClass, type CaptureForm } from "@/lib/workspaceCommercial";
@@ -10,10 +11,12 @@ export default function FlowConditions({
   data,
   patch,
   forms,
+  stages,
 }: {
   data: Record<string, unknown>;
   patch: (p: Record<string, unknown>) => void;
   forms: CaptureForm[];
+  stages: WorkspaceStage[];
 }) {
   const rules = (data.rules as Rule[]) || [
     { field: "source", operator: "equals", value: "form" },
@@ -21,7 +24,7 @@ export default function FlowConditions({
   const fields = [
     ["source", "Origem do lead"],
     ["tag", "Etiqueta"],
-    ["stage", "ID da etapa"],
+    ["stage", "Etapa do CRM"],
     ["message", "Mensagem"],
     ["value", "Valor"],
     ["email", "E-mail"],
@@ -80,13 +83,48 @@ export default function FlowConditions({
               </option>
             ))}
           </select>
-          {!["filled", "not_filled"].includes(r.operator) && (
-            <Input
-              aria-label={`Valor da regra ${i + 1}`}
-              value={r.value || ""}
-              onChange={(e) => change(i, { value: e.target.value })}
-            />
-          )}
+          {!["filled", "not_filled"].includes(r.operator) &&
+            (r.field === "stage" ? (
+              <select
+                className={selectClass + " w-full"}
+                aria-label={`Valor da regra ${i + 1}`}
+                value={r.value || ""}
+                onChange={(e) => change(i, { value: e.target.value })}
+              >
+                <option value="">Selecione uma etapa</option>
+                {stages.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            ) : r.field === "source" ? (
+              <select
+                className={selectClass + " w-full"}
+                aria-label={`Valor da regra ${i + 1}`}
+                value={r.value || ""}
+                onChange={(e) => change(i, { value: e.target.value })}
+              >
+                {[
+                  ["manual", "Manual"],
+                  ["form", "Formulário"],
+                  ["appointment", "Agendamento"],
+                  ["whatsapp", "WhatsApp"],
+                  ["meta", "Meta Ads"],
+                  ["import", "Importação"],
+                ].map(([id, label]) => (
+                  <option key={id} value={id}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <Input
+                aria-label={`Valor da regra ${i + 1}`}
+                value={r.value || ""}
+                onChange={(e) => change(i, { value: e.target.value })}
+              />
+            ))}
           <Button
             size="sm"
             variant="ghost"

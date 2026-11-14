@@ -947,7 +947,7 @@ function FlowEditor({
                   </>
                 )}
                 {current.type === "condition" && (
-                  <FlowConditions data={d} patch={patch} forms={forms} />
+                  <FlowConditions data={d} patch={patch} forms={forms} stages={stages}/>
                 )}
                 {current.type.includes("tags") && (
                   <label className="text-sm block">
