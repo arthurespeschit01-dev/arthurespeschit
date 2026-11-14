@@ -464,6 +464,7 @@ export function attribution(input: unknown, req?: Request) {
     "fbc",
     "fbp",
     "fbclid",
+    "cg_click",
   ])
     if (typeof v[k] === "string" && v[k].length <= 500) out[k] = v[k] as string;
   if (typeof v.source_url === "string") {

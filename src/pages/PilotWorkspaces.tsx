@@ -445,6 +445,9 @@ function WorkspaceView() {
                     {
                       inicio: "Visão geral da empresa",
                       geral: "Configurações da empresa",
+                      whatsapp: "Conexão e recebimento do WhatsApp",
+                      "google-agenda": "Conexão do calendário da empresa",
+                      webhooks: "Entradas externas e mapeamentos",
                       rastreamento: "Atribuição e conversões de anúncios",
                       canais: "Contas de envio da empresa",
                       creditos: "Consumo e limites de envio",

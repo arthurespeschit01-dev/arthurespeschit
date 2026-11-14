@@ -46,6 +46,8 @@ await db.exec(
 for (const name of [
   "20261113220957_workspace_integrations.sql",
   "20261114005109_workspace_professional_automations.sql",
+  "20261114011614_workspace_action_cancellation_guards.sql",
+  "20261114024829_workspace_trigger_configuration.sql",
 ])
   await db.exec(
     await readFile(
@@ -181,6 +183,9 @@ async function contextFor(id) {
           "agency_workspace_action_outbox",
           "agency_workspace_conversion_rules",
           "agency_workspace_tracking_links",
+          "agency_workspace_tracking_clicks",
+          "agency_workspace_whatsapp_accounts",
+          "agency_workspace_webhook_receipts",
           ...[
             "forms",
             "form_submissions",
@@ -356,6 +361,45 @@ try {
   assert.equal(await page.locator(".react-flow__node").count(), 4);
   const editor = page.locator('[aria-label="Editor de automações"]');
   await page
+    .locator(".react-flow__node")
+    .filter({ hasText: "GATILHO" })
+    .click();
+  await page
+    .getByLabel("Tipo de evento", { exact: true })
+    .selectOption("stage_changed");
+  await page.getByLabel("Quando entrar na etapa", { exact: true }).waitFor();
+  assert(
+    (await page
+      .getByLabel("Quando entrar na etapa", { exact: true })
+      .locator("option")
+      .count()) > 1,
+  );
+  await page
+    .getByLabel("Tipo de evento", { exact: true })
+    .selectOption("external_webhook");
+  await page
+    .getByRole("button", { name: "Gerar webhook", exact: false })
+    .waitFor();
+  await page
+    .getByLabel("Tipo de evento", { exact: true })
+    .selectOption("form_submitted");
+  await page
+    .getByRole("button", { name: "Equipe respondeu?", exact: false })
+    .click();
+  await page.getByRole("button", { name: "15 min", exact: true }).click();
+  await page.getByRole("button", { name: "30 min", exact: true }).click();
+  assert.equal(
+    await page.getByLabel("Prazo de resposta em minutos").inputValue(),
+    "30",
+  );
+  await page
+    .getByLabel("Momento de conferir resposta")
+    .selectOption("deadline");
+  await page
+    .getByRole("button", { name: "Remover bloco", exact: true })
+    .click();
+
+  await page
     .getByRole("button", { name: "Estágio padrão", exact: false })
     .click();
   await page
@@ -419,6 +463,54 @@ try {
   await page
     .getByRole("button", { name: "Fechar editor", exact: true })
     .click();
+  await navigateModule(page, "Geral");
+  await page
+    .getByRole("link", { name: "WhatsApp", exact: false })
+    .filter({ hasText: "Conexão exclusiva" })
+    .click();
+  await page.getByRole("heading", { name: "WhatsApp", exact: true }).waitFor();
+  assert.equal(
+    await page
+      .getByRole("heading", { name: "Google Agenda", exact: true })
+      .count(),
+    0,
+  );
+  assert.equal(
+    await page
+      .getByRole("heading", { name: "Webhook externo", exact: true })
+      .count(),
+    0,
+  );
+  await navigateModule(page, "Geral");
+  await page.getByRole("link", { name: "Google Agenda", exact: false }).click();
+  await page
+    .getByRole("heading", { name: "Google Agenda", exact: true })
+    .first()
+    .waitFor();
+  assert.equal(
+    await page.getByRole("heading", { name: "WhatsApp", exact: true }).count(),
+    0,
+  );
+  assert.equal(
+    await page
+      .getByRole("heading", { name: "Webhook externo", exact: true })
+      .count(),
+    0,
+  );
+  await navigateModule(page, "Geral");
+  await page
+    .getByRole("link", { name: "Rastreamento de anúncios", exact: false })
+    .click();
+  await page
+    .getByRole("button", { name: "Links rastreáveis", exact: true })
+    .click();
+  await page.getByLabel("Destino", { exact: true }).selectOption("form");
+  assert(
+    (await page
+      .getByLabel("Formulário", { exact: true })
+      .locator("option")
+      .count()) > 1,
+  );
   await navigateModule(page, "Workspace");
   await page.getByLabel("E-mail do convidado").fill("member@example.invalid");
   await page.getByLabel("Nome do convidado").fill("Atendente");

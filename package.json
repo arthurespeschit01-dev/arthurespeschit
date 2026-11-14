@@ -14,7 +14,7 @@
     "test:db": "node tests/pipelines-db.mjs && node tests/legacy-data-db.mjs && node tests/client-operations-db.mjs && node tests/whatsapp-inbox-db.mjs && node tests/whatsapp-mailboxes-db.mjs && node tests/billing-schedule-db.mjs && node tests/task-history-db.mjs && node tests/forms-finance-db.mjs && node tests/form-intake-db.mjs && node tests/task-workspace-db.mjs && node tests/task-schedule-db.mjs && node tests/signup-tenants-db.mjs && node tests/whatsapp-complete-queue-db.mjs && node tests/lid-addresses-db.mjs && node tests/media-schema-db.mjs",
     "test:browser": "node tests/agency-browser.mjs && node tests/form-commercial-browser.mjs && node tests/task-workspace-browser.mjs && node tests/task-schedule-browser.mjs && node tests/signup-browser.mjs",
     "test:edge": "deno test --allow-env supabase/functions/agency-portal/index_test.ts supabase/functions/agency-calendar/index_test.ts supabase/functions/agency-whatsapp/index_test.ts supabase/functions/_shared/agency-whatsapp-delivery_test.ts supabase/functions/_shared/agency-whatsapp-replay_test.ts supabase/functions/_shared/agency-whatsapp-media_test.ts supabase/functions/_shared/agency-whatsapp-avatar_test.ts supabase/functions/_shared/agency-whatsapp-upload_test.ts",
-    "test:pilot": "node tests/pilot-workspaces-db.mjs && node tests/workspace-commercial-db.mjs && node tests/workspace-professional-db.mjs && node tests/pilot-workspaces-browser.mjs"
+    "test:pilot": "node tests/pilot-workspaces-db.mjs && node tests/workspace-commercial-db.mjs && node tests/workspace-professional-db.mjs && node tests/workspace-trigger-config-db.mjs && node tests/pilot-workspaces-browser.mjs"
   },
   "dependencies": {
     "@lovable.dev/cloud-auth-js": "^1.1.2",

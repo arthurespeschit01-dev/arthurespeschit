@@ -1,3 +1,7 @@
+import {
+  mappedWebhook,
+  trackingRedirect,
+} from "../_shared/workspace-triggers.ts";
 import { receiveMetaLead } from "../_shared/workspace-meta.ts";
 import { providerMedia } from "../_shared/agency-whatsapp-upload.ts";
 import {
@@ -221,22 +225,15 @@ export async function handle(req: Request) {
     }
   }
   if (req.method === "GET" && callbackUrl.searchParams.get("link")) {
-    const r = await checked(
-      db.rpc("agency_workspace_resolve_link", {
+    const incoming = attribution(Object.fromEntries(callbackUrl.searchParams));
+    const resolved = await checked(
+      db.rpc("agency_workspace_resolve_tracking_link", {
         p_token: callbackUrl.searchParams.get("link"),
+        p_attributes: incoming,
       }),
     );
-    if (!r) return reply({ error: "Link indisponível." }, 404);
-    const target = new URL(r.destination);
-    if (target.protocol !== "https:")
-      return reply({ error: "Destino inválido." }, 400);
-    if (r.source) target.searchParams.set("utm_source", r.source);
-    if (r.campaign) target.searchParams.set("utm_campaign", r.campaign);
-    for (const name of ["fbclid", "gclid", "gbraid", "wbraid"]) {
-      const value = callbackUrl.searchParams.get(name);
-      if (value && value.length <= 500) target.searchParams.set(name, value);
-    }
-    return Response.redirect(target.toString(), 302);
+    if (!resolved) return reply({ error: "Link indisponível." }, 404);
+    return Response.redirect(trackingRedirect(resolved, callbackUrl), 302);
   }
   if (req.method === "GET" && callbackUrl.searchParams.get("meta_workspace")) {
     const workspace = callbackUrl.searchParams.get("meta_workspace")!;
@@ -323,41 +320,38 @@ export async function handle(req: Request) {
           db.rpc("agency_workspace_ingest_message", {
             p_workspace: c.workspace_id,
             p_account: state.account_id,
-            p_event: event,
+            p_event: { ...event, attribution: whatsappAttribution(body) },
           }),
         );
-        const attrs = whatsappAttribution(body);
-        if (Object.keys(attrs).length && !event.isGroup) {
-          const message = await checked(
-            db
-              .from("agency_workspace_messages")
-              .select("lead_id")
-              .eq("workspace_id", c.workspace_id)
-              .eq("account_id", state.account_id)
-              .eq("provider_id", event.providerId)
-              .maybeSingle(),
-          );
-          if (message?.lead_id) {
-            const lead = await checked(
-              db
-                .from("agency_workspace_leads")
-                .select("attributes")
-                .eq("workspace_id", c.workspace_id)
-                .eq("id", message.lead_id)
-                .single(),
-            );
-            await checked(
-              db
-                .from("agency_workspace_leads")
-                .update({ attributes: { ...attrs, ...lead.attributes } })
-                .eq("workspace_id", c.workspace_id)
-                .eq("id", message.lead_id),
-            );
-          }
-        }
       }
       await work(c.workspace_id);
       return reply({ ok: true });
+    }
+    const automationHook = url.searchParams.get("automation_webhook");
+    if (automationHook) {
+      if (!/^[a-f0-9]{64}$/.test(automationHook))
+        return reply({ error: "Webhook inválido." }, 404);
+      const h = await checked(
+        db.rpc("agency_workspace_find_automation_webhook", {
+          p_token: automationHook,
+        }),
+      );
+      if (!h) return reply({ error: "Webhook inválido ou pausado." }, 404);
+      await active(h.workspace_id);
+      const mapped = await mappedWebhook(body, h.contact_map, h.id);
+      const attrs = attribution(body.attribution);
+      const result = await checked(
+        db.rpc("agency_workspace_receive_automation_webhook", {
+          p_id: h.id,
+          p_request: mapped.request,
+          p_contact: {
+            ...mapped.contact,
+            ...(Object.keys(attrs).length ? { attribution: attrs } : {}),
+          },
+        }),
+      );
+      await work(h.workspace_id).catch(() => {});
+      return reply({ ...result, request_id: mapped.request });
     }
     const external = url.searchParams.get("intake");
     if (external) {
@@ -516,6 +510,8 @@ export async function handle(req: Request) {
       "google_disconnect",
       "save_whatsapp",
       "provider_settings",
+      "automation_webhook_settings",
+      "save_automation_webhook",
       "retry_action",
       "save_provider",
       "asset_upload",
@@ -607,6 +603,33 @@ export async function handle(req: Request) {
       );
       await work(workspace);
       return reply({ ok: true });
+    }
+    if (
+      body.action === "automation_webhook_settings" ||
+      body.action === "save_automation_webhook"
+    ) {
+      if (body.action === "save_automation_webhook") await active(workspace);
+      if (body.id && !uuid(body.id)) throw Error("Webhook inválido.");
+      const result = await checked(
+        db.rpc("agency_workspace_automation_webhook", {
+          p_workspace: workspace,
+          p_id: body.id || null,
+          p_values:
+            body.action === "save_automation_webhook" ? body.values : null,
+        }),
+      );
+      return reply({
+        webhook: result
+          ? {
+              id: result.id,
+              name: result.name,
+              enabled: result.enabled,
+              stage_id: result.stage_id,
+              contact_map: result.contact_map,
+              url: `${base}/functions/v1/workspace-operations?automation_webhook=${result.token}`,
+            }
+          : null,
+      });
     }
     if (body.action === "provider_settings") {
       const providers = await Promise.all(

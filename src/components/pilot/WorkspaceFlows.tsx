@@ -1,3 +1,4 @@
+import FlowTriggerFields from "./FlowTriggerFields";
 import FlowExecutions from "./FlowExecutions";
 import FlowConditions from "./FlowConditions";
 import FlowAdvancedFields from "./FlowAdvancedFields";
@@ -78,6 +79,11 @@ function Block({ data, selected }: NodeProps) {
       <p className="text-xs text-muted-foreground mt-2 whitespace-pre-wrap break-words">
         {String(data.summary || "Clique para configurar")}
       </p>
+      {kind !== "trigger" && data.connected === false && (
+        <p className="text-xs text-muted-foreground mt-1">
+          Sem conexão de entrada
+        </p>
+      )}
       {kind === "split" ? (
         <>
           {(
@@ -120,8 +126,8 @@ function Block({ data, selected }: NodeProps) {
             style={{ left: "70%", background: "#ef4444" }}
           />
           <div className="flex justify-between text-[10px] mt-2">
-            <span>Sim</span>
-            <span>Não</span>
+            <span>{String(data.yes_label || "Sim")}</span>
+            <span>{String(data.no_label || "Não")}</span>
           </div>
         </>
       ) : (
@@ -131,14 +137,32 @@ function Block({ data, selected }: NodeProps) {
   );
 }
 const nodeTypes = { block: Block };
-const summary = (n: FlowNode) =>
-  n.type === "trigger"
-    ? events[String(n.data.event)] || "Escolha um gatilho"
-    : n.type === "wait"
-      ? `${n.data.minutes || 1} minuto(s)`
-      : n.type.includes("tags")
-        ? ((n.data.tags as string[]) || []).join(", ")
-        : String(n.data.text || n.data.field || "Configurar ação");
+const summary = (n: FlowNode, stages: WorkspaceStage[]) => {
+  const stage = (id: unknown) => stages.find((s) => s.id === id)?.name;
+  if (n.type === "trigger") {
+    const event = String(n.data.event),
+      label = events[event] || "Escolha um gatilho";
+    if (event === "stage_changed")
+      return `${label} · ${stage(n.data.from_stage_id) || "Qualquer origem"} → ${stage(n.data.to_stage_id) || "Qualquer destino"}`;
+    if (event === "external_webhook")
+      return n.data.webhook_id
+        ? "Webhook configurado · confira a ativação"
+        : "Gere a URL de recebimento";
+    if (event === "tag_added")
+      return `${label} · ${n.data.tag || "Qualquer etiqueta"}`;
+    if (event === "message_received")
+      return `${label} · ${n.data.message_mode === "first_contact" ? "Contato novo" : n.data.message_mode === "first_unanswered" ? "Nova sequência" : "Todas as mensagens"}${(n.data.texts as string[] | undefined)?.length ? " · com filtro de texto" : ""}`;
+    return label;
+  }
+  if (n.type === "team_response" || n.type === "wait_response")
+    return `${n.data.minutes || 1} min · ${n.data.response_mode === "deadline" ? "Conferir no fim do prazo" : "Continuar ao responder"}${n.data.deduplicate ? " · Agrupar mensagens" : ""}`;
+  if (n.type === "move_stage")
+    return `Mover para ${stage(n.data.stage_id) || "etapa a configurar"}`;
+  if (n.type === "wait") return `${n.data.minutes || 1} minuto(s)`;
+  if (n.type.includes("tags"))
+    return ((n.data.tags as string[]) || []).join(", ");
+  return String(n.data.text || n.data.field || "Configurar ação");
+};
 export default function WorkspaceFlows({
   workspace,
   flows,
@@ -445,11 +469,22 @@ function FlowEditor({
         data: {
           kind: n.type,
           title: n.data.label || labels[n.type],
+          yes_label:
+            n.type === "team_response" || n.type === "wait_response"
+              ? "Respondeu"
+              : "Sim",
+          no_label:
+            n.type === "team_response"
+              ? "Sem resposta"
+              : n.type === "wait_response"
+                ? "Prazo esgotado"
+                : "Não",
+          connected: edges.some((e) => e.target === n.id),
           outlets: n.data.branches,
-          summary: summary(n),
+          summary: summary(n, stages),
         },
       })),
-    [raw, selected, sizes],
+    [raw, selected, sizes, edges, stages],
   );
   const current = raw.find((n) => n.id === selected);
   const onNodesChange = useCallback((changes: NodeChange[]) => {
@@ -532,54 +567,63 @@ function FlowEditor({
         : { x: 160, y: 160 });
     const data: Record<string, unknown> =
       type === "trigger"
-        ? { event: event || "form_submitted" }
+        ? { event: event || "form_submitted", config_version: 2 }
         : type === "condition"
           ? {
               match: "all",
               rules: [{ field: "source", operator: "equals", value: "form" }],
             }
-          : ["wait", "wait_response", "team_response"].includes(type)
-            ? { minutes: 60 }
-            : type === "wait_appointment"
+          : ["wait_response", "team_response"].includes(type)
+            ? {
+                minutes: 15,
+                reply_anchor:
+                  type === "team_response" ? "last_incoming" : "last_outgoing",
+                response_mode:
+                  type === "team_response" ? "deadline" : "immediate",
+                deduplicate: true,
+              }
+            : type === "wait"
               ? { minutes: 60 }
-              : type === "business_hours"
-                ? {
-                    days: [1, 2, 3, 4, 5],
-                    start: "09:00",
-                    end: "18:00",
-                    timezone: "America/Sao_Paulo",
-                  }
-                : type === "split"
+              : type === "wait_appointment"
+                ? { minutes: 60 }
+                : type === "business_hours"
                   ? {
-                      branches: [
-                        { id: "yes", label: "Caminho A", weight: 50 },
-                        { id: "no", label: "Caminho B", weight: 50 },
-                      ],
+                      days: [1, 2, 3, 4, 5],
+                      start: "09:00",
+                      end: "18:00",
+                      timezone: "America/Sao_Paulo",
                     }
-                  : type.includes("tags")
-                    ? { tags: ["Nova etiqueta"] }
-                    : type === "move_stage"
-                      ? { stage_id: stages[0]?.id }
-                      : type === "assign_user"
-                        ? { user_id: members[0]?.user_id }
-                        : type === "distribute"
-                          ? {
-                              user_ids: members
-                                .filter((m) => m.role !== "viewer")
-                                .map((m) => m.user_id),
-                            }
-                          : type === "meta_event"
-                            ? { event_name: "Lead" }
-                            : {
-                                text:
-                                  type === "create_task"
-                                    ? "Entrar em contato com {nome}"
-                                    : type === "create_group"
-                                      ? "Atendimento de {nome}"
-                                      : "Olá, {nome}!",
-                                subject: "Contato da equipe",
-                                participants: [],
-                              };
+                  : type === "split"
+                    ? {
+                        branches: [
+                          { id: "yes", label: "Caminho A", weight: 50 },
+                          { id: "no", label: "Caminho B", weight: 50 },
+                        ],
+                      }
+                    : type.includes("tags")
+                      ? { tags: ["Nova etiqueta"] }
+                      : type === "move_stage"
+                        ? { stage_id: stages[0]?.id }
+                        : type === "assign_user"
+                          ? { user_id: members[0]?.user_id }
+                          : type === "distribute"
+                            ? {
+                                user_ids: members
+                                  .filter((m) => m.role !== "viewer")
+                                  .map((m) => m.user_id),
+                              }
+                            : type === "meta_event"
+                              ? { event_name: "Lead" }
+                              : {
+                                  text:
+                                    type === "create_task"
+                                      ? "Entrar em contato com {nome}"
+                                      : type === "create_group"
+                                        ? "Atendimento de {nome}"
+                                        : "Olá, {nome}!",
+                                  subject: "Contato da equipe",
+                                  participants: [],
+                                };
     setRaw((prior) => [
       ...prior,
       { id, type, position: center, data: { ...data, label } },
@@ -860,6 +904,7 @@ function FlowEditor({
               </div>
               <fieldset disabled={!manage} className="space-y-3 min-w-0">
                 <FlowAdvancedFields
+                  key={current.id}
                   type={current.type}
                   data={d}
                   patch={patch}
@@ -875,79 +920,24 @@ function FlowEditor({
                   />
                 </label>
                 {current.type === "trigger" && (
-                  <>
-                    <label className="text-sm block">
-                      Evento
-                      <select
-                        className={selectClass + " w-full"}
-                        value={String(d.event || "form_submitted")}
-                        onChange={(e) =>
-                          patch({ event: e.target.value, source_id: "" })
-                        }
-                      >
-                        {Object.entries(events).map(([k, v]) => (
-                          <option key={k} value={k}>
-                            {v}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    {["form_submitted", "appointment_created"].includes(
-                      String(d.event),
-                    ) && (
-                      <label className="text-sm block">
-                        Origem
-                        <select
-                          className={selectClass + " w-full"}
-                          value={String(d.source_id || "")}
-                          onChange={(e) => patch({ source_id: e.target.value })}
-                        >
-                          <option value="">Todas</option>
-                          {(d.event === "form_submitted"
-                            ? forms
-                            : calendars
-                          ).map((f) => (
-                            <option key={f.id} value={f.id}>
-                              {f.title}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    )}
-                    {d.event === "message_received" && (
-                      <>
-                        <Input
-                          placeholder="Texto contém (opcional)"
-                          aria-label="Filtro de mensagem"
-                          value={String(d.contains || "")}
-                          onChange={(e) => patch({ contains: e.target.value })}
-                        />
-                        <select
-                          aria-label="Direção da mensagem"
-                          className={selectClass}
-                          value={String(d.direction || "incoming")}
-                          onChange={(e) => patch({ direction: e.target.value })}
-                        >
-                          <option value="both">Qualquer direção</option>
-                          <option value="incoming">Recebida</option>
-                          <option value="outgoing">Enviada</option>
-                        </select>
-                        <label className="text-sm flex gap-2">
-                          <input
-                            type="checkbox"
-                            checked={!!d.first_contact}
-                            onChange={(e) =>
-                              patch({ first_contact: e.target.checked })
-                            }
-                          />
-                          Somente primeiro contato
-                        </label>
-                      </>
-                    )}
-                  </>
+                  <FlowTriggerFields
+                    key={current.id}
+                    workspace={workspace}
+                    data={d}
+                    patch={patch}
+                    stages={stages}
+                    forms={forms}
+                    calendars={calendars}
+                    manage={manage}
+                  />
                 )}
                 {current.type === "condition" && (
-                  <FlowConditions data={d} patch={patch} forms={forms} stages={stages}/>
+                  <FlowConditions
+                    data={d}
+                    patch={patch}
+                    forms={forms}
+                    stages={stages}
+                  />
                 )}
                 {current.type.includes("tags") && (
                   <label className="text-sm block">

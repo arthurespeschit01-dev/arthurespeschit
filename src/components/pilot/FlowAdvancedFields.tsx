@@ -1,3 +1,4 @@
+import FlowReplyFields from "./FlowReplyFields";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -47,9 +48,15 @@ export default function FlowAdvancedFields({
   };
   return (
     <div className="space-y-3">
-      {["wait_response", "team_response", "wait_appointment"].includes(
-        type,
-      ) && (
+      {["team_response", "wait_response"].includes(type) && (
+        <FlowReplyFields
+          type={type as "team_response" | "wait_response"}
+          workspace={workspace}
+          data={data}
+          patch={patch}
+        />
+      )}
+      {type === "wait_appointment" && (
         <>
           <label className="text-sm block">
             {type === "wait_appointment"

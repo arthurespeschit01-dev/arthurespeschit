@@ -75,6 +75,8 @@ export async function receiveMetaLead(
             "Contato Meta Ads",
           phone: fields.phone_number || "",
           email: fields.email || "",
+          meta_form_id: String(change.value?.form_id || ""),
+          meta_page_id: String(entry.id),
         },
       });
       if (error)

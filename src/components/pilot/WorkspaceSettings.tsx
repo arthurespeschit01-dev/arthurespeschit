@@ -41,14 +41,20 @@ export default function WorkspaceSettings({
         [
           "WhatsApp",
           "Conexão exclusiva desta empresa e recebimento de mensagens",
-          "integracoes",
+          "whatsapp",
           MessageSquare,
         ],
         [
           "Google Agenda",
           "Calendário e disponibilidade da empresa",
-          "integracoes",
+          "google-agenda",
           Calendar,
+        ],
+        [
+          "Webhooks externos",
+          "URLs de entrada, mapeamento e recebimentos",
+          "webhooks",
+          Webhook,
         ],
         [
           "Rastreamento de anúncios",

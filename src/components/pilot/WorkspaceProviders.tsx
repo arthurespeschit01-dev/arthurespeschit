@@ -9,6 +9,7 @@ import {
   dateLabel,
   selectClass,
 } from "@/lib/workspaceCommercial";
+import TrackingLinks from "./WorkspaceTrackingLinks";
 import { RecordMenu, ShareLink, Empty } from "./CommercialShared";
 const fields: Record<string, [string, string, boolean][]> = {
   meta: [
@@ -316,7 +317,7 @@ export default function WorkspaceProviders({
                           {
                             queued: "Na fila",
                             sending: "Enviando",
-                            sent: "Confirmado",
+                            sent: "Aceito pelo provedor",
                             failed: "Falhou",
                             uncertain: "Não confirmado",
                             cancelled: "Cancelado",
@@ -728,108 +729,6 @@ function ConversionRules({
           </div>
         </form>
       )}
-    </section>
-  );
-}
-function TrackingLinks({
-  workspace,
-  links,
-  base,
-  busy,
-  act,
-}: {
-  workspace: string;
-  links: TrackingLink[];
-  base: string;
-  busy: boolean;
-  act: (fn: () => PromiseLike<unknown>) => Promise<void>;
-}) {
-  const [name, setName] = useState(""),
-    [url, setUrl] = useState(""),
-    [source, setSource] = useState(""),
-    [campaign, setCampaign] = useState("");
-  return (
-    <section className="space-y-3">
-      <h3 className="font-semibold">Links rastreáveis</h3>
-      <form
-        className="border rounded-xl p-4 bg-card grid sm:grid-cols-2 gap-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void act(() =>
-            workspaceDb.from("agency_workspace_tracking_links").insert({
-              workspace_id: workspace,
-              name,
-              destination: url,
-              source,
-              campaign,
-            }),
-          );
-        }}
-      >
-        <Input
-          required
-          aria-label="Nome do link"
-          placeholder="Nome do link"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <Input
-          required
-          type="url"
-          pattern="https://.*"
-          aria-label="Destino do link"
-          placeholder="https://…"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-        />
-        <Input
-          aria-label="Origem UTM"
-          placeholder="Origem (utm_source)"
-          value={source}
-          onChange={(e) => setSource(e.target.value)}
-        />
-        <Input
-          aria-label="Campanha UTM"
-          placeholder="Campanha (utm_campaign)"
-          value={campaign}
-          onChange={(e) => setCampaign(e.target.value)}
-        />
-        <Button disabled={busy}>Criar link</Button>
-      </form>
-      {links.map((l) => (
-        <article key={l.id} className="border rounded-xl p-4 bg-card space-y-2">
-          <div className="flex justify-between gap-3">
-            <div>
-              <h4 className="font-semibold">{l.name}</h4>
-              <p className="text-xs text-muted-foreground">
-                {l.clicks} cliques · {l.enabled ? "Ativo" : "Pausado"}
-              </p>
-            </div>
-            <RecordMenu
-              enabled={!busy}
-              toggle={() =>
-                void act(() =>
-                  workspaceDb
-                    .from("agency_workspace_tracking_links")
-                    .update({ enabled: !l.enabled })
-                    .eq("workspace_id", workspace)
-                    .eq("id", l.id),
-                )
-              }
-              remove={() =>
-                void act(() =>
-                  workspaceDb
-                    .from("agency_workspace_tracking_links")
-                    .delete()
-                    .eq("workspace_id", workspace)
-                    .eq("id", l.id),
-                )
-              }
-            />
-          </div>
-          <ShareLink url={base + l.token} />
-        </article>
-      ))}
     </section>
   );
 }

@@ -65,6 +65,9 @@ export default function WorkspaceCommercial({
     enabled: ![
       "conversas",
       "integracoes",
+      "whatsapp",
+      "google-agenda",
+      "webhooks",
       "geral",
       "rastreamento",
       "canais",
@@ -117,13 +120,22 @@ export default function WorkspaceCommercial({
         write={write}
       />
     );
-  if (section === "integracoes")
+  if (
+    ["integracoes", "whatsapp", "google-agenda", "webhooks"].includes(section)
+  )
     return (
       <WorkspaceIntegrations
-        key={workspace}
+        key={workspace + section}
         workspace={workspace}
         stages={stages}
         manage={manage}
+        kind={
+          section === "google-agenda"
+            ? "google"
+            : section === "webhooks"
+              ? "webhook"
+              : "whatsapp"
+        }
       />
     );
   if (q.isPending) return <p role="status">Carregando módulos…</p>;
