@@ -53,6 +53,7 @@ for (const name of [
   "20261114033015_workspace_roles_and_form_builder.sql",
   "20261114033021_workspace_tracking_and_flow_audit.sql",
   "20261114034242_workspace_ai_conversion_rules.sql",
+  "20261114151246_workspace_crm_and_flow_parity.sql",
 ])
   await db.exec(
     await readFile(
@@ -192,6 +193,27 @@ async function contextFor(id) {
         );
         return reply(r.rows[0].result);
       }
+      if (
+        [
+          "agency_workspace_default_pipeline",
+          "agency_workspace_undo_lead",
+          "agency_workspace_conversation_metrics",
+        ].includes(table)
+      ) {
+        const args =
+          table === "agency_workspace_default_pipeline"
+            ? [body.p_workspace, body.p_pipeline]
+            : table === "agency_workspace_undo_lead"
+              ? [body.p_workspace, body.p_history]
+              : [body.p_workspace, body.p_from, body.p_until];
+        const r = await run(id, () =>
+          db.query(
+            `select public.${table}(${args.map((_, i) => "$" + (i + 1)).join(",")}) result`,
+            args,
+          ),
+        );
+        return reply(r.rows[0].result);
+      }
       if (table === "agency_workspace_flow_issues") {
         const r = await run(id, () =>
           db.query("select agency_workspace_flow_issues($1,$2) result", [
@@ -260,6 +282,8 @@ async function contextFor(id) {
           "agency_workspace_ai_checks",
           ...[
             "forms",
+            "form_folders",
+            "crm_history",
             "form_submissions",
             "form_views",
             "calendars",
@@ -402,15 +426,28 @@ try {
   await page
     .getByRole("heading", { name: "Captação de contatos", exact: true })
     .waitFor();
+  await page.getByLabel("Nome da nova pasta").fill("Campanhas");
+  await page.getByRole("button", { name: "Nova pasta", exact: true }).click();
+  await page
+    .getByLabel("Pasta dos formulários")
+    .selectOption({ label: "Campanhas (0)" });
   await page
     .getByRole("button", { name: "Novo formulário", exact: true })
     .click();
   await page.getByLabel("Título", { exact: true }).fill("Briefing de teste");
-  await page.getByRole('button',{name:'Negrito',exact:true}).click();
-  assert.equal(await page.locator('[aria-label="Editor de formulário"] main strong').count(),1);
-  await page.getByRole('button',{name:'Riscado',exact:true}).click();
-  assert.equal(await page.locator('[aria-label="Editor de formulário"] main del').count(),1);
-  await page.getByLabel('Título do campo 1',{exact:true}).fill('Nome');
+  await page.getByRole("button", { name: "Negrito", exact: true }).click();
+  assert.equal(
+    await page
+      .locator('[aria-label="Editor de formulário"] main strong')
+      .count(),
+    1,
+  );
+  await page.getByRole("button", { name: "Riscado", exact: true }).click();
+  assert.equal(
+    await page.locator('[aria-label="Editor de formulário"] main del').count(),
+    1,
+  );
+  await page.getByLabel("Título do campo 1", { exact: true }).fill("Nome");
   await page
     .getByRole("button", { name: "Adicionar campo", exact: true })
     .click();
@@ -432,6 +469,26 @@ try {
       ),
     )
   ).rows[0];
+  assert(publicForm.folder_id);
+  await page
+    .getByRole("button", { name: "Duplicar formulário", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Salvar formulário", exact: true })
+    .click();
+  await page
+    .getByRole("heading", { name: "Briefing de teste · cópia", exact: true })
+    .waitFor();
+  const copied = (
+    await run(pilot, () =>
+      db.query(
+        "select * from agency_workspace_forms where workspace_id=$1 and title=$2",
+        [alpha, "Briefing de teste · cópia"],
+      ),
+    )
+  ).rows[0];
+  assert.equal(copied.enabled, false);
+  assert.notEqual(copied.token, publicForm.token);
   const publicPage = await context.newPage();
   await publicPage.goto(base + "/captura/" + publicForm.token);
   await publicPage.getByLabel("Nome", { exact: true }).fill("Carla");
@@ -606,6 +663,38 @@ try {
   await page
     .getByRole("button", { name: "Fechar editor", exact: true })
     .click();
+  const exportWait = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Exportar JSON", exact: true })
+    .click();
+  const exported = await exportWait;
+  const text = await readFile(await exported.path(), "utf8");
+  await page
+    .getByLabel("Arquivo do funil")
+    .setInputFiles({
+      name: "funil.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(text),
+    });
+  await page.locator('[aria-label="Editor de automações"]').waitFor();
+  assert.equal(
+    await page.getByLabel("Ativo", { exact: true }).isChecked(),
+    false,
+  );
+  await page.getByRole("button", { name: "Salvar funil", exact: true }).click();
+  await page
+    .locator('[aria-label="Editor de automações"]')
+    .waitFor({ state: "detached" });
+  const imported = (
+    await run(pilot, () =>
+      db.query(
+        "select * from agency_workspace_flows where workspace_id=$1 and name like '%importado'",
+        [alpha],
+      ),
+    )
+  ).rows;
+  assert.equal(imported.length, 1);
+  assert.equal(imported[0].enabled, false);
   await navigateModule(page, "Geral");
   await page
     .getByRole("link", { name: "WhatsApp", exact: false })
@@ -764,6 +853,33 @@ try {
   await page
     .getByRole("button", { name: "Carla revisada", exact: true })
     .waitFor();
+  await page
+    .getByRole("button", { name: "Lista de oportunidades", exact: true })
+    .click();
+  assert.equal(await page.getByLabel("Pipeline da empresa").isVisible(), false);
+  await page
+    .getByRole("button", { name: "Histórico do CRM", exact: true })
+    .click();
+  await page
+    .getByRole("heading", { name: "Últimas 100 alterações da empresa" })
+    .waitFor();
+  await page
+    .getByRole("button", { name: "Desfazer", exact: true })
+    .first()
+    .click();
+  await page.getByRole("button", { name: "Desfeito", exact: true }).waitFor();
+  assert.equal(
+    (
+      await run(pilot, () =>
+        db.query(
+          "select name from agency_workspace_leads where workspace_id=$1 and phone='11999990000'",
+          [alpha],
+        ),
+      )
+    ).rows[0].name,
+    "Carla piloto",
+  );
+
   await navigateModule(page, "Todas as subcontas");
   await page
     .getByRole("button", {

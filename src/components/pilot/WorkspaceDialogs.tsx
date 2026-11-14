@@ -290,7 +290,7 @@ export function PipelineDialog({
   leads: WorkspaceLead[];
 } & Base) {
   const [name, setName] = useState(pipeline?.name || ""),
-    [items, setItems] = useState(() =>
+    [items, setItems] = useState<WorkspaceStage[]>(() =>
       stages.length
         ? stages.map((s) => ({ ...s }))
         : [
@@ -339,6 +339,15 @@ export function PipelineDialog({
                     name: s.name.trim(),
                     color: s.color,
                     kind: s.kind,
+                    probability:
+                      s.kind === "won"
+                        ? 100
+                        : s.kind === "lost"
+                          ? 0
+                          : (s.probability ?? 0),
+                    show_on_dashboard: s.show_on_dashboard ?? true,
+                    create_meeting_task: s.create_meeting_task ?? false,
+                    meeting_due_minutes: s.meeting_due_minutes ?? 1440,
                   })),
                 },
               );
@@ -419,6 +428,88 @@ export function PipelineDialog({
                   <option value="won">Ganho</option>
                   <option value="lost">Perdido</option>
                 </select>
+                <label className="text-xs">
+                  Probabilidade (%)
+                  <Input
+                    type="number"
+                    className="w-28"
+                    aria-label={`Probabilidade da etapa ${i + 1}`}
+                    min={0}
+                    max={100}
+                    disabled={s.kind !== "open"}
+                    value={
+                      s.kind === "won"
+                        ? 100
+                        : s.kind === "lost"
+                          ? 0
+                          : (s.probability ?? 0)
+                    }
+                    onChange={(e) =>
+                      setItems((a) =>
+                        a.map((x, j) =>
+                          j === i
+                            ? { ...x, probability: Number(e.target.value) }
+                            : x,
+                        ),
+                      )
+                    }
+                  />
+                </label>
+                <label className="text-xs flex gap-2 items-center">
+                  <input
+                    type="checkbox"
+                    checked={s.show_on_dashboard ?? true}
+                    onChange={(e) =>
+                      setItems((a) =>
+                        a.map((x, j) =>
+                          j === i
+                            ? { ...x, show_on_dashboard: e.target.checked }
+                            : x,
+                        ),
+                      )
+                    }
+                  />
+                  Mostrar no dashboard
+                </label>
+                <label className="text-xs flex gap-2 items-center">
+                  <input
+                    type="checkbox"
+                    checked={s.create_meeting_task ?? false}
+                    onChange={(e) =>
+                      setItems((a) =>
+                        a.map((x, j) =>
+                          j === i
+                            ? { ...x, create_meeting_task: e.target.checked }
+                            : x,
+                        ),
+                      )
+                    }
+                  />
+                  Criar tarefa de reunião
+                </label>
+                {s.create_meeting_task && (
+                  <label className="text-xs">
+                    Prazo da tarefa (minutos)
+                    <Input
+                      type="number"
+                      min={0}
+                      max={43200}
+                      value={s.meeting_due_minutes ?? 1440}
+                      onChange={(e) =>
+                        setItems((a) =>
+                          a.map((x, j) =>
+                            j === i
+                              ? {
+                                  ...x,
+                                  meeting_due_minutes: Number(e.target.value),
+                                }
+                              : x,
+                          ),
+                        )
+                      }
+                    />
+                  </label>
+                )}
                 <Button
                   type="button"
                   variant="outline"

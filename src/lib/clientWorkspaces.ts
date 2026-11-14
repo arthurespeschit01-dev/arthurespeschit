@@ -10,11 +10,17 @@ export interface ClientWorkspace {
   owner_user_id: string;
 }
 export interface WorkspacePipeline {
+  is_default?: boolean;
+  archived?: boolean;
   id: string;
   workspace_id: string;
   name: string;
 }
 export interface WorkspaceStage {
+  probability?: number;
+  show_on_dashboard?: boolean;
+  create_meeting_task?: boolean;
+  meeting_due_minutes?: number;
   id: string;
   workspace_id: string;
   pipeline_id: string;

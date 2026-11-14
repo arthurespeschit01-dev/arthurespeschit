@@ -15,7 +15,8 @@
     "test:browser": "node tests/agency-browser.mjs && node tests/form-commercial-browser.mjs && node tests/task-workspace-browser.mjs && node tests/task-schedule-browser.mjs && node tests/signup-browser.mjs",
     "test:edge": "deno test --allow-env supabase/functions/agency-portal/index_test.ts supabase/functions/agency-calendar/index_test.ts supabase/functions/agency-whatsapp/index_test.ts supabase/functions/_shared/agency-whatsapp-delivery_test.ts supabase/functions/_shared/agency-whatsapp-replay_test.ts supabase/functions/_shared/agency-whatsapp-media_test.ts supabase/functions/_shared/agency-whatsapp-avatar_test.ts supabase/functions/_shared/agency-whatsapp-upload_test.ts",
     "test:pilot": "node tests/pilot-workspaces-db.mjs && node tests/workspace-commercial-db.mjs && node tests/workspace-professional-db.mjs && node tests/workspace-trigger-config-db.mjs && node tests/workspace-expansion-db.mjs && node tests/pilot-workspaces-browser.mjs",
-    "test:pilot-visual": "node tests/pilot-visual-browser.mjs"
+    "test:pilot-visual": "node tests/pilot-visual-browser.mjs",
+    "test:chronos-parity": "node tests/workspace-parity-db.mjs && vitest run src/lib/workflowTransfer.test.ts src/lib/trackingSite.test.ts"
   },
   "dependencies": {
     "@lovable.dev/cloud-auth-js": "^1.1.2",

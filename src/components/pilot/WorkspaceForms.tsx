@@ -26,6 +26,7 @@ import { RecordMenu, ShareLink, Empty } from "./CommercialShared";
 export default function WorkspaceForms({
   workspace,
   forms,
+  folders,
   responses,
   stages,
   manage,
@@ -34,6 +35,7 @@ export default function WorkspaceForms({
 }: {
   workspace: string;
   forms: CaptureForm[];
+  folders: { id: string; name: string }[];
   responses: Submission[];
   stages: WorkspaceStage[];
   manage: boolean;
@@ -41,7 +43,9 @@ export default function WorkspaceForms({
   run: (fn: () => PromiseLike<{ error: unknown }>) => void;
 }) {
   const [editing, setEditing] = useState<CaptureForm | null>(null),
-    [selected, setSelected] = useState("");
+    [selected, setSelected] = useState(""),
+    [folder, setFolder] = useState("all"),
+    [folderName, setFolderName] = useState("");
   const fresh = (): CaptureForm => ({
     id: "",
     workspace_id: workspace,
@@ -58,6 +62,7 @@ export default function WorkspaceForms({
     stage_id: stages[0]?.id || "",
     token: "",
     enabled: true,
+    folder_id: folder === "all" || folder === "none" ? null : folder,
     success_message: "Recebemos suas informações. Obrigado!",
     presentation: {
       layout: "step",
@@ -78,53 +83,148 @@ export default function WorkspaceForms({
         Cada resposta pode criar um contato no CRM e iniciar um funil. Contatos
         já existentes mantêm a etapa em que estão.
       </p>
-      <div className="grid md:grid-cols-2 gap-3">
-        {forms.map((f) => (
-          <article
-            className="border rounded-xl p-4 bg-card space-y-3"
-            key={f.id}
-          >
-            <div className="flex justify-between items-start gap-3">
-              <div>
-                <h3 className="font-semibold">{f.title}</h3>
-                <p className="text-xs text-muted-foreground">
-                  {f.enabled ? "Ativo" : "Desativado"} ·{" "}
-                  {responses.filter((r) => r.form_id === f.id).length} respostas
-                </p>
-              </div>
-              <RecordMenu
-                enabled={manage}
-                edit={() => setEditing(f)}
-                toggle={() =>
-                  run(() =>
-                    workspaceDb
-                      .from("agency_workspace_forms")
-                      .update({ enabled: !f.enabled })
-                      .eq("workspace_id", workspace)
-                      .eq("id", f.id),
-                  )
-                }
-                remove={() =>
-                  run(() =>
-                    workspaceDb
-                      .from("agency_workspace_forms")
-                      .delete()
-                      .eq("workspace_id", workspace)
-                      .eq("id", f.id),
-                  )
-                }
-              />
-            </div>
-            <ShareLink url={publicLink("captura", f.token)} />
+      <div className="flex flex-wrap gap-2 items-center">
+        <select
+          aria-label="Pasta dos formulários"
+          className={selectClass}
+          value={folder}
+          onChange={(e) => setFolder(e.target.value)}
+        >
+          <option value="all">Todas as pastas ({forms.length})</option>
+          <option value="none">
+            Sem pasta ({forms.filter((f) => !f.folder_id).length})
+          </option>
+          {folders.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name} ({forms.filter((f) => f.folder_id === p.id).length})
+            </option>
+          ))}
+        </select>
+        {manage && (
+          <>
+            <Input
+              className="max-w-xs"
+              aria-label="Nome da nova pasta"
+              maxLength={120}
+              placeholder="Nome da nova pasta"
+              value={folderName}
+              onChange={(e) => setFolderName(e.target.value)}
+            />
             <Button
               variant="outline"
-              size="sm"
-              onClick={() => setSelected(f.id)}
+              disabled={!folderName.trim()}
+              onClick={() =>
+                run(async () => {
+                  const r = await workspaceDb
+                    .from("agency_workspace_form_folders")
+                    .insert({
+                      workspace_id: workspace,
+                      name: folderName.trim(),
+                    });
+                  if (!r.error) setFolderName("");
+                  return r;
+                })
+              }
             >
-              Ver respostas
+              Nova pasta
             </Button>
-          </article>
-        ))}
+          </>
+        )}
+      </div>
+      <div className="grid md:grid-cols-2 gap-3">
+        {forms
+          .filter(
+            (f) =>
+              folder === "all" ||
+              (folder === "none" ? !f.folder_id : f.folder_id === folder),
+          )
+          .map((f) => (
+            <article
+              className="border rounded-xl p-4 bg-card space-y-3"
+              key={f.id}
+            >
+              <div className="flex justify-between items-start gap-3">
+                <div>
+                  <h3 className="font-semibold">{f.title}</h3>
+                  <p className="text-xs text-muted-foreground">
+                    {f.enabled ? "Ativo" : "Desativado"} ·{" "}
+                    {responses.filter((r) => r.form_id === f.id).length}{" "}
+                    respostas
+                  </p>
+                </div>
+                <RecordMenu
+                  enabled={manage}
+                  edit={() => setEditing(f)}
+                  toggle={() =>
+                    run(() =>
+                      workspaceDb
+                        .from("agency_workspace_forms")
+                        .update({ enabled: !f.enabled })
+                        .eq("workspace_id", workspace)
+                        .eq("id", f.id),
+                    )
+                  }
+                  remove={() =>
+                    run(() =>
+                      workspaceDb
+                        .from("agency_workspace_forms")
+                        .delete()
+                        .eq("workspace_id", workspace)
+                        .eq("id", f.id),
+                    )
+                  }
+                />
+              </div>
+              <ShareLink url={publicLink("captura", f.token)} />
+              {manage && (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setEditing({
+                        ...f,
+                        id: "",
+                        token: "",
+                        title: f.title + " · cópia",
+                        enabled: false,
+                      })
+                    }
+                  >
+                    Duplicar formulário
+                  </Button>
+                  <select
+                    aria-label={"Mover formulário " + f.title + " para pasta"}
+                    className={selectClass}
+                    value={f.folder_id || ""}
+                    onChange={(e) =>
+                      run(() =>
+                        workspaceDb
+                          .from("agency_workspace_forms")
+                          .update({ folder_id: e.target.value || null })
+                          .eq("workspace_id", workspace)
+                          .eq("id", f.id),
+                      )
+                    }
+                  >
+                    <option value="">Sem pasta</option>
+                    {folders.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelected(f.id)}
+              >
+                Ver respostas
+              </Button>
+            </article>
+          ))}
       </div>
       {!forms.length && (
         <Empty>
