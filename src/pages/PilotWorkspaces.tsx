@@ -443,6 +443,11 @@ function WorkspaceView() {
                 ? "Configurações da subconta"
                 : (
                     {
+                      inicio: "Visão geral da empresa",
+                      geral: "Configurações da empresa",
+                      rastreamento: "Atribuição e conversões de anúncios",
+                      canais: "Contas de envio da empresa",
+                      creditos: "Consumo e limites de envio",
                       formularios: "Formulários e respostas",
                       agendamentos: "Agenda da empresa",
                       funis: "Funis e automações",
