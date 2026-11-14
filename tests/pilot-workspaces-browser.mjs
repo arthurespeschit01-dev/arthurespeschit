@@ -1,3 +1,5 @@
+import { workflowCatalog } from "../src/components/pilot/workflowCatalog.ts";
+import { formAnswers } from "../supabase/functions/_shared/workspace-public.ts";
 import { chromium } from "playwright";
 import { PGlite } from "@electric-sql/pglite";
 import { readFile } from "node:fs/promises";
@@ -48,6 +50,9 @@ for (const name of [
   "20261114005109_workspace_professional_automations.sql",
   "20261114011614_workspace_action_cancellation_guards.sql",
   "20261114024829_workspace_trigger_configuration.sql",
+  "20261114033015_workspace_roles_and_form_builder.sql",
+  "20261114033021_workspace_tracking_and_flow_audit.sql",
+  "20261114034242_workspace_ai_conversion_rules.sql",
 ])
   await db.exec(
     await readFile(
@@ -64,8 +69,14 @@ let queue = Promise.resolve(),
   sends = 0;
 const run = (id, fn) => {
   const next = queue.then(async () => {
-    await db.exec("reset role;set role authenticated");
-    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [id]);
+    await db.exec(
+      id
+        ? "reset role;set role authenticated"
+        : "reset role;set role service_role",
+    );
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [
+      id || "",
+    ]);
     return fn();
   });
   queue = next.catch(() => {});
@@ -123,6 +134,34 @@ async function contextFor(id) {
     try {
       if (u.pathname.includes("/auth/")) return reply({ id, app_metadata: {} });
       if (u.pathname.includes("/functions/")) {
+        if (body?.action === "public_form" || body?.action === "submit_form") {
+          const f = (
+            await run(null, () =>
+              db.query("select * from agency_workspace_forms where token=$1", [
+                body.token,
+              ]),
+            )
+          ).rows[0];
+          if (!f) return reply({ error: "Não encontrado" }, 404);
+          if (body.action === "public_form")
+            return reply({
+              title: f.title,
+              description: f.description,
+              fields: f.fields,
+              presentation: f.presentation,
+            });
+          const answers = formAnswers(f.fields, body.answers);
+          await run(null, () =>
+            db.query("select agency_workspace_submit_form_v2($1,$2,$3,$4)", [
+              f.token,
+              body.request_id,
+              JSON.stringify(answers),
+              "{}",
+            ]),
+          );
+          return reply({ message: f.success_message });
+        }
+
         if (body?.action === "provider_settings")
           return reply({
             providers: { meta: null, google_ads: null, email: null, sms: null },
@@ -150,6 +189,34 @@ async function contextFor(id) {
             : db.query("select agency_workspace_permissions($1) result", [
                 body.p_workspace,
               ]),
+        );
+        return reply(r.rows[0].result);
+      }
+      if (table === "agency_workspace_flow_issues") {
+        const r = await run(id, () =>
+          db.query("select agency_workspace_flow_issues($1,$2) result", [
+            body.p_workspace,
+            JSON.stringify(body.p_definition),
+          ]),
+        );
+        return reply(r.rows[0].result);
+      }
+      if (table === "agency_workspace_save_role") {
+        const r = await run(id, () =>
+          db.query("select agency_workspace_save_role($1,$2,$3) result", [
+            body.p_workspace,
+            body.p_id,
+            JSON.stringify(body.p_values),
+          ]),
+        );
+        return reply(r.rows[0].result);
+      }
+      if (table === "agency_workspace_tracking_summary") {
+        const r = await run(id, () =>
+          db.query("select agency_workspace_tracking_summary($1,$2) result", [
+            body.p_workspace,
+            body.p_days,
+          ]),
         );
         return reply(r.rows[0].result);
       }
@@ -186,6 +253,11 @@ async function contextFor(id) {
           "agency_workspace_tracking_clicks",
           "agency_workspace_whatsapp_accounts",
           "agency_workspace_webhook_receipts",
+          "agency_workspace_roles",
+          "agency_workspace_member_roles",
+          "agency_workspace_member_notifications",
+          "agency_workspace_ai_rules",
+          "agency_workspace_ai_checks",
           ...[
             "forms",
             "form_submissions",
@@ -337,6 +409,7 @@ try {
   await page
     .getByRole("button", { name: "Adicionar campo", exact: true })
     .click();
+  await page.getByRole("button", { name: "Texto curto", exact: true }).click();
   await page.getByLabel("Título do campo 4").fill("Objetivo");
   await page.getByLabel("Condição do campo 4").selectOption("name");
   await page.getByLabel("Valor da condição").fill("Carla");
@@ -346,6 +419,54 @@ try {
   await page
     .getByRole("heading", { name: "Briefing de teste", exact: true })
     .waitFor();
+  const publicForm = (
+    await run(pilot, () =>
+      db.query(
+        "select * from agency_workspace_forms where workspace_id=$1 and title='Briefing de teste'",
+        [alpha],
+      ),
+    )
+  ).rows[0];
+  const publicPage = await context.newPage();
+  await publicPage.goto(base + "/captura/" + publicForm.token);
+  await publicPage.getByLabel("Nome", { exact: true }).fill("Carla");
+  await publicPage
+    .getByRole("button", { name: "Continuar", exact: true })
+    .click();
+  await publicPage
+    .getByLabel("WhatsApp", { exact: true })
+    .fill("5511988883456");
+  await publicPage
+    .getByRole("button", { name: "Continuar", exact: true })
+    .click();
+  await publicPage
+    .getByLabel("E-mail", { exact: true })
+    .fill("carla-form@example.invalid");
+  await publicPage
+    .getByRole("button", { name: "Continuar", exact: true })
+    .click();
+  await publicPage
+    .getByLabel("Objetivo", { exact: true })
+    .fill("Solicitar atendimento");
+  await publicPage
+    .getByRole("button", { name: "Enviar respostas", exact: true })
+    .click();
+  await publicPage
+    .getByRole("heading", {
+      name: "Recebemos suas informações. Obrigado!",
+      exact: true,
+    })
+    .waitFor();
+  const captured = (
+    await run(pilot, () =>
+      db.query(
+        "select * from agency_workspace_leads where workspace_id=$1 and phone='5511988883456'",
+        [alpha],
+      ),
+    )
+  ).rows;
+  assert.equal(captured.length, 1);
+  await publicPage.close();
   await navigateModule(page, "Funis e automações");
   await page.getByRole("button", { name: "Abrir editor", exact: true }).click();
   await page
@@ -426,6 +547,8 @@ try {
   // An unfinished draft can be saved, reopened, edited and deleted.
   await page.getByLabel("Ativo", { exact: true }).uncheck();
   await page.getByRole("button", { name: "Salvar funil", exact: true }).click();
+  if (await page.getByRole("alert").count())
+    console.error(await page.getByRole("alert").allTextContents());
   await page
     .locator('[aria-label="Editor de automações"]')
     .waitFor({ state: "detached" });
@@ -440,11 +563,26 @@ try {
     .click();
   await page.getByLabel("Ativo", { exact: true }).check();
   await page.getByRole("button", { name: "Salvar funil", exact: true }).click();
+  if (await page.getByRole("alert").count())
+    console.error(await page.getByRole("alert").allTextContents());
   await page
     .locator('[aria-label="Editor de automações"]')
     .waitFor({ state: "detached" });
   await page.getByRole("button", { name: "Abrir editor", exact: true }).click();
 
+  for (const item of workflowCatalog.flatMap((g) => g.items)) {
+    const [type, label] = item;
+    await page.getByRole("button", { name: label, exact: false }).click();
+    await page.getByLabel("Nome do bloco", { exact: true }).waitFor();
+    const fields = await page
+      .locator('[aria-label="Editor de automações"] fieldset')
+      .locator("input,textarea,select")
+      .count();
+    assert(fields > 1, `Block ${label} lacks configuration`);
+    await page
+      .getByRole("button", { name: "Remover bloco", exact: true })
+      .click();
+  }
   await page.screenshot({
     path: "/workspace/work/workspace-flow-desktop.png",
     fullPage: true,
@@ -505,6 +643,10 @@ try {
     .getByRole("button", { name: "Links rastreáveis", exact: true })
     .click();
   await page.getByLabel("Destino", { exact: true }).selectOption("form");
+  await page
+    .getByLabel("Formulário", { exact: true })
+    .getByRole("option", { name: "Briefing de teste", exact: true })
+    .waitFor({ state: "attached" });
   assert(
     (await page
       .getByLabel("Formulário", { exact: true })
@@ -512,6 +654,19 @@ try {
       .count()) > 1,
   );
   await navigateModule(page, "Workspace");
+  await page.getByRole("button", { name: "Funções", exact: true }).click();
+  await page.getByRole("button", { name: "Nova função", exact: true }).click();
+  await page
+    .getByLabel("Nome da função", { exact: true })
+    .fill("Comercial de teste");
+  await page.getByLabel("Acesso a CRM", { exact: true }).selectOption("write");
+  await page
+    .getByRole("button", { name: "Salvar função", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Comercial de teste", exact: false })
+    .waitFor();
+  await page.getByRole("button", { name: "Membros", exact: true }).click();
   await page.getByLabel("E-mail do convidado").fill("member@example.invalid");
   await page.getByLabel("Nome do convidado").fill("Atendente");
   await page

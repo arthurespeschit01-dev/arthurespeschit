@@ -10,9 +10,11 @@ import {
 export default function WorkspaceNavigation({
   base,
   section,
+  permissions,
 }: {
   base: string;
   section: string;
+  permissions?: Record<string, { read: boolean }>;
 }) {
   const commercial = [
       "dashboard",
@@ -40,20 +42,37 @@ export default function WorkspaceNavigation({
     if (commercial) setCommercial(true);
     if (settings) setSettings(true);
     setMobile(false);
-  }, [section]);
-  const link = (to: string, label: string, Icon?: typeof Home) => (
-    <NavLink
-      key={to}
-      end
-      to={to}
-      className={({ isActive }) =>
-        `flex items-center gap-2 rounded-lg px-3 min-h-11 py-2 text-sm ${isActive ? "bg-primary/15 text-primary font-semibold" : "text-sidebar-foreground hover:bg-sidebar-accent"}`
-      }
-    >
-      {Icon && <Icon size={17} />}
-      <span>{label}</span>
-    </NavLink>
-  );
+  }, [section, commercial, settings]);
+  const link = (to: string, label: string, Icon?: typeof Home) => {
+    const section = to.slice(base.length + 1);
+    const module = (
+      {
+        conversas: "conversations",
+        dashboard: "crm",
+        crm: "crm",
+        formularios: "forms",
+        agendamentos: "calendar",
+        funis: "flows",
+        equipe: "team",
+        geral: "settings",
+        configuracoes: "settings",
+      } as Record<string, string>
+    )[section];
+    if (module && permissions && !permissions[module]?.read) return null;
+    return (
+      <NavLink
+        key={to}
+        end
+        to={to}
+        className={({ isActive }) =>
+          `flex items-center gap-2 rounded-lg px-3 min-h-11 py-2 text-sm ${isActive ? "bg-primary/15 text-primary font-semibold" : "text-sidebar-foreground hover:bg-sidebar-accent"}`
+        }
+      >
+        {Icon && <Icon size={17} />}
+        <span>{label}</span>
+      </NavLink>
+    );
+  };
   return (
     <>
       <button

@@ -1,3 +1,4 @@
+import { encodeClickRef } from "./workspace-tracking.ts";
 import { publicContact, uuid } from "./workspace-public.ts";
 export function readWebhookField(input: unknown, path: string) {
   if (
@@ -66,6 +67,7 @@ export function trackingRedirect(
     click_ref?: string;
     source?: string;
     campaign?: string;
+    code_style?: string;
   },
   incoming?: URL,
 ) {
@@ -96,7 +98,12 @@ export function trackingRedirect(
   ) {
     const text =
       target.searchParams.get("text") || "Olá! Gostaria de mais informações.";
-    target.searchParams.set("text", text + "\nRef: CG-" + link.click_ref);
+    target.searchParams.set(
+      "text",
+      text +
+        "\n" +
+        encodeClickRef(link.click_ref, link.code_style === "invisible"),
+    );
   }
   return target.toString();
 }

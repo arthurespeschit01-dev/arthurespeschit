@@ -5,6 +5,7 @@ export type CaptureField = Omit<FormField, "type"> & {
   type: FormField["type"] | "tel";
 };
 export interface CaptureForm {
+  presentation?: import("@/components/pilot/WorkspaceFormRunner").FormPresentation;
   id: string;
   workspace_id: string;
   title: string;
@@ -47,7 +48,11 @@ export interface WorkspaceFlow {
   name: string;
   enabled: boolean;
   version: number;
-  definition: { nodes: FlowNode[]; edges: FlowEdge[] };
+  definition: {
+    nodes: FlowNode[];
+    edges: FlowEdge[];
+    configuration_version?: number;
+  };
 }
 export interface TeamMember {
   user_id: string;

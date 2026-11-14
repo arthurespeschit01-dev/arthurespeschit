@@ -350,8 +350,35 @@ function WorkspaceView() {
           : location.pathname.endsWith("/configuracoes")
             ? "settings"
             : location.pathname.split("/").pop() || "dashboard";
-  const enabled = !!w && w.status === "active" && !!data?.permissions.can_write;
-  const manage = !!data?.permissions.can_manage && w?.status === "active";
+  const module =
+    (
+      {
+        crm: "crm",
+        dashboard: "crm",
+        formularios: "forms",
+        agendamentos: "calendar",
+        funis: "flows",
+        conversas: "conversations",
+        equipe: "team",
+        settings: "settings",
+        geral: "settings",
+        whatsapp: "settings",
+        "google-agenda": "settings",
+        webhooks: "settings",
+        rastreamento: "settings",
+        canais: "settings",
+        creditos: "settings",
+      } as Record<string, string>
+    )[section] || "tasks";
+  const scoped =
+    section === "inicio" ? undefined : data?.permissions.modules?.[module];
+  const enabled =
+    !!w &&
+    w.status === "active" &&
+    (scoped?.write ?? !!data?.permissions.can_write);
+  const manage =
+    w?.status === "active" &&
+    (scoped?.manage ?? !!data?.permissions.can_manage);
   const operation = async (action: () => PromiseLike<{ error: unknown }>) => {
     setBusy(true);
     setError("");
@@ -425,7 +452,11 @@ function WorkspaceView() {
             ))}
           </select>
         </label>
-        <WorkspaceNavigation base={base} section={section} />
+        <WorkspaceNavigation
+          base={base}
+          section={section}
+          permissions={data?.permissions.modules}
+        />
         <Button variant="ghost" asChild className="w-full justify-start">
           <Link to="/laboratorio/subcontas">
             <ArrowLeft size={16} />
@@ -471,324 +502,336 @@ function WorkspaceView() {
             {error}
           </p>
         )}
-        {["crm", "dashboard"].includes(section) && (
-          <div className="flex flex-wrap gap-2 items-center">
-            <select
-              aria-label="Pipeline da subconta"
-              className="h-11 border rounded-md bg-background px-3 text-sm min-w-0 max-w-full"
-              value={pipeline?.id || ""}
-              onChange={(e) => setPipelineId(e.target.value)}
-            >
-              {data?.pipelines.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-            <Menu label="Opções da pipeline">
-              <DropdownMenuItem
-                disabled={!manage || busy}
-                onSelect={() => setPipelineDialog("new")}
-              >
-                Nova pipeline
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={!manage || !pipeline || busy}
-                onSelect={() => setPipelineDialog("edit")}
-              >
-                Configurar pipeline
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-destructive"
-                disabled={!manage || !pipeline || !!leads.length || busy}
-                onSelect={() => {
-                  if (
-                    pipeline &&
-                    window.confirm(`Excluir a pipeline “${pipeline.name}”?`)
-                  )
-                    void operation(() =>
-                      workspaceDb
-                        .from("agency_workspace_pipelines")
-                        .delete()
-                        .eq("id", pipeline.id)
-                        .eq("workspace_id", workspaceId),
-                    );
-                }}
-              >
-                Excluir pipeline vazia
-              </DropdownMenuItem>
-            </Menu>
-            {section === "crm" && (
-              <Button
-                disabled={!enabled || !stages.length || busy}
-                onClick={() => setLeadDialog("new")}
-              >
-                <Plus size={16} />
-                Novo lead
-              </Button>
-            )}
-          </div>
-        )}
-        {!["settings", "crm"].includes(section) && (
-          <WorkspaceCommercial
-            key={workspaceId + section}
-            workspace={workspaceId}
-            owner={w.owner_user_id}
-            section={section}
-            stages={data?.stages || []}
-            manage={manage}
-            write={enabled}
-          />
-        )}
-        {section === "dashboard" && (
+        {scoped && !scoped.read ? (
+          <p className="border rounded-xl p-4">
+            Sua função não tem acesso a este módulo.
+          </p>
+        ) : (
           <>
-            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-              {[
-                ["Total de leads", leads.length],
-                ["Em aberto", leads.length - won.length - lost.length],
-                ["Ganhos", won.length],
-                [
-                  "Valor ganho",
-                  money(won.reduce((sum, l) => sum + Number(l.value), 0)),
-                ],
-              ].map(([label, value]) => (
-                <div key={label} className="border rounded-xl bg-card p-4">
-                  <p className="text-xs text-muted-foreground">{label}</p>
-                  <p className="text-xl font-bold mt-2 break-words">{value}</p>
-                </div>
-              ))}
-            </div>
-            <section className="border rounded-xl bg-card p-4 space-y-4">
-              <h2 className="font-semibold">Distribuição por etapa</h2>
-              {stages.map((s) => {
-                const count = leads.filter((l) => l.stage_id === s.id).length;
-                return (
-                  <div key={s.id} className="space-y-2">
-                    <div className="flex justify-between gap-3 text-sm">
-                      <span className="break-words">{s.name}</span>
-                      <span className="font-semibold">{count}</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-secondary overflow-hidden">
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          background: s.color,
-                          width: `${leads.length ? (count / leads.length) * 100 : 0}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-              {!leads.length && (
-                <p className="text-sm text-muted-foreground">
-                  Os indicadores serão atualizados quando você cadastrar e
-                  movimentar leads nesta subconta.
-                </p>
-              )}
-            </section>
-            <p className="text-xs text-muted-foreground">
-              Os números refletem os leads e as etapas desta pipeline. Nenhuma
-              conversa da agência entra nestes indicadores.
-            </p>
-          </>
-        )}
-        {section === "crm" && (
-          <>
-            <Input
-              aria-label="Buscar leads na subconta"
-              placeholder="Buscar por nome, telefone ou e-mail…"
-              className="max-w-xl"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            {!pipeline && (
-              <Button
-                disabled={!enabled}
-                onClick={() => setPipelineDialog("new")}
-              >
-                Criar primeira pipeline
-              </Button>
-            )}
-            <div
-              className="flex gap-3 overflow-x-auto pb-4 items-start"
-              aria-label="Pipeline da empresa"
-            >
-              {stages.map((s) => (
-                <section
-                  key={s.id}
-                  className="w-[280px] shrink-0 max-w-[85vw] rounded-xl border bg-secondary/40"
-                  onDragOver={(e) => enabled && e.preventDefault()}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    const l = leads.find(
-                      (l) => l.id === e.dataTransfer.getData("text/plain"),
-                    );
-                    if (enabled && l) moveLead(l, s.id);
-                  }}
+            {["crm", "dashboard"].includes(section) && (
+              <div className="flex flex-wrap gap-2 items-center">
+                <select
+                  aria-label="Pipeline da subconta"
+                  className="h-11 border rounded-md bg-background px-3 text-sm min-w-0 max-w-full"
+                  value={pipeline?.id || ""}
+                  onChange={(e) => setPipelineId(e.target.value)}
                 >
-                  <header
-                    className="border-t-4 rounded-t-xl p-3 flex items-center justify-between gap-2"
-                    style={{ borderColor: s.color }}
+                  {data?.pipelines.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+                <Menu label="Opções da pipeline">
+                  <DropdownMenuItem
+                    disabled={!manage || busy}
+                    onSelect={() => setPipelineDialog("new")}
                   >
-                    <h2 className="font-semibold text-sm break-words">
-                      {s.name}
-                    </h2>
-                    <span className="text-xs text-muted-foreground">
-                      {leads.filter((l) => l.stage_id === s.id).length}
-                    </span>
-                  </header>
-                  <div className="p-2 space-y-2 min-h-24">
-                    {leads
-                      .filter(
-                        (l) =>
-                          l.stage_id === s.id &&
-                          `${l.name} ${l.phone} ${l.email}`
-                            .toLocaleLowerCase()
-                            .includes(search.toLocaleLowerCase()),
+                    Nova pipeline
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={!manage || !pipeline || busy}
+                    onSelect={() => setPipelineDialog("edit")}
+                  >
+                    Configurar pipeline
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-destructive"
+                    disabled={!manage || !pipeline || !!leads.length || busy}
+                    onSelect={() => {
+                      if (
+                        pipeline &&
+                        window.confirm(`Excluir a pipeline “${pipeline.name}”?`)
                       )
-                      .map((l) => (
-                        <article
-                          key={l.id}
-                          draggable={enabled && !busy}
-                          onDragStart={(e) =>
-                            e.dataTransfer.setData("text/plain", l.id)
-                          }
-                          className="rounded-lg border bg-card p-3 space-y-3"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <button
-                              className="text-left text-sm font-semibold break-words min-w-0"
-                              onClick={() => setLeadDialog(l)}
-                              disabled={!enabled}
-                            >
-                              {l.name}
-                            </button>
-                            <Menu label={`Opções do lead ${l.name}`}>
-                              <DropdownMenuItem
-                                disabled={!enabled || busy}
-                                onSelect={() => setLeadDialog(l)}
-                              >
-                                Editar lead
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                disabled={!enabled || busy}
-                                className="text-destructive"
-                                onSelect={() => {
-                                  if (
-                                    window.confirm(
-                                      `Excluir o lead “${l.name}” desta subconta?`,
-                                    )
-                                  )
-                                    void operation(() =>
-                                      workspaceDb
-                                        .from("agency_workspace_leads")
-                                        .delete()
-                                        .eq("id", l.id)
-                                        .eq("workspace_id", workspaceId),
-                                    );
-                                }}
-                              >
-                                Excluir lead
-                              </DropdownMenuItem>
-                            </Menu>
-                          </div>
-                          {l.phone && (
-                            <p className="text-xs text-muted-foreground break-all">
-                              {l.phone}
-                            </p>
-                          )}
-                          <p className="text-sm">{money(l.value)}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Origem:{" "}
-                            {(
-                              {
-                                form: "Formulário",
-                                appointment: "Agendamento",
-                                whatsapp: "WhatsApp",
-                                manual: "Manual",
-                                meta: "Meta Ads",
-                                import: "Importação",
-                              } as Record<string, string>
-                            )[l.source_type || "manual"] || l.source_type}
-                          </p>
-                          {!!l.tags?.length && (
-                            <div className="flex flex-wrap gap-1">
-                              {l.tags.map((t) => (
-                                <span
-                                  className="text-xs bg-primary/10 text-foreground px-2 py-1 rounded"
-                                  key={t}
-                                >
-                                  {t}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          <select
-                            aria-label={`Etapa de ${l.name}`}
-                            className="w-full h-10 rounded-md border bg-background px-2 text-xs"
-                            value={l.stage_id}
-                            disabled={!enabled || busy}
-                            onChange={(e) => moveLead(l, e.target.value)}
-                          >
-                            {stages.map((stage) => (
-                              <option key={stage.id} value={stage.id}>
-                                {stage.name}
-                              </option>
-                            ))}
-                          </select>
-                        </article>
-                      ))}
-                  </div>
+                        void operation(() =>
+                          workspaceDb
+                            .from("agency_workspace_pipelines")
+                            .delete()
+                            .eq("id", pipeline.id)
+                            .eq("workspace_id", workspaceId),
+                        );
+                    }}
+                  >
+                    Excluir pipeline vazia
+                  </DropdownMenuItem>
+                </Menu>
+                {section === "crm" && (
+                  <Button
+                    disabled={!enabled || !stages.length || busy}
+                    onClick={() => setLeadDialog("new")}
+                  >
+                    <Plus size={16} />
+                    Novo lead
+                  </Button>
+                )}
+              </div>
+            )}
+            {!["settings", "crm"].includes(section) && (
+              <WorkspaceCommercial
+                key={workspaceId + section}
+                workspace={workspaceId}
+                owner={w.owner_user_id}
+                section={section}
+                stages={data?.stages || []}
+                manage={manage}
+                write={enabled}
+              />
+            )}
+            {section === "dashboard" && (
+              <>
+                <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+                  {[
+                    ["Total de leads", leads.length],
+                    ["Em aberto", leads.length - won.length - lost.length],
+                    ["Ganhos", won.length],
+                    [
+                      "Valor ganho",
+                      money(won.reduce((sum, l) => sum + Number(l.value), 0)),
+                    ],
+                  ].map(([label, value]) => (
+                    <div key={label} className="border rounded-xl bg-card p-4">
+                      <p className="text-xs text-muted-foreground">{label}</p>
+                      <p className="text-xl font-bold mt-2 break-words">
+                        {value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <section className="border rounded-xl bg-card p-4 space-y-4">
+                  <h2 className="font-semibold">Distribuição por etapa</h2>
+                  {stages.map((s) => {
+                    const count = leads.filter(
+                      (l) => l.stage_id === s.id,
+                    ).length;
+                    return (
+                      <div key={s.id} className="space-y-2">
+                        <div className="flex justify-between gap-3 text-sm">
+                          <span className="break-words">{s.name}</span>
+                          <span className="font-semibold">{count}</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-secondary overflow-hidden">
+                          <div
+                            className="h-full rounded-full"
+                            style={{
+                              background: s.color,
+                              width: `${leads.length ? (count / leads.length) * 100 : 0}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {!leads.length && (
+                    <p className="text-sm text-muted-foreground">
+                      Os indicadores serão atualizados quando você cadastrar e
+                      movimentar leads nesta subconta.
+                    </p>
+                  )}
                 </section>
-              ))}
-            </div>
+                <p className="text-xs text-muted-foreground">
+                  Os números refletem os leads e as etapas desta pipeline.
+                  Nenhuma conversa da agência entra nestes indicadores.
+                </p>
+              </>
+            )}
+            {section === "crm" && (
+              <>
+                <Input
+                  aria-label="Buscar leads na subconta"
+                  placeholder="Buscar por nome, telefone ou e-mail…"
+                  className="max-w-xl"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+                {!pipeline && (
+                  <Button
+                    disabled={!enabled}
+                    onClick={() => setPipelineDialog("new")}
+                  >
+                    Criar primeira pipeline
+                  </Button>
+                )}
+                <div
+                  className="flex gap-3 overflow-x-auto pb-4 items-start"
+                  aria-label="Pipeline da empresa"
+                >
+                  {stages.map((s) => (
+                    <section
+                      key={s.id}
+                      className="w-[280px] shrink-0 max-w-[85vw] rounded-xl border bg-secondary/40"
+                      onDragOver={(e) => enabled && e.preventDefault()}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const l = leads.find(
+                          (l) => l.id === e.dataTransfer.getData("text/plain"),
+                        );
+                        if (enabled && l) moveLead(l, s.id);
+                      }}
+                    >
+                      <header
+                        className="border-t-4 rounded-t-xl p-3 flex items-center justify-between gap-2"
+                        style={{ borderColor: s.color }}
+                      >
+                        <h2 className="font-semibold text-sm break-words">
+                          {s.name}
+                        </h2>
+                        <span className="text-xs text-muted-foreground">
+                          {leads.filter((l) => l.stage_id === s.id).length}
+                        </span>
+                      </header>
+                      <div className="p-2 space-y-2 min-h-24">
+                        {leads
+                          .filter(
+                            (l) =>
+                              l.stage_id === s.id &&
+                              `${l.name} ${l.phone} ${l.email}`
+                                .toLocaleLowerCase()
+                                .includes(search.toLocaleLowerCase()),
+                          )
+                          .map((l) => (
+                            <article
+                              key={l.id}
+                              draggable={enabled && !busy}
+                              onDragStart={(e) =>
+                                e.dataTransfer.setData("text/plain", l.id)
+                              }
+                              className="rounded-lg border bg-card p-3 space-y-3"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <button
+                                  className="text-left text-sm font-semibold break-words min-w-0"
+                                  onClick={() => setLeadDialog(l)}
+                                  disabled={!enabled}
+                                >
+                                  {l.name}
+                                </button>
+                                <Menu label={`Opções do lead ${l.name}`}>
+                                  <DropdownMenuItem
+                                    disabled={!enabled || busy}
+                                    onSelect={() => setLeadDialog(l)}
+                                  >
+                                    Editar lead
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    disabled={!enabled || busy}
+                                    className="text-destructive"
+                                    onSelect={() => {
+                                      if (
+                                        window.confirm(
+                                          `Excluir o lead “${l.name}” desta subconta?`,
+                                        )
+                                      )
+                                        void operation(() =>
+                                          workspaceDb
+                                            .from("agency_workspace_leads")
+                                            .delete()
+                                            .eq("id", l.id)
+                                            .eq("workspace_id", workspaceId),
+                                        );
+                                    }}
+                                  >
+                                    Excluir lead
+                                  </DropdownMenuItem>
+                                </Menu>
+                              </div>
+                              {l.phone && (
+                                <p className="text-xs text-muted-foreground break-all">
+                                  {l.phone}
+                                </p>
+                              )}
+                              <p className="text-sm">{money(l.value)}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Origem:{" "}
+                                {(
+                                  {
+                                    form: "Formulário",
+                                    appointment: "Agendamento",
+                                    whatsapp: "WhatsApp",
+                                    manual: "Manual",
+                                    meta: "Meta Ads",
+                                    import: "Importação",
+                                  } as Record<string, string>
+                                )[l.source_type || "manual"] || l.source_type}
+                              </p>
+                              {!!l.tags?.length && (
+                                <div className="flex flex-wrap gap-1">
+                                  {l.tags.map((t) => (
+                                    <span
+                                      className="text-xs bg-primary/10 text-foreground px-2 py-1 rounded"
+                                      key={t}
+                                    >
+                                      {t}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              <select
+                                aria-label={`Etapa de ${l.name}`}
+                                className="w-full h-10 rounded-md border bg-background px-2 text-xs"
+                                value={l.stage_id}
+                                disabled={!enabled || busy}
+                                onChange={(e) => moveLead(l, e.target.value)}
+                              >
+                                {stages.map((stage) => (
+                                  <option key={stage.id} value={stage.id}>
+                                    {stage.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </article>
+                          ))}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+              </>
+            )}
+            {section === "settings" && (
+              <>
+                <section className="border rounded-xl p-4 space-y-3 bg-card">
+                  <h2 className="font-semibold">Empresa</h2>
+                  <p className="text-sm text-muted-foreground break-words">
+                    {w.description || "Nenhuma descrição cadastrada."}
+                  </p>
+                  <Button
+                    variant="outline"
+                    disabled={!manage}
+                    onClick={() => setWorkspaceDialog(true)}
+                  >
+                    Editar subconta
+                  </Button>
+                </section>
+              </>
+            )}
+            {workspaceDialog && (
+              <WorkspaceDialog
+                workspace={w}
+                onClose={() => setWorkspaceDialog(false)}
+                onSaved={refresh}
+              />
+            )}
+            {leadDialog && pipeline && (
+              <LeadDialog
+                key={leadDialog === "new" ? "new" : leadDialog.id}
+                workspace={workspaceId}
+                pipeline={pipeline.id}
+                stages={stages}
+                lead={leadDialog === "new" ? undefined : leadDialog}
+                onClose={() => setLeadDialog(null)}
+                onSaved={refresh}
+              />
+            )}
+            {pipelineDialog && (
+              <PipelineDialog
+                workspace={workspaceId}
+                pipeline={pipelineDialog === "edit" ? pipeline : undefined}
+                stages={pipelineDialog === "edit" ? stages : []}
+                leads={leads}
+                onClose={() => setPipelineDialog(null)}
+                onSaved={refresh}
+              />
+            )}
           </>
-        )}
-        {section === "settings" && (
-          <>
-            <section className="border rounded-xl p-4 space-y-3 bg-card">
-              <h2 className="font-semibold">Empresa</h2>
-              <p className="text-sm text-muted-foreground break-words">
-                {w.description || "Nenhuma descrição cadastrada."}
-              </p>
-              <Button
-                variant="outline"
-                disabled={!manage}
-                onClick={() => setWorkspaceDialog(true)}
-              >
-                Editar subconta
-              </Button>
-            </section>
-          </>
-        )}
-        {workspaceDialog && (
-          <WorkspaceDialog
-            workspace={w}
-            onClose={() => setWorkspaceDialog(false)}
-            onSaved={refresh}
-          />
-        )}
-        {leadDialog && pipeline && (
-          <LeadDialog
-            key={leadDialog === "new" ? "new" : leadDialog.id}
-            workspace={workspaceId}
-            pipeline={pipeline.id}
-            stages={stages}
-            lead={leadDialog === "new" ? undefined : leadDialog}
-            onClose={() => setLeadDialog(null)}
-            onSaved={refresh}
-          />
-        )}
-        {pipelineDialog && (
-          <PipelineDialog
-            workspace={workspaceId}
-            pipeline={pipelineDialog === "edit" ? pipeline : undefined}
-            stages={pipelineDialog === "edit" ? stages : []}
-            leads={leads}
-            onClose={() => setPipelineDialog(null)}
-            onSaved={refresh}
-          />
         )}
       </main>
     </div>

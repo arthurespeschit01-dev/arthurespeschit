@@ -1,3 +1,13 @@
+import { processWorkspaceAi } from "../_shared/workspace-ai.ts";
+import {
+  decodeClickRef,
+  googleConversionCsv,
+  trackingSiteScript,
+} from "../_shared/workspace-tracking.ts";
+import {
+  workspaceFormDefinition,
+  workspaceAnswerError,
+} from "../_shared/workspace-form.ts";
 import {
   mappedWebhook,
   trackingRedirect,
@@ -111,6 +121,7 @@ async function account(c: any) {
 }
 async function work(workspace: string) {
   await syncGoogle(db, workspace).catch(() => {});
+  await processWorkspaceAi(db, workspace);
   await processWorkspaceActions(
     db,
     workspace,
@@ -224,6 +235,37 @@ export async function handle(req: Request) {
       );
     }
   }
+  if (req.method === "GET" && callbackUrl.searchParams.has("tracking_script")) {
+    const token = callbackUrl.searchParams.get("tracking_script") || "";
+    if (!/^[a-f0-9]{64}$/.test(token))
+      return reply({ error: "Link inválido." }, 404);
+    return new Response(
+      trackingSiteScript(callbackUrl.origin + callbackUrl.pathname, token),
+      {
+        headers: {
+          "Content-Type": "application/javascript; charset=utf-8",
+          "Cache-Control": "public,max-age=300",
+          "Access-Control-Allow-Origin": "*",
+        },
+      },
+    );
+  }
+  if (req.method === "GET" && callbackUrl.searchParams.has("google_feed")) {
+    const token = callbackUrl.searchParams.get("google_feed") || "";
+    if (!/^[a-f0-9]{64}$/.test(token))
+      return reply({ error: "Feed inválido." }, 404);
+    const data = await checked(
+      db.rpc("agency_workspace_google_feed_rows", { p_token: token }),
+    );
+    if (!data) return reply({ error: "Feed pausado ou inválido." }, 404);
+    return new Response(googleConversionCsv(data.rows), {
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Cache-Control": "no-store",
+        "Content-Disposition": 'attachment; filename="conversions.csv"',
+      },
+    });
+  }
   if (req.method === "GET" && callbackUrl.searchParams.get("link")) {
     const incoming = attribution(Object.fromEntries(callbackUrl.searchParams));
     const resolved = await checked(
@@ -320,7 +362,15 @@ export async function handle(req: Request) {
           db.rpc("agency_workspace_ingest_message", {
             p_workspace: c.workspace_id,
             p_account: state.account_id,
-            p_event: { ...event, attribution: whatsappAttribution(body) },
+            p_event: {
+              ...event,
+              attribution: {
+                ...whatsappAttribution(body),
+                ...(decodeClickRef(event.body)
+                  ? { cg_ref: decodeClickRef(event.body) }
+                  : {}),
+              },
+            },
           }),
         );
       }
@@ -384,11 +434,16 @@ export async function handle(req: Request) {
         title: f.title,
         description: f.description,
         fields: f.fields,
+        presentation: f.presentation,
       });
     }
     if (body.action === "submit_form") {
       const f = await publicResource("form", body.token);
       if (!uuid(body.request_id)) throw Error("Solicitação inválida.");
+      const definitionError = workspaceFormDefinition(f.fields, f.presentation);
+      if (definitionError) throw Error(definitionError);
+      const answerError = workspaceAnswerError(f.fields, body.answers);
+      if (answerError) throw Error(answerError);
       const answers = formAnswers(f.fields, body.answers);
       const result = await checked(
         db.rpc("agency_workspace_submit_form_v2", {
@@ -509,7 +564,12 @@ export async function handle(req: Request) {
       "google_connect",
       "google_disconnect",
       "save_whatsapp",
+      "ai_settings",
+      "save_ai_settings",
       "provider_settings",
+      "google_feed_settings",
+      "save_google_feed",
+      "save_ad_destination",
       "automation_webhook_settings",
       "save_automation_webhook",
       "retry_action",
@@ -520,12 +580,27 @@ export async function handle(req: Request) {
       "save_webhook",
       "integration_settings",
     ];
-    if (managers.includes(body.action) && !permissions.can_manage)
+    const actionModule = [
+      "automation_webhook_settings",
+      "save_automation_webhook",
+      "asset_upload",
+    ].includes(body.action)
+      ? "flows"
+      : body.action === "send"
+        ? "conversations"
+        : "settings";
+    if (
+      managers.includes(body.action) &&
+      !(permissions.modules?.[actionModule]?.manage ?? permissions.can_manage)
+    )
       return reply(
         { error: "Somente administradores podem configurar integrações." },
         403,
       );
-    if (["send", "process"].includes(body.action) && !permissions.can_write)
+    if (
+      ["send", "process"].includes(body.action) &&
+      !(permissions.modules?.conversations?.write ?? permissions.can_write)
+    )
       return reply({ error: "Sem permissão de edição." }, 403);
     if (body.action === "google_connect") {
       await active(workspace);
@@ -631,6 +706,50 @@ export async function handle(req: Request) {
           : null,
       });
     }
+    if (
+      body.action === "google_feed_settings" ||
+      body.action === "save_google_feed"
+    ) {
+      if (body.action === "save_google_feed") await active(workspace);
+      const feed = await checked(
+        db.rpc("agency_workspace_google_feed_settings", {
+          p_workspace: workspace,
+          p_values: body.action === "save_google_feed" ? body.values : null,
+        }),
+      );
+      const { token, ...settings } = feed;
+      return reply({
+        ...settings,
+        url: token
+          ? `${base}/functions/v1/workspace-operations?google_feed=${token}`
+          : null,
+      });
+    }
+    if (body.action === "save_ad_destination") {
+      await active(workspace);
+      const result = await checked(
+        db.rpc("agency_workspace_ad_destination", {
+          p_workspace: workspace,
+          p_values: body.values,
+        }),
+      );
+      return reply(result);
+    }
+    if (body.action === "ai_settings" || body.action === "save_ai_settings") {
+      if (body.action === "save_ai_settings") await active(workspace);
+      const c = await checked(
+        db.rpc("agency_workspace_ai_settings", {
+          p_workspace: workspace,
+          p_values: body.action === "save_ai_settings" ? body.values : null,
+        }),
+      );
+      return reply({
+        enabled: !!c?.enabled,
+        configured: !!c?.api_key,
+        model: c?.model || "openai/gpt-5.4-nano",
+        daily_limit: c?.daily_limit || 100,
+      });
+    }
     if (body.action === "provider_settings") {
       const providers = await Promise.all(
         channelKinds.map(async (kind) => [
@@ -640,6 +759,9 @@ export async function handle(req: Request) {
       );
       return reply({
         providers: Object.fromEntries(providers),
+        meta_destination: await checked(
+          db.rpc("agency_workspace_ad_destination", { p_workspace: workspace }),
+        ),
         meta_callback: `${base}/functions/v1/workspace-operations?meta_workspace=${workspace}`,
         link_base: `${base}/functions/v1/workspace-operations?link=`,
       });
@@ -696,6 +818,12 @@ export async function handle(req: Request) {
       );
     }
     if (body.action === "asset_url") {
+      if (
+        permissions.modules &&
+        !permissions.modules.conversations?.read &&
+        !permissions.modules.flows?.read
+      )
+        return reply({ error: "Sem acesso a este arquivo." }, 403);
       return reply(await asset(db, workspace, String(body.path || "")));
     }
     if (body.action === "integration_settings") {

@@ -1,3 +1,7 @@
+import { presentationStyle } from "@/lib/workspaceFormPresentation";
+import WorkspaceFormRunner, {
+  type FormPresentation,
+} from "@/components/pilot/WorkspaceFormRunner";
 import { useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -34,6 +38,7 @@ export default function WorkspacePublic() {
         title: string;
         description: string;
         fields?: CaptureField[];
+        presentation?: FormPresentation;
         duration_minutes?: number;
         timezone?: string;
         slots?: string[];
@@ -107,14 +112,21 @@ export default function WorkspacePublic() {
                 }}
               >
                 {kind === "form" ? (
-                  <AgencyFormFields
-                    fields={(query.data.fields as FormField[]) || []}
-                    answers={answers}
-                    onChange={(v) => {
-                      setAnswers(v);
-                      setRequest(crypto.randomUUID());
-                    }}
-                  />
+                  <div
+                    className="rounded-lg p-4"
+                    style={presentationStyle(query.data.presentation)}
+                  >
+                    <WorkspaceFormRunner
+                      fields={query.data.fields || []}
+                      presentation={query.data.presentation}
+                      busy={busy}
+                      answers={answers}
+                      onChange={(v) => {
+                        setAnswers(v);
+                        setRequest(crypto.randomUUID());
+                      }}
+                    />
+                  </div>
                 ) : (
                   <>
                     <p className="text-sm">
@@ -193,17 +205,20 @@ export default function WorkspacePublic() {
                     {error}
                   </p>
                 )}
-                <Button
-                  className="w-full"
-                  type="submit"
-                  disabled={busy || (kind === "calendar" && !slot)}
-                >
-                  {busy
-                    ? "Enviando…"
-                    : kind === "form"
-                      ? "Enviar respostas"
-                      : "Confirmar agendamento"}
-                </Button>
+                {(kind !== "form" ||
+                  query.data.presentation?.layout !== "step") && (
+                  <Button
+                    className="w-full"
+                    type="submit"
+                    disabled={busy || (kind === "calendar" && !slot)}
+                  >
+                    {busy
+                      ? "Enviando…"
+                      : kind === "form"
+                        ? "Enviar respostas"
+                        : "Confirmar agendamento"}
+                  </Button>
+                )}
               </form>
             </>
           )

@@ -16,12 +16,14 @@ export default function FlowAdvancedFields({
   patch,
   members,
   workspace,
+  calendars,
 }: {
   type: string;
   data: Record<string, unknown>;
   patch: (v: Record<string, unknown>) => void;
   members: TeamMember[];
   workspace: string;
+  calendars: import("@/lib/workspaceCommercial").WorkspaceCalendar[];
 }) {
   const [uploading, setUploading] = useState(false),
     [error, setError] = useState("");
@@ -55,6 +57,52 @@ export default function FlowAdvancedFields({
           data={data}
           patch={patch}
         />
+      )}
+      {["wait_appointment", "send_event"].includes(type) && (
+        <label className="text-sm block">
+          Agenda da reunião
+          <select
+            aria-label="Agenda da reunião"
+            className={selectClass + " w-full"}
+            value={String(data.calendar_id || "")}
+            onChange={(e) => patch({ calendar_id: e.target.value })}
+          >
+            <option value="">Próxima reunião em qualquer agenda</option>
+            {calendars.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.title}
+              </option>
+            ))}
+          </select>
+          <span className="text-xs text-muted-foreground">
+            O lead precisa ter uma reunião confirmada nessa agenda quando chegar
+            ao bloco.
+          </span>
+        </label>
+      )}
+      {type === "add_participants" && (
+        <label className="text-sm block">
+          Grupo de destino (opcional)
+          <Input
+            aria-label="ID do grupo de destino"
+            placeholder="120…@g.us · vazio: grupo criado neste fluxo"
+            value={String(data.group_id || "")}
+            onChange={(e) => patch({ group_id: e.target.value })}
+          />
+        </label>
+      )}
+      {type === "stage" && (
+        <label className="text-sm block">
+          Descrição do estágio
+          <Textarea
+            value={String(data.description || "")}
+            onChange={(e) => patch({ description: e.target.value })}
+          />
+          <span className="text-xs text-muted-foreground">
+            Este bloco organiza o percurso e continua pela conexão de saída.
+            Para decidir entre caminhos, use Condição SE/SENÃO.
+          </span>
+        </label>
       )}
       {type === "wait_appointment" && (
         <>

@@ -1,3 +1,4 @@
+import WorkspaceNotificationInbox from "./WorkspaceNotificationInbox";
 import { Link } from "react-router-dom";
 import WorkspaceProviders from "./WorkspaceProviders";
 import WorkspaceSettings from "./WorkspaceSettings";
@@ -289,6 +290,7 @@ export default function WorkspaceCommercial({
         />
       ) : (
         <>
+          <WorkspaceNotificationInbox workspace={workspace} />
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
             {[
               ["Formulários recebidos", responses.length],

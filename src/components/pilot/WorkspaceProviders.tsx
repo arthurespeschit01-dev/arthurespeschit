@@ -1,3 +1,6 @@
+import WorkspaceAiRules from "./WorkspaceAiRules";
+import WorkspaceGoogleFeed from "./WorkspaceGoogleFeed";
+import WorkspaceAdDestination from "./WorkspaceAdDestination";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
@@ -97,6 +100,7 @@ export default function WorkspaceProviders({
           providers: Record<string, Provider | null>;
           meta_callback: string;
           link_base: string;
+          meta_destination: { create_leads: boolean; stage_id: string | null };
         }>("provider_settings", { workspace_id: workspace }),
         workspaceDb
           .from("agency_workspace_conversion_rules")
@@ -173,6 +177,7 @@ export default function WorkspaceProviders({
             ? [
                 ["meta", "Meta Ads"],
                 ["google_ads", "Google Ads"],
+                ["ai", "Pela IA"],
                 ["links", "Links rastreáveis"],
               ]
             : [
@@ -241,6 +246,8 @@ export default function WorkspaceProviders({
             créditos pela Central.
           </p>
         </>
+      ) : tab === "ai" ? (
+        <WorkspaceAiRules workspace={workspace} />
       ) : tab === "links" ? (
         <TrackingLinks
           workspace={workspace}
@@ -251,6 +258,9 @@ export default function WorkspaceProviders({
         />
       ) : (
         <>
+          {mode === "tracking" && tab === "google_ads" && (
+            <WorkspaceGoogleFeed workspace={workspace} />
+          )}
           <ProviderForm
             key={tab}
             kind={tab}
@@ -269,6 +279,22 @@ export default function WorkspaceProviders({
               )
             }
           />
+          {mode === "tracking" && tab === "meta" && (
+            <WorkspaceAdDestination
+              key={JSON.stringify(d.config.meta_destination)}
+              stages={stages}
+              value={d.config.meta_destination}
+              busy={busy}
+              save={(values) =>
+                void act(() =>
+                  workspaceOperation("save_ad_destination", {
+                    workspace_id: workspace,
+                    values,
+                  }),
+                )
+              }
+            />
+          )}
           {mode === "tracking" && (
             <ConversionRules
               workspace={workspace}

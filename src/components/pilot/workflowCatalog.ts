@@ -59,9 +59,9 @@ export const workflowCatalog = [
     items: [
       ["stage", "Estágio padrão", "Marca uma fase para organizar o funil."],
       [
-        "stage",
+        "condition",
         "Estágio condicional",
-        "Identifica uma fase; use SE/SENÃO para ramificar.",
+        "Separa caminhos com uma regra configurável de SE/SENÃO.",
       ],
       [
         "condition",

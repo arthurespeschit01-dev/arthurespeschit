@@ -102,6 +102,10 @@ export async function workspaceData(id: string) {
       can_write: boolean;
       can_manage: boolean;
       pilot_owner: boolean;
+      modules?: Record<
+        string,
+        { read: boolean; write: boolean; manage: boolean }
+      >;
     },
     workspace: results[1].data as ClientWorkspace | null,
     pipelines: results[2].data as WorkspacePipeline[],

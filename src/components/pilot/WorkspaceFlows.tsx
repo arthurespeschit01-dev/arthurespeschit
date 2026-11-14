@@ -1,4 +1,5 @@
-import FlowTriggerFields from "./FlowTriggerFields";
+import FlowTriggerFields, { StagePicker } from "./FlowTriggerFields";
+import { useFlowContext } from "./useFlowContext";
 import FlowExecutions from "./FlowExecutions";
 import FlowConditions from "./FlowConditions";
 import FlowAdvancedFields from "./FlowAdvancedFields";
@@ -69,7 +70,9 @@ function Block({ data, selected }: NodeProps) {
           ? "Gatilho"
           : kind === "stage"
             ? "Estágio"
-            : kind === "condition"
+            : ["condition", "team_response", "wait_response", "split"].includes(
+                  kind,
+                )
               ? "Condição"
               : "Ação"}
       </p>
@@ -158,6 +161,8 @@ const summary = (n: FlowNode, stages: WorkspaceStage[]) => {
     return `${n.data.minutes || 1} min · ${n.data.response_mode === "deadline" ? "Conferir no fim do prazo" : "Continuar ao responder"}${n.data.deduplicate ? " · Agrupar mensagens" : ""}`;
   if (n.type === "move_stage")
     return `Mover para ${stage(n.data.stage_id) || "etapa a configurar"}`;
+  if (n.type === "stage")
+    return String(n.data.description || "Estágio de organização");
   if (n.type === "wait") return `${n.data.minutes || 1} minuto(s)`;
   if (n.type.includes("tags"))
     return ((n.data.tags as string[]) || []).join(", ");
@@ -420,6 +425,7 @@ function FlowEditor({
   onClose: () => void;
   save: (f: WorkspaceFlow) => Promise<void>;
 }) {
+  const context = useFlowContext(workspace);
   const { theme } = useTheme();
   const [catalogSearch, setCatalogSearch] = useState(""),
     [catalogOpen, setCatalogOpen] = useState(false),
@@ -653,7 +659,10 @@ function FlowEditor({
     JSON.stringify({
       name: value.name,
       enabled: value.enabled,
-      definition: value.definition,
+      definition: {
+        nodes: value.definition.nodes,
+        edges: value.definition.edges,
+      },
     });
   const close = () => {
     if (
@@ -672,6 +681,25 @@ function FlowEditor({
     window.addEventListener("beforeunload", listener);
     return () => window.removeEventListener("beforeunload", listener);
   }, [dirty]);
+  const [auditMessage, setAuditMessage] = useState("");
+  const definition = {
+    configuration_version: 3,
+    nodes: raw,
+    edges: edges.map((e) => ({
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      ...(e.sourceHandle ? { branch: e.sourceHandle } : {}),
+    })),
+  };
+  const audit = async () => {
+    const r = await workspaceDb.rpc("agency_workspace_flow_issues", {
+      p_workspace: workspace,
+      p_definition: definition,
+    });
+    if (r.error) throw r.error;
+    return r.data as { node_id: string; message: string }[];
+  };
   const d = current?.data || {};
   const rule = (
     d.rules as { field: string; operator: string; value: string }[]
@@ -681,6 +709,11 @@ function FlowEditor({
       aria-label="Editor de automações"
       className="fixed inset-0 z-[90] bg-background text-foreground flex flex-col"
     >
+      {auditMessage && (
+        <p role="status" className="text-sm px-4 py-2 bg-emerald-500/10">
+          {auditMessage}
+        </p>
+      )}
       <header className="flex flex-wrap gap-2 items-center border-b px-4 py-3 shrink-0">
         <Input
           aria-label="Nome do funil"
@@ -708,11 +741,26 @@ function FlowEditor({
             setSaving(true);
             setError("");
             try {
+              if (enabled) {
+                const issues = await audit();
+                if (issues.length) {
+                  setSelected(issues[0].node_id);
+                  throw Error(
+                    issues
+                      .map(
+                        (i) =>
+                          `${String(raw.find((n) => n.id === i.node_id)?.data.label || labels[raw.find((n) => n.id === i.node_id)?.type || ""])}: ${i.message}`,
+                      )
+                      .join("\n"),
+                  );
+                }
+              }
               await save({
                 ...value,
                 name,
                 enabled,
                 definition: {
+                  configuration_version: 3,
                   nodes: raw,
                   edges: edges.map((e) => ({
                     id: e.id,
@@ -730,6 +778,28 @@ function FlowEditor({
           }}
         >
           {saving ? "Salvando…" : "Salvar funil"}
+        </Button>
+        <Button
+          variant="outline"
+          disabled={saving}
+          onClick={async () => {
+            try {
+              const issues = await audit();
+              if (issues.length) {
+                setSelected(issues[0].node_id);
+                setError(issues.map((i) => i.message).join("\n"));
+              } else {
+                setError("");
+                setAuditMessage(
+                  "Configuração verificada: nenhuma pendência detectada.",
+                );
+              }
+            } catch (e) {
+              setError((e as Error).message);
+            }
+          }}
+        >
+          Verificar blocos
         </Button>
         <Button variant="outline" disabled={saving} onClick={close}>
           Fechar editor
@@ -910,6 +980,7 @@ function FlowEditor({
                   patch={patch}
                   members={members}
                   workspace={workspace}
+                  calendars={calendars}
                 />
                 <label className="block text-sm">
                   Nome do bloco
@@ -953,19 +1024,14 @@ function FlowEditor({
                   </label>
                 )}
                 {current.type === "move_stage" && (
-                  <select
-                    aria-label="Etapa de destino"
-                    className={selectClass + " w-full"}
+                  <StagePicker
+                    label="Etapa de destino"
                     value={String(d.stage_id || "")}
-                    onChange={(e) => patch({ stage_id: e.target.value })}
-                  >
-                    <option value="">Escolha a etapa</option>
-                    {stages.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(stage_id) => patch({ stage_id })}
+                    stages={stages}
+                    pipelines={context.data?.pipelines || []}
+                    empty="Escolha a etapa"
+                  />
                 )}
                 {current.type === "assign_user" && (
                   <select
@@ -1003,6 +1069,26 @@ function FlowEditor({
                     <span className="text-xs text-muted-foreground">
                       Variáveis: {"{nome}, {telefone}, {email}, {valor}"}
                     </span>
+                  </label>
+                )}
+                {current.type === "create_task" && (
+                  <label className="text-sm block">
+                    Responsável da tarefa
+                    <select
+                      aria-label="Responsável da tarefa"
+                      className={selectClass + " w-full"}
+                      value={String(d.assignee_user_id || "")}
+                      onChange={(e) =>
+                        patch({ assignee_user_id: e.target.value })
+                      }
+                    >
+                      <option value="">Sem responsável</option>
+                      {members.map((m) => (
+                        <option key={m.user_id} value={m.user_id}>
+                          {m.display_name || m.email || "Proprietário"}
+                        </option>
+                      ))}
+                    </select>
                   </label>
                 )}
                 {current.type === "create_task" && (
