@@ -52,7 +52,7 @@ export function workspaceError(error: unknown) {
   const e = error as { code?: string; message?: string };
   if (e.code === "42501") return "Você não tem permissão para esta operação.";
   if (e.code === "23503")
-    return "Há leads vinculados. Mova os leads antes de remover esta etapa ou pipeline.";
+    return "Há registros vinculados. Revise os leads, formulários, agendas e regras antes de remover este registro.";
   if (e.code === "23514" || e.code === "23502")
     return "Revise os campos obrigatórios e os valores informados.";
   if (e.code === "23505")

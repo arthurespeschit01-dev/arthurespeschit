@@ -1,3 +1,16 @@
+import { receiveMetaLead } from "../_shared/workspace-meta.ts";
+import { providerMedia } from "../_shared/agency-whatsapp-upload.ts";
+import {
+  processWorkspaceActions,
+  providerConfig,
+  providerSummary,
+  validateProvider,
+  prepareAsset,
+  asset,
+  attribution,
+  whatsappAttribution,
+  channelKinds,
+} from "../_shared/workspace-actions.ts";
 import {
   googleReady,
   googleRedirect,
@@ -94,6 +107,16 @@ async function account(c: any) {
 }
 async function work(workspace: string) {
   await syncGoogle(db, workspace).catch(() => {});
+  await processWorkspaceActions(
+    db,
+    workspace,
+    async (c: any, path: string, method: string, body: any) => {
+      const current = await account(c);
+      if (current.account_id !== c.active_account_id)
+        throw Error("O número conectado mudou.");
+      return await provider(c, path, method, body);
+    },
+  );
   await checked(
     db.rpc("agency_workspace_process_due", { p_workspace: workspace }),
   );
@@ -109,10 +132,19 @@ async function work(workspace: string) {
     let status = "uncertain",
       id: string | null = null;
     try {
-      const result = await provider(c, "message/send-text", "POST", {
-        phone: m.phone,
-        message: m.body,
-      });
+      const media = m.media_path
+        ? providerMedia(
+            await asset(db, workspace, m.media_path),
+            m.phone,
+            m.body,
+          )
+        : null;
+      const result = await provider(
+        c,
+        media?.action || "message/send-text",
+        "POST",
+        media?.body || { phone: m.phone, message: m.body },
+      );
       id =
         String(result.messageId || result.id || result.key?.id || "") || null;
       status = id ? "sent" : "uncertain";
@@ -188,6 +220,40 @@ export async function handle(req: Request) {
       );
     }
   }
+  if (req.method === "GET" && callbackUrl.searchParams.get("link")) {
+    const r = await checked(
+      db.rpc("agency_workspace_resolve_link", {
+        p_token: callbackUrl.searchParams.get("link"),
+      }),
+    );
+    if (!r) return reply({ error: "Link indisponível." }, 404);
+    const target = new URL(r.destination);
+    if (target.protocol !== "https:")
+      return reply({ error: "Destino inválido." }, 400);
+    if (r.source) target.searchParams.set("utm_source", r.source);
+    if (r.campaign) target.searchParams.set("utm_campaign", r.campaign);
+    for (const name of ["fbclid", "gclid", "gbraid", "wbraid"]) {
+      const value = callbackUrl.searchParams.get(name);
+      if (value && value.length <= 500) target.searchParams.set(name, value);
+    }
+    return Response.redirect(target.toString(), 302);
+  }
+  if (req.method === "GET" && callbackUrl.searchParams.get("meta_workspace")) {
+    const workspace = callbackUrl.searchParams.get("meta_workspace")!;
+    if (!uuid(workspace)) return reply({ error: "Subconta inválida." }, 400);
+    const c = await providerConfig(db, workspace, "meta");
+    if (
+      c?.enabled &&
+      c.credentials?.verify_token &&
+      callbackUrl.searchParams.get("hub.mode") === "subscribe" &&
+      callbackUrl.searchParams.get("hub.verify_token") ===
+        c.credentials.verify_token
+    )
+      return new Response(callbackUrl.searchParams.get("hub.challenge") || "", {
+        headers: { "content-type": "text/plain", "cache-control": "no-store" },
+      });
+    return reply({ error: "Verificação recusada." }, 403);
+  }
   if (req.method !== "POST")
     return reply({ error: "Método não permitido." }, 405);
   try {
@@ -198,6 +264,32 @@ export async function handle(req: Request) {
       return reply({ error: "Solicitação muito grande." }, 413);
     const body = JSON.parse(raw || "{}"),
       url = new URL(req.url);
+    const metaWorkspace = url.searchParams.get("meta_workspace");
+    if (metaWorkspace) {
+      if (!uuid(metaWorkspace))
+        return reply({ error: "Subconta inválida." }, 400);
+      await active(metaWorkspace);
+      await receiveMetaLead(
+        db,
+        metaWorkspace,
+        raw,
+        req.headers.get("x-hub-signature-256") || "",
+      );
+      await work(metaWorkspace);
+      return reply({ ok: true });
+    }
+    const providerWorker = url.searchParams.get("provider_worker");
+    if (providerWorker) {
+      const workspace = await checked(
+        db.rpc("agency_workspace_provider_worker", {
+          p_secret: providerWorker,
+        }),
+      );
+      if (!workspace) return reply({ error: "Conexão inválida." }, 403);
+      await active(workspace);
+      await work(workspace);
+      return reply({ ok: true });
+    }
     const googleWorker = url.searchParams.get("google_worker");
     if (googleWorker) {
       const c = await googleConfig(db, null, "worker", {
@@ -226,7 +318,7 @@ export async function handle(req: Request) {
       const state = await account(c);
       if (!state.connected) return reply({ ok: true });
       const event = normalizeWhatsappEvent(body);
-      if (event)
+      if (event) {
         await checked(
           db.rpc("agency_workspace_ingest_message", {
             p_workspace: c.workspace_id,
@@ -234,6 +326,36 @@ export async function handle(req: Request) {
             p_event: event,
           }),
         );
+        const attrs = whatsappAttribution(body);
+        if (Object.keys(attrs).length && !event.isGroup) {
+          const message = await checked(
+            db
+              .from("agency_workspace_messages")
+              .select("lead_id")
+              .eq("workspace_id", c.workspace_id)
+              .eq("account_id", state.account_id)
+              .eq("provider_id", event.providerId)
+              .maybeSingle(),
+          );
+          if (message?.lead_id) {
+            const lead = await checked(
+              db
+                .from("agency_workspace_leads")
+                .select("attributes")
+                .eq("workspace_id", c.workspace_id)
+                .eq("id", message.lead_id)
+                .single(),
+            );
+            await checked(
+              db
+                .from("agency_workspace_leads")
+                .update({ attributes: { ...attrs, ...lead.attributes } })
+                .eq("workspace_id", c.workspace_id)
+                .eq("id", message.lead_id),
+            );
+          }
+        }
+      }
       await work(c.workspace_id);
       return reply({ ok: true });
     }
@@ -275,10 +397,11 @@ export async function handle(req: Request) {
       if (!uuid(body.request_id)) throw Error("Solicitação inválida.");
       const answers = formAnswers(f.fields, body.answers);
       const result = await checked(
-        db.rpc("agency_workspace_submit_form", {
+        db.rpc("agency_workspace_submit_form_v2", {
           p_token: body.token,
           p_request: body.request_id,
           p_answers: answers,
+          p_attribution: attribution(body.attribution, req),
         }),
       );
       await work(f.workspace_id).catch(() => {});
@@ -392,6 +515,10 @@ export async function handle(req: Request) {
       "google_connect",
       "google_disconnect",
       "save_whatsapp",
+      "provider_settings",
+      "retry_action",
+      "save_provider",
+      "asset_upload",
       "connect_whatsapp",
       "disconnect_whatsapp",
       "save_webhook",
@@ -411,6 +538,142 @@ export async function handle(req: Request) {
     if (body.action === "google_disconnect") {
       await googleConfig(db, workspace, "disconnect");
       return reply({ ok: true });
+    }
+    if (body.action === "retry_action") {
+      await active(workspace);
+      if (!uuid(body.id)) throw Error("Ação inválida.");
+      const a = await checked(
+        db
+          .from("agency_workspace_action_outbox")
+          .select("id,status,run_id,node_id")
+          .eq("workspace_id", workspace)
+          .eq("id", body.id)
+          .maybeSingle(),
+      );
+      if (!a || !["failed", "uncertain"].includes(a.status))
+        throw Error("Esta ação não pode ser repetida.");
+      if (a.status === "uncertain" && body.confirmed !== true)
+        throw Error("Confira o envio no provedor antes de repetir.");
+      if (a.run_id) {
+        const run = await checked(
+          db
+            .from("agency_workspace_flow_runs")
+            .select("flow_id")
+            .eq("workspace_id", workspace)
+            .eq("id", a.run_id)
+            .single(),
+        );
+        const flow = await checked(
+          db
+            .from("agency_workspace_flows")
+            .select("enabled")
+            .eq("workspace_id", workspace)
+            .eq("id", run.flow_id)
+            .single(),
+        );
+        if (!flow.enabled)
+          throw Error("Ative o funil antes de repetir esta ação.");
+        await checked(
+          db
+            .from("agency_workspace_flow_runs")
+            .update({
+              status: "waiting",
+              error: null,
+              next_run_at: new Date(Date.now() + 365 * 86400000).toISOString(),
+            })
+            .eq("workspace_id", workspace)
+            .eq("id", a.run_id),
+        );
+        await checked(
+          db
+            .from("agency_workspace_flow_steps")
+            .update({ status: "waiting", detail: null })
+            .eq("workspace_id", workspace)
+            .eq("run_id", a.run_id)
+            .eq("node_id", a.node_id),
+        );
+      }
+      await checked(
+        db
+          .from("agency_workspace_action_outbox")
+          .update({
+            status: "queued",
+            error: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("workspace_id", workspace)
+          .eq("id", a.id)
+          .eq("status", a.status),
+      );
+      await work(workspace);
+      return reply({ ok: true });
+    }
+    if (body.action === "provider_settings") {
+      const providers = await Promise.all(
+        channelKinds.map(async (kind) => [
+          kind,
+          providerSummary(await providerConfig(db, workspace, kind)),
+        ]),
+      );
+      return reply({
+        providers: Object.fromEntries(providers),
+        meta_callback: `${base}/functions/v1/workspace-operations?meta_workspace=${workspace}`,
+        link_base: `${base}/functions/v1/workspace-operations?link=`,
+      });
+    }
+    if (body.action === "save_provider") {
+      await active(workspace);
+      const kind = String(body.kind);
+      const previous = await providerConfig(db, workspace, kind);
+      const credentials = validateProvider(
+        kind,
+        body.credentials,
+        previous?.credentials,
+      );
+      if (credentials.entry_stage_id) {
+        const stage = await checked(
+          db
+            .from("agency_workspace_stages")
+            .select("id")
+            .eq("workspace_id", workspace)
+            .eq("id", credentials.entry_stage_id)
+            .maybeSingle(),
+        );
+        if (!stage) throw Error("Escolha uma etapa desta empresa.");
+      }
+      const required: Record<string, string[]> = {
+        meta: ["pixel_id", "access_token"],
+        google_ads: [
+          "customer_id",
+          "conversion_action",
+          "client_id",
+          "client_secret",
+          "refresh_token",
+        ],
+        email: ["api_key", "from"],
+        sms: ["account_sid", "auth_token", "from"],
+      };
+      if (body.enabled && required[kind]?.some((k) => !credentials[k]))
+        throw Error("Preencha os campos obrigatórios antes de ativar.");
+      await providerConfig(db, workspace, kind, {
+        enabled: body.enabled === true,
+        credentials,
+      });
+      return reply({ ok: true });
+    }
+    if (body.action === "asset_upload") {
+      await active(workspace);
+      return reply(
+        await prepareAsset(
+          db,
+          workspace,
+          String(body.name || "arquivo"),
+          Number(body.size),
+        ),
+      );
+    }
+    if (body.action === "asset_url") {
+      return reply(await asset(db, workspace, String(body.path || "")));
     }
     if (body.action === "integration_settings") {
       const c = await connection(workspace),

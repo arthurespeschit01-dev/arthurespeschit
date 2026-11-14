@@ -80,6 +80,13 @@ export default function WorkspacePublic() {
                           token,
                           request_id: request,
                           answers,
+                          attribution: {
+                            ...Object.fromEntries(
+                              new URLSearchParams(location.search),
+                            ),
+                            source_url:
+                              window.location.origin + location.pathname,
+                          },
                         })
                       : workspaceOperation<{ message: string }>("book", {
                           token,

@@ -46,3 +46,7 @@ Timers and internal actions run each minute through `pilot-workspace-automations
 Use Supabase Auth's supported signup/admin interfaces to provision accounts. Do not insert or hash credentials manually in Auth tables. Passwords belong to Auth and a password manager, never this repository. Enrollment is an administrative operation on the private allowlist after confirming the intended user. Do not auto-enroll signups or match user-editable metadata.
 
 Tests use synthetic users and local PGlite databases. They do not send emails, write to production or message WhatsApp contacts. A denied/non-pilot identity, foreign workspace IDs, read-only roles, archive restrictions and unchanged legacy records are part of the database suite.
+
+## Professional editor and tracking update
+
+See [professional workspace workflows](workspace-professional-workflows.md) for the grouped navigation, fullscreen editor, reply/appointment/business-hour waits, multi-path splits, workspace-owned email/SMS, conversion tracking, Meta form intake and cancellation guards. Provider setup and approvals remain explicit external prerequisites.

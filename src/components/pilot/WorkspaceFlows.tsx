@@ -1,5 +1,10 @@
+import FlowExecutions from "./FlowExecutions";
+import FlowConditions from "./FlowConditions";
+import FlowAdvancedFields from "./FlowAdvancedFields";
+import { createPortal } from "react-dom";
+import { workflowCatalog, flowLabels } from "./workflowCatalog";
 import { useTheme } from "@/contexts/ThemeContext";
-import { useCallback, useState, useEffect, useRef } from "react";
+import { useCallback, useState, useEffect, useRef, useMemo } from "react";
 import {
   ReactFlow,
   Background,
@@ -36,16 +41,10 @@ import {
 } from "@/lib/workspaceCommercial";
 import { RecordMenu, Empty } from "./CommercialShared";
 const labels: Record<string, string> = {
+  ...flowLabels,
   trigger: "Quando acontecer",
-  condition: "Condição",
+  stage: "Estágio",
   add_tags: "Adicionar etiquetas",
-  remove_tags: "Remover etiquetas",
-  move_stage: "Mover no CRM",
-  create_task: "Criar tarefa",
-  notify: "Notificação interna",
-  wait: "Esperar",
-  assign_user: "Atribuir responsável",
-  send_message: "Enviar WhatsApp",
 };
 const events: Record<string, string> = {
   form_submitted: "Formulário preenchido",
@@ -55,26 +54,58 @@ const events: Record<string, string> = {
   tag_added: "Etiqueta adicionada",
   message_received: "Mensagem no WhatsApp",
   external_webhook: "Webhook externo",
+  meta_lead: "Formulário Meta Ads",
 };
 function Block({ data, selected }: NodeProps) {
   const kind = String(data.kind);
   return (
     <div
-      className={`min-w-48 max-w-64 rounded-xl border-2 p-4 bg-card text-card-foreground shadow-sm ${selected ? "border-primary" : "border-border"}`}
+      className={`min-w-[260px] max-w-[320px] rounded-xl border-2 p-4 bg-card text-card-foreground shadow-sm ${selected ? "border-primary" : "border-border"}`}
     >
       <Handle type="target" position={Position.Top} />
       <p className="text-xs text-primary font-semibold uppercase">
         {kind === "trigger"
           ? "Gatilho"
-          : kind === "condition"
-            ? "Condição"
-            : "Ação"}
+          : kind === "stage"
+            ? "Estágio"
+            : kind === "condition"
+              ? "Condição"
+              : "Ação"}
       </p>
-      <p className="font-semibold text-sm mt-1">{labels[kind]}</p>
+      <p className="font-semibold text-sm mt-1">
+        {String(data.title || labels[kind])}
+      </p>
       <p className="text-xs text-muted-foreground mt-2 whitespace-pre-wrap break-words">
         {String(data.summary || "Clique para configurar")}
       </p>
-      {kind === "condition" ? (
+      {kind === "split" ? (
+        <>
+          {(
+            (data.outlets as {
+              id: string;
+              label: string;
+              weight: number;
+            }[]) || [
+              { id: "yes", label: "A", weight: 50 },
+              { id: "no", label: "B", weight: 50 },
+            ]
+          ).map((b, i, all) => (
+            <Handle
+              key={b.id}
+              type="source"
+              position={Position.Bottom}
+              id={b.id}
+              title={b.label + " " + b.weight + "%"}
+              style={{ left: `${((i + 1) * 100) / (all.length + 1)}%` }}
+            />
+          ))}
+          <p className="text-[10px] mt-2">
+            {((data.outlets as { label: string; weight: number }[]) || [])
+              .map((b) => b.label + " " + b.weight + "%")
+              .join(" · ")}
+          </p>
+        </>
+      ) : ["condition", "wait_response", "team_response"].includes(kind) ? (
         <>
           <Handle
             type="source"
@@ -180,33 +211,31 @@ export default function WorkspaceFlows({
         <FlowEditor
           key={editing.id || "new"}
           value={editing}
+          workspace={workspace}
           forms={forms}
           calendars={calendars}
           stages={stages}
           members={members}
           manage={manage}
           onClose={() => setEditing(null)}
-          save={(f) =>
-            run(async () => {
-              const values = {
-                workspace_id: workspace,
-                name: f.name,
-                enabled: f.enabled,
-                definition: f.definition,
-              };
-              const r = f.id
-                ? await workspaceDb
-                    .from("agency_workspace_flows")
-                    .update(values)
-                    .eq("workspace_id", workspace)
-                    .eq("id", f.id)
-                : await workspaceDb
-                    .from("agency_workspace_flows")
-                    .insert(values);
-              if (!r.error) setEditing(null);
-              return r;
-            })
-          }
+          save={async (f) => {
+            const values = {
+              workspace_id: workspace,
+              name: f.name,
+              enabled: f.enabled,
+              definition: f.definition,
+            };
+            const r = f.id
+              ? await workspaceDb
+                  .from("agency_workspace_flows")
+                  .update(values)
+                  .eq("workspace_id", workspace)
+                  .eq("id", f.id)
+              : await workspaceDb.from("agency_workspace_flows").insert(values);
+            if (r.error) throw r.error;
+            run(async () => ({ error: null }));
+            setEditing(null);
+          }}
         />
       ) : (
         <div className="grid md:grid-cols-2 gap-3">
@@ -348,6 +377,7 @@ export default function WorkspaceFlows({
 }
 function FlowEditor({
   value,
+  workspace,
   forms,
   calendars,
   stages,
@@ -357,15 +387,20 @@ function FlowEditor({
   save,
 }: {
   value: WorkspaceFlow;
+  workspace: string;
   forms: CaptureForm[];
   calendars: WorkspaceCalendar[];
   stages: WorkspaceStage[];
   members: TeamMember[];
   manage: boolean;
   onClose: () => void;
-  save: (f: WorkspaceFlow) => void;
+  save: (f: WorkspaceFlow) => Promise<void>;
 }) {
   const { theme } = useTheme();
+  const [catalogSearch, setCatalogSearch] = useState(""),
+    [catalogOpen, setCatalogOpen] = useState(false),
+    [saving, setSaving] = useState(false),
+    [executionOpen, setExecutionOpen] = useState(false);
   const canvas = useRef<HTMLDivElement>(null);
   const [instance, setInstance] = useState<ReactFlowInstance | null>(null);
   useEffect(() => {
@@ -396,27 +431,61 @@ function FlowEditor({
       })),
     ),
     [error, setError] = useState("");
-  const nodes: Node[] = raw.map((n) => ({
-    id: n.id,
-    type: "block",
-    position: n.position,
-    selected: n.id === selected,
-    data: { kind: n.type, summary: summary(n) },
-  }));
+  const [sizes, setSizes] = useState<
+    Record<string, { width: number; height: number }>
+  >({});
+  const nodes: Node[] = useMemo(
+    () =>
+      raw.map((n) => ({
+        id: n.id,
+        type: "block",
+        position: n.position,
+        selected: n.id === selected,
+        measured: sizes[n.id],
+        data: {
+          kind: n.type,
+          title: n.data.label || labels[n.type],
+          outlets: n.data.branches,
+          summary: summary(n),
+        },
+      })),
+    [raw, selected, sizes],
+  );
   const current = raw.find((n) => n.id === selected);
   const onNodesChange = useCallback((changes: NodeChange[]) => {
-    setRaw((prior) => {
-      const visual = prior.map((n) => ({
-        id: n.id,
-        position: n.position,
-        data: n.data,
-      }));
-      const next = applyNodeChanges(changes, visual);
-      return next.map((n) => ({
-        ...prior.find((p) => p.id === n.id)!,
-        position: n.position,
-      }));
+    setSizes((prior) => {
+      let next = prior;
+      for (const c of changes) {
+        if (
+          c.type === "dimensions" &&
+          c.dimensions &&
+          (prior[c.id]?.width !== c.dimensions.width ||
+            prior[c.id]?.height !== c.dimensions.height)
+        ) {
+          next = { ...next, [c.id]: c.dimensions };
+        }
+      }
+      return next;
     });
+    setRaw((prior) => {
+      let next = prior;
+      for (const change of changes) {
+        if (change.type === "position" && change.position)
+          next = next.map((n) =>
+            n.id === change.id ? { ...n, position: change.position! } : n,
+          );
+        if (change.type === "remove")
+          next = next.filter((n) => n.id !== change.id);
+      }
+      return next;
+    });
+    for (const c of changes) {
+      if (c.type === "select" && c.selected) setSelected(c.id);
+      if (c.type === "remove")
+        setEdges((prior) =>
+          prior.filter((e) => e.source !== c.id && e.target !== c.id),
+        );
+    }
   }, []);
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) =>
@@ -444,49 +513,131 @@ function FlowEditor({
         n.id === selected ? { ...n, data: { ...n.data, ...data } } : n,
       ),
     );
-  const add = (type: string) => {
+  const add = (
+    type: string,
+    label = labels[type],
+    event?: string,
+    position?: { x: number; y: number },
+  ) => {
+    if (!manage || raw.length >= 40) return;
     const id = "node_" + crypto.randomUUID().slice(0, 8);
-    setRaw([
-      ...raw,
-      {
-        id,
-        type,
-        position: { x: 120 + (raw.length % 2) * 300, y: 80 + raw.length * 170 },
-        data:
-          type === "trigger"
-            ? { event: "form_submitted" }
-            : type === "condition"
-              ? {
-                  match: "all",
-                  rules: [
-                    { field: "source", operator: "equals", value: "form" },
-                  ],
-                }
-              : type === "wait"
-                ? { minutes: 60 }
-                : type.includes("tags")
-                  ? { tags: ["Nova etiqueta"] }
-                  : type === "move_stage"
-                    ? { stage_id: stages[0]?.id }
-                    : type === "assign_user"
-                      ? { user_id: members[0]?.user_id }
-                      : {
-                          text:
-                            type === "create_task"
-                              ? "Entrar em contato com {nome}"
-                              : "Novo contato: {nome}",
-                        },
-      },
+    const rect = canvas.current?.getBoundingClientRect();
+    const center =
+      position ||
+      (instance && rect
+        ? instance.screenToFlowPosition({
+            x: rect.left + rect.width * 0.4,
+            y: rect.top + rect.height * 0.5,
+          })
+        : { x: 160, y: 160 });
+    const data: Record<string, unknown> =
+      type === "trigger"
+        ? { event: event || "form_submitted" }
+        : type === "condition"
+          ? {
+              match: "all",
+              rules: [{ field: "source", operator: "equals", value: "form" }],
+            }
+          : ["wait", "wait_response", "team_response"].includes(type)
+            ? { minutes: 60 }
+            : type === "wait_appointment"
+              ? { minutes: 60 }
+              : type === "business_hours"
+                ? {
+                    days: [1, 2, 3, 4, 5],
+                    start: "09:00",
+                    end: "18:00",
+                    timezone: "America/Sao_Paulo",
+                  }
+                : type === "split"
+                  ? {
+                      branches: [
+                        { id: "yes", label: "Caminho A", weight: 50 },
+                        { id: "no", label: "Caminho B", weight: 50 },
+                      ],
+                    }
+                  : type.includes("tags")
+                    ? { tags: ["Nova etiqueta"] }
+                    : type === "move_stage"
+                      ? { stage_id: stages[0]?.id }
+                      : type === "assign_user"
+                        ? { user_id: members[0]?.user_id }
+                        : type === "distribute"
+                          ? {
+                              user_ids: members
+                                .filter((m) => m.role !== "viewer")
+                                .map((m) => m.user_id),
+                            }
+                          : type === "meta_event"
+                            ? { event_name: "Lead" }
+                            : {
+                                text:
+                                  type === "create_task"
+                                    ? "Entrar em contato com {nome}"
+                                    : type === "create_group"
+                                      ? "Atendimento de {nome}"
+                                      : "Olá, {nome}!",
+                                subject: "Contato da equipe",
+                                participants: [],
+                              };
+    setRaw((prior) => [
+      ...prior,
+      { id, type, position: center, data: { ...data, label } },
     ]);
     setSelected(id);
+    setCatalogOpen(false);
+    if (instance)
+      void instance.setCenter(center.x + 140, center.y + 60, {
+        zoom: Math.max(instance.getZoom(), 0.8),
+        duration: 200,
+      });
   };
+  const dirty =
+    JSON.stringify({
+      name,
+      enabled,
+      definition: {
+        nodes: raw,
+        edges: edges.map((e) => ({
+          id: e.id,
+          source: e.source,
+          target: e.target,
+          ...(e.sourceHandle ? { branch: e.sourceHandle } : {}),
+        })),
+      },
+    }) !==
+    JSON.stringify({
+      name: value.name,
+      enabled: value.enabled,
+      definition: value.definition,
+    });
+  const close = () => {
+    if (
+      !saving &&
+      (!dirty || window.confirm("Sair do editor sem salvar as alterações?"))
+    )
+      onClose();
+  };
+  useEffect(() => {
+    const listener = (e: BeforeUnloadEvent) => {
+      if (dirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", listener);
+    return () => window.removeEventListener("beforeunload", listener);
+  }, [dirty]);
   const d = current?.data || {};
   const rule = (
     d.rules as { field: string; operator: string; value: string }[]
   )?.[0] || { field: "source", operator: "equals", value: "form" };
-  return (
-    <section className="space-y-3">
-      <div className="flex flex-wrap gap-2 items-center">
+  return createPortal(
+    <section
+      aria-label="Editor de automações"
+      className="fixed inset-0 z-[90] bg-background text-foreground flex flex-col"
+    >
+      <header className="flex flex-wrap gap-2 items-center border-b px-4 py-3 shrink-0">
         <Input
           aria-label="Nome do funil"
           className="max-w-md"
@@ -504,62 +655,162 @@ function FlowEditor({
           Ativo
         </label>
         <Button
-          disabled={!manage}
-          onClick={() => {
+          disabled={!manage || saving}
+          onClick={async () => {
             if (!name.trim()) {
               setError("Informe o nome.");
               return;
             }
-            save({
-              ...value,
-              name,
-              enabled,
-              definition: {
-                nodes: raw,
-                edges: edges.map((e) => ({
-                  id: e.id,
-                  source: e.source,
-                  target: e.target,
-                  ...(e.sourceHandle ? { branch: e.sourceHandle } : {}),
-                })) as FlowEdge[],
-              },
-            });
+            setSaving(true);
+            setError("");
+            try {
+              await save({
+                ...value,
+                name,
+                enabled,
+                definition: {
+                  nodes: raw,
+                  edges: edges.map((e) => ({
+                    id: e.id,
+                    source: e.source,
+                    target: e.target,
+                    ...(e.sourceHandle ? { branch: e.sourceHandle } : {}),
+                  })) as FlowEdge[],
+                },
+              });
+            } catch (e) {
+              setError((e as Error).message || "Não foi possível salvar.");
+            } finally {
+              setSaving(false);
+            }
           }}
         >
-          Salvar funil
+          {saving ? "Salvando…" : "Salvar funil"}
         </Button>
-        <Button variant="outline" onClick={onClose}>
+        <Button variant="outline" disabled={saving} onClick={close}>
           Fechar editor
         </Button>
-      </div>
+        <Button
+          variant="outline"
+          onClick={() => setExecutionOpen(!executionOpen)}
+        >
+          Execuções
+        </Button>
+        <Button
+          variant="outline"
+          className="md:hidden"
+          onClick={() => setCatalogOpen(!catalogOpen)}
+        >
+          Blocos
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setRaw((prior) =>
+              prior.map((n, i) => ({
+                ...n,
+                position: {
+                  x: n.type === "trigger" ? 200 : 200 + (i % 2) * 340,
+                  y: 80 + i * 180,
+                },
+              })),
+            );
+            requestAnimationFrame(
+              () => void instance?.fitView({ padding: 0.15 }),
+            );
+          }}
+        >
+          Organizar
+        </Button>
+      </header>
       {error && (
         <p role="alert" className="text-destructive">
           {error}
         </p>
       )}
-      <p className="text-xs text-muted-foreground">
-        Adicione blocos e arraste das saídas para as entradas. Clique em um
-        bloco para configurá-lo. Selecione uma conexão e pressione Delete para
-        removê-la. Use os botões de zoom também no celular.
-      </p>
-      <div className="grid xl:grid-cols-[180px_minmax(0,1fr)_250px] gap-3">
-        <aside className="border rounded-lg p-3 flex xl:flex-col gap-2 overflow-x-auto">
-          {Object.entries(labels).map(([k, v]) => (
-            <Button
-              key={k}
-              variant="outline"
-              size="sm"
-              disabled={!manage || raw.length >= 40}
-              onClick={() => add(k)}
-              className="shrink-0 justify-start"
-            >
-              + {v}
-            </Button>
+      <div className="flex flex-1 min-h-0 relative">
+        {executionOpen && (
+          <FlowExecutions
+            workspace={workspace}
+            flow={value.id}
+            onClose={() => setExecutionOpen(false)}
+          />
+        )}
+        <aside
+          aria-label="Catálogo de blocos"
+          className={`${catalogOpen ? "absolute inset-y-0 left-0 z-30 w-[min(320px,90vw)]" : "hidden"} md:relative md:block md:w-[300px] shrink-0 border-r bg-card overflow-y-auto p-3 space-y-3`}
+        >
+          <h2 className="font-semibold">Blocos</h2>
+          <Input
+            aria-label="Buscar bloco"
+            placeholder="Buscar bloco…"
+            value={catalogSearch}
+            onChange={(e) => setCatalogSearch(e.target.value)}
+          />
+          {workflowCatalog.map((group, index) => (
+            <details key={group.group} open className="border-b pb-3">
+              <summary
+                className={`text-xs font-semibold py-3 cursor-pointer ${index === 0 ? "text-blue-500" : index === 1 ? "text-purple-500" : "text-emerald-500"}`}
+              >
+                {group.group}
+              </summary>
+              <p className="text-xs text-muted-foreground mb-3">{group.hint}</p>
+              <div className="space-y-2">
+                {group.items
+                  .filter(([, label, description]) =>
+                    (label + " " + description)
+                      .toLowerCase()
+                      .includes(catalogSearch.toLowerCase()),
+                  )
+                  .map(([type, label, description, event]) => (
+                    <button
+                      key={label}
+                      disabled={!manage || raw.length >= 40}
+                      draggable={manage}
+                      onDragStart={(e) =>
+                        e.dataTransfer.setData(
+                          "application/workspace-block",
+                          JSON.stringify({ type, label, event }),
+                        )
+                      }
+                      onClick={() => add(type, label, event)}
+                      className="w-full text-left border rounded-xl p-3 hover:border-primary hover:bg-primary/5 focus-visible:outline-primary"
+                    >
+                      <span className="block text-xs font-semibold">
+                        {label}
+                      </span>
+                      <span className="block text-xs text-muted-foreground mt-1 leading-4">
+                        {description}
+                      </span>
+                    </button>
+                  ))}
+              </div>
+            </details>
           ))}
         </aside>
         <div
           ref={canvas}
-          className="h-[540px] min-w-0 border rounded-xl bg-muted/30"
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "copy";
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            try {
+              const item = JSON.parse(
+                e.dataTransfer.getData("application/workspace-block"),
+              );
+              add(
+                item.type,
+                item.label,
+                item.event,
+                instance?.screenToFlowPosition({ x: e.clientX, y: e.clientY }),
+              );
+            } catch {
+              /* ignore external drops */
+            }
+          }}
+          className="flex-1 min-w-0 h-full bg-muted/20"
         >
           <ReactFlow
             colorMode={theme}
@@ -575,19 +826,54 @@ function FlowEditor({
             nodesConnectable={manage}
             deleteKeyCode={manage ? ["Backspace", "Delete"] : null}
             fitView
-            minZoom={0.2}
+            minZoom={0.25}
             maxZoom={1.5}
           >
             <Background />
             <Controls />
-            <MiniMap className="hidden sm:block" pannable zoomable />
+            <MiniMap
+              className="hidden sm:block"
+              nodeColor="#8b5cf6"
+              nodeStrokeColor="#a78bfa"
+              pannable
+              zoomable
+            />
           </ReactFlow>
         </div>
-        <aside className="border rounded-lg p-3 space-y-3 min-w-0">
+        <aside
+          aria-label="Configurar bloco"
+          className={`${current ? "block" : "hidden"} absolute z-20 right-3 bottom-3 md:top-3 max-h-[65%] md:max-h-[calc(100%-24px)] w-[min(340px,calc(100%-24px))] bg-card shadow-xl border rounded-xl p-4 space-y-3 overflow-y-auto`}
+        >
           {current ? (
             <>
-              <h3 className="font-semibold text-sm">{labels[current.type]}</h3>
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="font-semibold text-sm">
+                  {String(current.data.label || labels[current.type])}
+                </h3>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setSelected("")}
+                >
+                  Fechar
+                </Button>
+              </div>
               <fieldset disabled={!manage} className="space-y-3 min-w-0">
+                <FlowAdvancedFields
+                  type={current.type}
+                  data={d}
+                  patch={patch}
+                  members={members}
+                  workspace={workspace}
+                />
+                <label className="block text-sm">
+                  Nome do bloco
+                  <Input
+                    value={String(d.label || labels[current.type])}
+                    maxLength={160}
+                    onChange={(e) => patch({ label: e.target.value })}
+                  />
+                </label>
                 {current.type === "trigger" && (
                   <>
                     <label className="text-sm block">
@@ -661,67 +947,7 @@ function FlowEditor({
                   </>
                 )}
                 {current.type === "condition" && (
-                  <>
-                    <select
-                      aria-label="Campo da condição"
-                      className={selectClass + " w-full"}
-                      value={rule.field}
-                      onChange={(e) =>
-                        patch({ rules: [{ ...rule, field: e.target.value }] })
-                      }
-                    >
-                      {[
-                        ["source", "Origem do lead"],
-                        ["tag", "Etiqueta"],
-                        ["stage", "ID da etapa"],
-                        ["message", "Mensagem"],
-                        ["value", "Valor"],
-                        ["email", "E-mail"],
-                        ["phone", "Telefone"],
-                        ["name", "Nome"],
-                        ...forms.flatMap((f) =>
-                          f.fields.map((x) => [
-                            "answer:" + x.id,
-                            `Resposta: ${x.label}`,
-                          ]),
-                        ),
-                      ].map(([k, v]) => (
-                        <option key={k} value={k}>
-                          {v}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      aria-label="Operador"
-                      className={selectClass + " w-full"}
-                      value={rule.operator}
-                      onChange={(e) =>
-                        patch({
-                          rules: [{ ...rule, operator: e.target.value }],
-                        })
-                      }
-                    >
-                      {[
-                        ["equals", "Igual a"],
-                        ["not_equals", "Diferente de"],
-                        ["contains", "Contém"],
-                        ["filled", "Preenchido"],
-                        ["not_filled", "Não preenchido"],
-                        ["greater_than", "Maior que"],
-                      ].map(([k, v]) => (
-                        <option key={k} value={k}>
-                          {v}
-                        </option>
-                      ))}
-                    </select>
-                    <Input
-                      aria-label="Valor da condição"
-                      value={rule.value || ""}
-                      onChange={(e) =>
-                        patch({ rules: [{ ...rule, value: e.target.value }] })
-                      }
-                    />
-                  </>
+                  <FlowConditions data={d} patch={patch} forms={forms} />
                 )}
                 {current.type.includes("tags") && (
                   <label className="text-sm block">
@@ -821,6 +1047,28 @@ function FlowEditor({
                   variant="outline"
                   size="sm"
                   onClick={() => {
+                    const id = "node_" + crypto.randomUUID().slice(0, 8);
+                    setRaw((prior) => [
+                      ...prior,
+                      {
+                        ...current,
+                        id,
+                        position: {
+                          x: current.position.x + 60,
+                          y: current.position.y + 150,
+                        },
+                        data: structuredClone(current.data),
+                      },
+                    ]);
+                    setSelected(id);
+                  }}
+                >
+                  Duplicar bloco
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
                     setRaw(raw.filter((n) => n.id !== selected));
                     setEdges(
                       edges.filter(
@@ -841,6 +1089,7 @@ function FlowEditor({
           )}
         </aside>
       </div>
-    </section>
+    </section>,
+    document.body,
   );
 }

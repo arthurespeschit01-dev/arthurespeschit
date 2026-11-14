@@ -1,3 +1,4 @@
+import WorkspaceNavigation from "@/components/pilot/WorkspaceNavigation";
 import WorkspaceCommercial from "@/components/pilot/WorkspaceCommercial";
 import { useState } from "react";
 import {
@@ -343,7 +344,7 @@ function WorkspaceView() {
   const base = `/laboratorio/subcontas/${workspaceId}`,
     section =
       location.pathname.split("/").pop() === workspaceId
-        ? "dashboard"
+        ? "inicio"
         : location.pathname.endsWith("/crm")
           ? "crm"
           : location.pathname.endsWith("/configuracoes")
@@ -424,47 +425,7 @@ function WorkspaceView() {
             ))}
           </select>
         </label>
-        <nav className="flex lg:flex-col gap-1 overflow-x-auto">
-          {[
-            { to: base, label: "Dashboard", icon: LayoutDashboard },
-            { to: base + "/conversas", label: "Conversas", icon: Columns3 },
-            { to: base + "/crm", label: "CRM", icon: Columns3 },
-            { to: base + "/formularios", label: "Formulários", icon: Columns3 },
-            {
-              to: base + "/agendamentos",
-              label: "Agendamentos",
-              icon: Columns3,
-            },
-            {
-              to: base + "/funis",
-              label: "Funis e automações",
-              icon: Columns3,
-            },
-            {
-              to: base + "/equipe",
-              label: "Pessoas e permissões",
-              icon: Settings,
-            },
-            { to: base + "/integracoes", label: "Integrações", icon: Settings },
-            {
-              to: base + "/configuracoes",
-              label: "Configurações",
-              icon: Settings,
-            },
-          ].map((n) => (
-            <NavLink
-              key={n.to}
-              to={n.to}
-              end
-              className={({ isActive }) =>
-                `flex items-center gap-2 rounded-lg px-3 py-3 text-sm shrink-0 ${isActive ? "bg-primary/15 text-primary font-semibold" : "text-sidebar-foreground hover:bg-sidebar-accent"}`
-              }
-            >
-              <n.icon size={17} />
-              {n.label}
-            </NavLink>
-          ))}
-        </nav>
+        <WorkspaceNavigation base={base} section={section} />
         <Button variant="ghost" asChild className="w-full justify-start">
           <Link to="/laboratorio/subcontas">
             <ArrowLeft size={16} />

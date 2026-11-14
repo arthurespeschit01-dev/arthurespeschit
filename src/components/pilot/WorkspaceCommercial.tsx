@@ -1,3 +1,6 @@
+import { Link } from "react-router-dom";
+import WorkspaceProviders from "./WorkspaceProviders";
+import WorkspaceSettings from "./WorkspaceSettings";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -59,7 +62,14 @@ export default function WorkspaceCommercial({
     queryFn: () => commercialData(workspace, manage),
     refetchOnMount: "always",
     refetchInterval: 10000,
-    enabled: !["conversas", "integracoes"].includes(section),
+    enabled: ![
+      "conversas",
+      "integracoes",
+      "geral",
+      "rastreamento",
+      "canais",
+      "creditos",
+    ].includes(section),
   });
   const refresh = () => {
     void client.invalidateQueries({
@@ -82,6 +92,23 @@ export default function WorkspaceCommercial({
       .catch((e) => setError(workspaceError(e)))
       .finally(() => setBusy(false));
   };
+  if (["rastreamento", "canais", "creditos"].includes(section))
+    return (
+      <WorkspaceProviders
+        key={section + workspace}
+        workspace={workspace}
+        manage={manage}
+        stages={stages}
+        mode={
+          section === "rastreamento"
+            ? "tracking"
+            : section === "canais"
+              ? "channels"
+              : "credits"
+        }
+      />
+    );
+  if (section === "geral") return <WorkspaceSettings workspace={workspace} />;
   if (section === "conversas")
     return (
       <WorkspaceConversations
@@ -117,6 +144,89 @@ export default function WorkspaceCommercial({
     flows = data.flows as WorkspaceFlow[],
     runs = data.flow_runs as FlowRun[],
     members = data.members as TeamMember[];
+  if (section === "inicio") {
+    const upcoming = appointments
+      .filter(
+        (a) =>
+          a.status === "confirmed" && Date.parse(a.starts_at) >= Date.now(),
+      )
+      .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+    const openTasks = (data.tasks as Task[]).filter((t) => !t.completed);
+    return (
+      <div className="space-y-6">
+        <header className="border rounded-2xl bg-card p-6">
+          <h2 className="text-2xl font-bold">Início</h2>
+          <p className="text-sm text-muted-foreground mt-2">
+            Visão do atendimento e da agenda desta empresa.
+          </p>
+          <div className="flex flex-wrap gap-3 mt-5">
+            <Button asChild>
+              <Link to={"/laboratorio/subcontas/" + workspace + "/conversas"}>
+                Abrir conversas
+              </Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link to={"/laboratorio/subcontas/" + workspace + "/crm"}>
+                Acessar CRM
+              </Link>
+            </Button>
+          </div>
+        </header>
+        <div className="grid sm:grid-cols-3 gap-3">
+          {[
+            ["Tarefas abertas", openTasks.length],
+            ["Próximos agendamentos", upcoming.length],
+            ["Pessoas na equipe", members.length],
+          ].map(([title, n]) => (
+            <article key={title} className="border rounded-xl bg-card p-5">
+              <p className="text-sm text-muted-foreground">{title}</p>
+              <p className="text-3xl font-bold mt-2">{n}</p>
+            </article>
+          ))}
+        </div>
+        <section className="border rounded-xl bg-card p-5 space-y-3">
+          <h3 className="font-semibold">Próximos compromissos</h3>
+          {upcoming.slice(0, 5).map((a) => (
+            <p key={a.id} className="text-sm border-b pb-2">
+              {a.name} · {dateLabel(a.starts_at)}
+            </p>
+          ))}
+          {!upcoming.length && (
+            <p className="text-sm text-muted-foreground">
+              Nenhum compromisso futuro confirmado.
+            </p>
+          )}
+        </section>
+        <section className="border rounded-xl bg-card p-5 space-y-3">
+          <h3 className="font-semibold">Tarefas do atendimento</h3>
+          {openTasks.slice(0, 10).map((t) => (
+            <label key={t.id} className="flex gap-3 text-sm">
+              <input
+                type="checkbox"
+                disabled={!write}
+                checked={false}
+                onChange={() =>
+                  run(() =>
+                    workspaceDb
+                      .from("agency_workspace_tasks")
+                      .update({ completed: true })
+                      .eq("workspace_id", workspace)
+                      .eq("id", t.id),
+                  )
+                }
+              />
+              {t.title}
+            </label>
+          ))}
+          {!openTasks.length && (
+            <p className="text-sm text-muted-foreground">
+              Nenhuma tarefa em aberto.
+            </p>
+          )}
+        </section>
+      </div>
+    );
+  }
   return (
     <div className="space-y-4" aria-busy={busy}>
       {error && (

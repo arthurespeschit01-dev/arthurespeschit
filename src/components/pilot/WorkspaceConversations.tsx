@@ -1,3 +1,4 @@
+import WorkspaceMessageAsset from "./WorkspaceMessageAsset";
 import { useAuth } from "@/contexts/AuthContext";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -15,6 +16,7 @@ interface Message {
   body: string;
   created_at: string;
   kind: string;
+  media_path?: string | null;
 }
 export default function WorkspaceConversations({
   workspace,
@@ -181,6 +183,12 @@ export default function WorkspaceConversations({
                     <p className="font-semibold text-xs mb-1">
                       {m.sender_name}
                     </p>
+                  )}
+                  {m.media_path && (
+                    <WorkspaceMessageAsset
+                      workspace={workspace}
+                      path={m.media_path}
+                    />
                   )}
                   <p className="whitespace-pre-wrap break-words">{m.body}</p>
                   <p className="text-[10px] opacity-80 mt-1">

@@ -11,7 +11,7 @@ await db.exec(
   ),
 );
 await db.exec(
-  "create role service_role bypassrls;alter table auth.users add column email_confirmed_at timestamptz default now()",
+  "create role service_role bypassrls;alter table auth.users add column email_confirmed_at timestamptz default now();create table public.agency_whatsapp_connections(instance_id text);grant select on public.agency_whatsapp_connections to service_role",
 );
 const pilot = randomUUID(),
   other = randomUUID();
@@ -43,6 +43,16 @@ await db.exec(
     "utf8",
   ),
 );
+for (const name of [
+  "20261113220957_workspace_integrations.sql",
+  "20261114005109_workspace_professional_automations.sql",
+])
+  await db.exec(
+    await readFile(
+      new URL("../supabase/migrations/" + name, import.meta.url),
+      "utf8",
+    ),
+  );
 await db.query(
   "insert into agency_private.pilot_accounts(user_id,enabled) values($1,true)",
   [pilot],
@@ -111,6 +121,12 @@ async function contextFor(id) {
     try {
       if (u.pathname.includes("/auth/")) return reply({ id, app_metadata: {} });
       if (u.pathname.includes("/functions/")) {
+        if (body?.action === "provider_settings")
+          return reply({
+            providers: { meta: null, google_ads: null, email: null, sms: null },
+            meta_callback: "https://fixture.invalid/meta",
+            link_base: "https://fixture.invalid/link?token=",
+          });
         if (body?.action === "send") sends++;
         return reply({ configured: false, connected: false });
       }
@@ -162,6 +178,9 @@ async function contextFor(id) {
           "agency_workspace_stages",
           "agency_workspace_leads",
           "agency_workspace_members",
+          "agency_workspace_action_outbox",
+          "agency_workspace_conversion_rules",
+          "agency_workspace_tracking_links",
           ...[
             "forms",
             "form_submissions",
@@ -248,6 +267,39 @@ async function contextFor(id) {
   });
   return context;
 }
+async function navigateModule(page, name) {
+  const link = page.getByRole("link", { name, exact: true });
+  if (
+    [
+      "CRM",
+      "Dashboard",
+      "Formulários",
+      "Agendamentos",
+      "Funis e automações",
+      "Workspace",
+      "Geral",
+    ].includes(name)
+  ) {
+    const mobile = page.getByRole("button", {
+      name: "Menu da empresa",
+      exact: true,
+    });
+    if (
+      (await mobile.isVisible()) &&
+      (await mobile.getAttribute("aria-expanded")) === "false"
+    )
+      await mobile.click();
+    const group = page.getByRole("button", {
+      name: ["Workspace", "Geral"].includes(name)
+        ? "Configurações"
+        : "Comercial",
+      exact: true,
+    });
+    if ((await group.getAttribute("aria-expanded")) === "false")
+      await group.click();
+  }
+  await link.click();
+}
 try {
   const context = await contextFor(pilot),
     page = await context.newPage();
@@ -269,7 +321,7 @@ try {
     .waitFor();
   const alpha = page.url().split("/subcontas/")[1];
   // Real module definitions and visual canvas, without provider sends.
-  await page.getByRole("link", { name: "Formulários", exact: true }).click();
+  await navigateModule(page, "Formulários");
   await page
     .getByRole("heading", { name: "Captação de contatos", exact: true })
     .waitFor();
@@ -289,9 +341,7 @@ try {
   await page
     .getByRole("heading", { name: "Briefing de teste", exact: true })
     .waitFor();
-  await page
-    .getByRole("link", { name: "Funis e automações", exact: true })
-    .click();
+  await navigateModule(page, "Funis e automações");
   await page.getByRole("button", { name: "Abrir editor", exact: true }).click();
   await page
     .locator(".react-flow")
@@ -304,6 +354,53 @@ try {
       throw e;
     });
   assert.equal(await page.locator(".react-flow__node").count(), 4);
+  const editor = page.locator('[aria-label="Editor de automações"]');
+  await page
+    .getByRole("button", { name: "Estágio padrão", exact: false })
+    .click();
+  await page
+    .getByLabel("Nome do bloco", { exact: true })
+    .fill("Estágio revisado");
+  const newNode = page
+    .locator(".react-flow__node")
+    .filter({ hasText: "Estágio revisado" });
+  await newNode.waitFor();
+  const nodeId = await newNode.getAttribute("data-id");
+  const beforePosition = await newNode.getAttribute("style");
+  await page.getByRole("button", { name: "Fechar", exact: true }).click();
+  const box = await newNode.boundingBox();
+  await page.mouse.move(box.x + 60, box.y + 35);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 150, box.y + 130, { steps: 15 });
+  await page.mouse.up();
+  assert.notEqual(await newNode.getAttribute("style"), beforePosition);
+  await newNode.click();
+  assert.equal(
+    await page.getByLabel("Nome do bloco", { exact: true }).inputValue(),
+    "Estágio revisado",
+  );
+  // An unfinished draft can be saved, reopened, edited and deleted.
+  await page.getByLabel("Ativo", { exact: true }).uncheck();
+  await page.getByRole("button", { name: "Salvar funil", exact: true }).click();
+  await page
+    .locator('[aria-label="Editor de automações"]')
+    .waitFor({ state: "detached" });
+  await page.getByRole("button", { name: "Abrir editor", exact: true }).click();
+  await page.locator(`[data-id="${nodeId}"]`).click();
+  assert.equal(
+    await page.getByLabel("Nome do bloco", { exact: true }).inputValue(),
+    "Estágio revisado",
+  );
+  await page
+    .getByRole("button", { name: "Remover bloco", exact: true })
+    .click();
+  await page.getByLabel("Ativo", { exact: true }).check();
+  await page.getByRole("button", { name: "Salvar funil", exact: true }).click();
+  await page
+    .locator('[aria-label="Editor de automações"]')
+    .waitFor({ state: "detached" });
+  await page.getByRole("button", { name: "Abrir editor", exact: true }).click();
+
   await page.screenshot({
     path: "/workspace/work/workspace-flow-desktop.png",
     fullPage: true,
@@ -322,16 +419,14 @@ try {
   await page
     .getByRole("button", { name: "Fechar editor", exact: true })
     .click();
-  await page
-    .getByRole("link", { name: "Pessoas e permissões", exact: true })
-    .click();
+  await navigateModule(page, "Workspace");
   await page.getByLabel("E-mail do convidado").fill("member@example.invalid");
   await page.getByLabel("Nome do convidado").fill("Atendente");
   await page
     .getByRole("button", { name: "Criar convite", exact: true })
     .click();
   await page.getByText("Atendente · Atendente", { exact: false }).waitFor();
-  await page.getByRole("link", { name: "CRM", exact: true }).click();
+  await navigateModule(page, "CRM");
   await page.getByRole("button", { name: "Novo lead", exact: true }).click();
   await page.getByLabel("Nome", { exact: true }).fill("Carla piloto");
   await page.getByLabel("Telefone", { exact: true }).fill("11999990000");
@@ -343,7 +438,7 @@ try {
   await page
     .getByLabel("Etapa de Carla piloto", { exact: true })
     .selectOption({ label: "Ganho" });
-  await page.getByRole("link", { name: "Dashboard", exact: true }).click();
+  await navigateModule(page, "Dashboard");
   await page.getByText("R$ 300,00", { exact: true }).waitFor();
   await page
     .getByRole("button", { name: "Opções da pipeline", exact: true })
@@ -361,14 +456,12 @@ try {
   await page
     .getByRole("button", { name: "Salvar pipeline", exact: true })
     .click();
-  await page.getByRole("link", { name: "CRM", exact: true }).click();
+  await navigateModule(page, "CRM");
   await page
     .getByRole("heading", { name: "Entrada personalizada", exact: true })
     .waitFor();
   await page.getByRole("heading", { name: "Retorno", exact: true }).waitFor();
-  await page
-    .getByRole("link", { name: "Todas as subcontas", exact: true })
-    .click();
+  await navigateModule(page, "Todas as subcontas");
   await page
     .getByRole("button", { name: "Nova subconta", exact: true })
     .click();
@@ -381,7 +474,7 @@ try {
   await page
     .getByRole("heading", { name: "Empresa Beta", exact: true })
     .waitFor();
-  await page.getByRole("link", { name: "CRM", exact: true }).click();
+  await navigateModule(page, "CRM");
   assert.equal(
     await page
       .getByRole("button", { name: "Carla piloto", exact: true })
@@ -394,7 +487,7 @@ try {
   await page
     .getByRole("heading", { name: "Empresa Alpha", exact: true })
     .waitFor();
-  await page.getByRole("link", { name: "CRM", exact: true }).click();
+  await navigateModule(page, "CRM");
   await page
     .getByRole("button", { name: "Carla piloto", exact: true })
     .waitFor();
@@ -419,9 +512,7 @@ try {
   await page
     .getByRole("button", { name: "Carla revisada", exact: true })
     .waitFor();
-  await page
-    .getByRole("link", { name: "Todas as subcontas", exact: true })
-    .click();
+  await navigateModule(page, "Todas as subcontas");
   await page
     .getByRole("button", {
       name: "Opções da subconta Empresa Alpha",
@@ -432,22 +523,20 @@ try {
   await page
     .getByLabel("Status das subcontas", { exact: true })
     .selectOption("archived");
-  await page.getByRole("link", { name: "Abrir subconta", exact: true }).click();
+  await navigateModule(page, "Abrir subconta");
   await page
     .getByText(
       "Subconta arquivada. Os dados continuam disponíveis para consulta.",
       { exact: true },
     )
     .waitFor();
-  await page.getByRole("link", { name: "CRM", exact: true }).click();
+  await navigateModule(page, "CRM");
   assert(
     await page
       .getByRole("button", { name: "Novo lead", exact: true })
       .isDisabled(),
   );
-  await page
-    .getByRole("link", { name: "Todas as subcontas", exact: true })
-    .click();
+  await navigateModule(page, "Todas as subcontas");
   await page
     .getByLabel("Status das subcontas", { exact: true })
     .selectOption("archived");
