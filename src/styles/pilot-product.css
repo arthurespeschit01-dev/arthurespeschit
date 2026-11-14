@@ -1,6 +1,6 @@
 /* Owner-only presentation layer. Never changes routes, data, sections or controls. */
 html[data-product-skin="pilot"] {
-  --radius: 0.25rem;
+  --radius: 0.625rem;
   --primary: 265 48% 46%;
   --primary-foreground: 0 0% 100%;
   --ring: 265 48% 46%;
@@ -14,7 +14,7 @@ html[data-product-skin="pilot"] {
   --sidebar-ring: 265 60% 73%;
 }
 html[data-product-skin="pilot"].light {
-  --background: 60 8% 96%;
+  --background: 225 25% 97%;
   --foreground: 230 8% 14%;
   --card: 0 0% 100%;
   --card-foreground: 230 8% 14%;
@@ -26,8 +26,8 @@ html[data-product-skin="pilot"].light {
   --secondary-foreground: 230 8% 20%;
   --muted: 60 5% 93%;
   --muted-foreground: 228 5% 39%;
-  --border: 60 3% 85%;
-  --input: 60 3% 80%;
+  --border: 225 16% 88%;
+  --input: 225 15% 82%;
   --surface: 60 6% 95%;
   --surface-hover: 60 5% 92%;
   --neon-purple: 265 48% 46%;
@@ -70,7 +70,7 @@ html[data-product-skin="pilot"] .glass-surface {
   background: hsl(var(--card));
   border-color: hsl(var(--border));
   backdrop-filter: none;
-  border-radius: 4px;
+  border-radius: 12px;
 }
 html[data-product-skin="pilot"] .gradient-text {
   background: none;
@@ -78,12 +78,9 @@ html[data-product-skin="pilot"] .gradient-text {
   color: hsl(var(--foreground));
   -webkit-text-fill-color: currentColor;
 }
-html[data-product-skin="pilot"] :is(.rounded-xl, .rounded-2xl, .rounded-lg) {
-  border-radius: 4px;
-}
 html[data-product-skin="pilot"]
   :is(button, input, select, textarea, [role="combobox"]) {
-  border-radius: 3px;
+  border-radius: 8px;
 }
 html[data-product-skin="pilot"] :is(button, a) {
   transition-duration: 120ms;
@@ -106,7 +103,7 @@ html[data-product-skin="pilot"] .agency-shell > aside nav {
   padding: 12px 10px;
 }
 html[data-product-skin="pilot"] .agency-shell > aside :is(a, button) {
-  border-radius: 2px;
+  border-radius: 8px;
   font-size: 13px;
 }
 html[data-product-skin="pilot"] .agency-shell > aside nav :is(a, button) {
@@ -170,13 +167,46 @@ html[data-product-skin="pilot"] .agency-shell .agency-content th {
 html[data-product-skin="pilot"] .agency-shell .agency-content tbody tr:hover {
   background: hsl(var(--muted) / 0.45);
 }
+/* KPI rows read as three coherent reports while retaining every metric and position. */
+html[data-product-skin="pilot"] .agency-content .grid:has(> .dashboard-metric) {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  gap: 0;
+  overflow: hidden;
+}
 html[data-product-skin="pilot"] .dashboard-metric {
   background: transparent;
   border: 0;
-  border-bottom: 1px solid hsl(var(--border));
   border-radius: 0;
-  padding: 16px;
+  padding: 20px 24px;
   box-shadow: none;
+  min-width: 0;
+}
+html[data-product-skin="pilot"] .dashboard-metric + .dashboard-metric {
+  border-left: 1px solid hsl(var(--border) / 0.65);
+}
+html[data-product-skin="pilot"] .dashboard-metric .text-2xl {
+  font-size: 28px;
+  letter-spacing: -0.035em;
+}
+html[data-product-skin="pilot"] .dashboard-metric .tracking-wider {
+  text-transform: none;
+  font-size: 13px;
+}
+html[data-product-skin="pilot"] .dashboard-metric > div:first-child {
+  margin-bottom: 14px;
+}
+@media (max-width: 1023px) {
+  html[data-product-skin="pilot"] .dashboard-metric {
+    padding: 16px;
+  }
+  html[data-product-skin="pilot"] .dashboard-metric:nth-child(3) {
+    border-left: 0;
+  }
+  html[data-product-skin="pilot"] .dashboard-metric:nth-child(n + 3) {
+    border-top: 1px solid hsl(var(--border));
+  }
 }
 html[data-product-skin="pilot"] .dashboard-metric svg {
   color: hsl(var(--muted-foreground));
@@ -214,13 +244,13 @@ html[data-product-skin="pilot"].dark
 }
 @media (min-width: 1024px) {
   html[data-product-skin="pilot"] .agency-shell > aside.w-64 {
-    width: 224px;
+    width: 240px;
   }
   html[data-product-skin="pilot"] .agency-shell .agency-toolbar {
-    height: 48px;
+    height: 56px;
   }
   html[data-product-skin="pilot"] .agency-shell .agency-content {
-    padding: 20px 28px 28px;
+    padding: 24px 32px 32px;
   }
   html[data-product-skin="pilot"]
     .agency-shell
@@ -268,4 +298,79 @@ html[data-product-skin="pilot"]
   .agency-content
   .recharts-cartesian-axis-tick-value {
   fill: hsl(var(--muted-foreground));
+}
+
+/* A consistent frame, calmer navigation and clear working surfaces. */
+html[data-product-skin="pilot"].light {
+  --sidebar-background: 240 20% 98%;
+  --sidebar-foreground: 230 17% 30%;
+  --sidebar-accent: 260 45% 93%;
+  --sidebar-accent-foreground: 265 48% 36%;
+  --sidebar-border: 230 18% 89%;
+  --sidebar-primary: 265 48% 46%;
+}
+html[data-product-skin="pilot"] .agency-shell > aside {
+  border-color: hsl(var(--sidebar-border));
+}
+html[data-product-skin="pilot"] .agency-shell > aside > div:first-child {
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+html[data-product-skin="pilot"] .agency-shell > aside nav :is(a, button) {
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+html[data-product-skin="pilot"]
+  .agency-shell
+  > aside
+  nav
+  a[aria-current="page"] {
+  box-shadow: none;
+  font-weight: 650;
+}
+html[data-product-skin="pilot"] .agency-shell > aside input {
+  background: hsl(var(--card) / 0.08);
+}
+html[data-product-skin="pilot"]
+  .agency-content
+  > div
+  > div:first-child:has(h1) {
+  padding-bottom: 20px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+html[data-product-skin="pilot"] .agency-content h1 + p {
+  line-height: 1.6;
+}
+html[data-product-skin="pilot"] .agency-content .glass-surface {
+  box-shadow: 0 2px 3px hsl(230 30% 10% / 0.025);
+}
+html[data-product-skin="pilot"]
+  .agency-content
+  .glass-surface
+  > .grid:first-child:not(:last-child) {
+  background: hsl(var(--muted) / 0.65);
+  text-transform: none;
+  letter-spacing: 0;
+}
+html[data-product-skin="pilot"] .agency-content .glass-surface > .grid.group {
+  padding-top: 18px;
+  padding-bottom: 18px;
+}
+html[data-product-skin="pilot"] .agency-content input,
+html[data-product-skin="pilot"] .agency-content select,
+html[data-product-skin="pilot"] .agency-content [role="combobox"] {
+  background-color: hsl(var(--card));
+}
+html[data-product-skin="pilot"] [data-task-workspace] [role="tablist"] {
+  gap: 12px;
+}
+html[data-product-skin="pilot"] [data-task-workspace] table td {
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+html[data-product-skin="pilot"] .agency-content .recharts-cartesian-grid line {
+  stroke-dasharray: 3 6;
+  stroke-opacity: 0.4;
 }

@@ -1,6 +1,7 @@
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+const preview = process.env.VISUAL_PREVIEW === "1";
 const base = process.env.TEST_APP_URL || "http://localhost:8081";
 const browser = await chromium.launch({
   headless: true,
@@ -116,14 +117,43 @@ async function open(kind) {
       return reply(kind === "owner" || kind === "invited");
     if (name === "agency_task_summary")
       return reply({
-        pendente: 1,
+        pendente: preview ? 4 : 1,
         concluída: 0,
         cancelada: 0,
         "em andamento": 0,
         scheduled: 0,
       });
     if (name === "agency_tasks_list")
-      return reply(body.p_scope === "history" ? [] : [task]);
+      return reply(
+        body.p_scope === "history"
+          ? []
+          : preview
+            ? [
+                task,
+                {
+                  ...task,
+                  id: randomUUID(),
+                  title: "Revisar campanha de captação",
+                  priority: "alta",
+                  area: "Tráfego",
+                },
+                {
+                  ...task,
+                  id: randomUUID(),
+                  title: "Aprovar calendário de conteúdo",
+                  priority: "média",
+                  area: "Social Media",
+                },
+                {
+                  ...task,
+                  id: randomUUID(),
+                  title: "Preparar apresentação de resultados",
+                  priority: "baixa",
+                  area: "Atendimento",
+                },
+              ]
+            : [task],
+      );
     if (!["GET", "HEAD", "OPTIONS"].includes(req.method())) {
       writes.push(name);
       return reply({ message: "Unexpected write" }, 400);
@@ -132,8 +162,53 @@ async function open(kind) {
       name === "profiles"
         ? [{ user_id: id, onboarding_completed: true }]
         : name === "clients"
-          ? [client]
-          : [];
+          ? preview
+            ? [
+                client,
+                {
+                  ...client,
+                  id: randomUUID(),
+                  name: "Horizonte Clínica",
+                  niche: "Saúde",
+                  monthly_fee: 2800,
+                },
+                {
+                  ...client,
+                  id: randomUUID(),
+                  name: "Studio Forma",
+                  niche: "Arquitetura",
+                  monthly_fee: 2400,
+                },
+                {
+                  ...client,
+                  id: randomUUID(),
+                  name: "Vértice Educação",
+                  niche: "Educação",
+                  monthly_fee: 4200,
+                },
+                {
+                  ...client,
+                  id: randomUUID(),
+                  name: "Casa Botânica",
+                  niche: "Varejo",
+                  monthly_fee: 1900,
+                  status: "Pausado",
+                },
+              ]
+            : [client]
+          : name === "mensalidades" && preview
+            ? Array.from({ length: 6 }, (_, i) => ({
+                id: randomUUID(),
+                cliente_id: clientId,
+                valor: 9400 + i * 750,
+                status: "pago",
+                vencimento: new Date(
+                  new Date().getFullYear(),
+                  new Date().getMonth() - 5 + i,
+                  12,
+                ).toLocaleDateString("en-CA"),
+              }))
+            : [];
     return reply(
       req.headers().accept?.includes("vnd.pgrst.object")
         ? data[0] || null
@@ -212,9 +287,11 @@ try {
         await owner.page.locator("html").getAttribute("data-product-skin"),
         "pilot",
       );
+      await owner.page.waitForTimeout(1200);
       await owner.page.screenshot({
+        animations: "disabled",
         path:
-          "/workspace/work/visual-" +
+          (preview ? "/workspace/work/proposal-" : "/workspace/work/visual-") +
           (path === "/" ? "dashboard" : path.slice(1)) +
           "-" +
           theme +
@@ -246,7 +323,7 @@ try {
     await owner.page
       .getByRole("dialog")
       .evaluate((el) => getComputedStyle(el).borderRadius),
-    "4px",
+    "10px",
   );
   await owner.page.keyboard.press("Escape");
   await owner.page.setViewportSize({ width: 390, height: 844 });
