@@ -50,3 +50,7 @@ Tests use synthetic users and local PGlite databases. They do not send emails, w
 ## Professional editor and tracking update
 
 See [professional workspace workflows](workspace-professional-workflows.md) for the grouped navigation, fullscreen editor, reply/appointment/business-hour waits, multi-path splits, workspace-owned email/SMS, conversion tracking, Meta form intake and cancellation guards. Provider setup and approvals remain explicit external prerequisites.
+
+## WhatsApp connection transports
+
+See [pilot WhatsApp connections](pilot-whatsapp-connections.md) for separate QR/Meta setup, the Embedded Signup v4 prerequisites, delegated pairing link boundaries, private opt-out enforcement, supported paths and release limitations. A pilot workspace keeps one primary transport; switching requires disabling the current connection and never copies or moves the agency connection.

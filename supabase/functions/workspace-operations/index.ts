@@ -1,3 +1,18 @@
+import {
+  receiveOptOut,
+  assertCampaignAllowed,
+} from "../_shared/workspace-whatsapp-preferences.ts";
+import {
+  cloudApp,
+  cloudGraph,
+  exchangeCloudCode,
+  verifyCloudNumber,
+  cloudWebhookEvents,
+  cloudMessage,
+  cloudWithinWindow,
+  graphVersion,
+} from "../_shared/workspace-cloud.ts";
+import { verifyMetaSignature } from "../_shared/workspace-meta.ts";
 import { fetchWorkspaceQr } from "../_shared/workspace-qr.ts";
 import { processWorkspaceAi } from "../_shared/workspace-ai.ts";
 import {
@@ -68,6 +83,33 @@ const checked = async (p: PromiseLike<{ data: unknown; error: unknown }>) => {
   return data as any;
 };
 async function provider(c: any, path: string, method = "GET", body?: unknown) {
+  if (c.transport === "cloud") {
+    if (path === "instance/fetch-instance") {
+      const info = await cloudGraph(
+        `${c.cloud_phone_id}?fields=id,display_phone_number,platform_type`,
+        c.token,
+      );
+      return {
+        connected: c.enabled && info.platform_type === "CLOUD_API",
+        connectedPhone: info.display_phone_number,
+      };
+    }
+    let payload;
+    try {
+      payload = cloudMessage(path, body);
+    } catch (e) {
+      (e as any).explicit = true;
+      throw e;
+    }
+    await cloudWithinWindow(db, c, payload.to);
+    const data = await cloudGraph(
+      `${c.cloud_phone_id}/messages`,
+      c.token,
+      "POST",
+      payload,
+    );
+    return { messageId: data.messages?.[0]?.id };
+  }
   const url = new URL("https://api.w-api.app/v1/" + path);
   url.searchParams.set("instanceId", c.instance_id);
   const r = await fetch(url, {
@@ -128,6 +170,8 @@ async function work(workspace: string) {
     db,
     workspace,
     async (c: any, path: string, method: string, body: any) => {
+      for (const phone of body?.phone ? [body.phone] : body?.participants || [])
+        await assertCampaignAllowed(db, workspace, phone);
       const current = await account(c);
       if (current.account_id !== c.active_account_id)
         throw Error("O número conectado mudou.");
@@ -149,6 +193,7 @@ async function work(workspace: string) {
     let status = "uncertain",
       id: string | null = null;
     try {
+      if (m.run_id) await assertCampaignAllowed(db, workspace, m.phone);
       const media = m.media_path
         ? providerMedia(
             await asset(db, workspace, m.media_path),
@@ -165,7 +210,8 @@ async function work(workspace: string) {
       id =
         String(result.messageId || result.id || result.key?.id || "") || null;
       status = id ? "sent" : "uncertain";
-    } catch {
+    } catch (e) {
+      if ((e as any).explicit) status = "failed";
       /* Ambiguous failures are never resent automatically. */
     }
     await checked(
@@ -207,6 +253,35 @@ async function publicResource(kind: string, token: unknown) {
     throw Error("Link inválido, expirado ou desativado.");
   await active(row.workspace_id);
   return row;
+}
+async function prepareWapi(c: any) {
+  const workspace = c.workspace_id;
+  if (c.transport === "cloud") throw Error("Esta conexão usa a API oficial.");
+  const callback = `${base}/functions/v1/workspace-operations?whatsapp=${c.webhook_secret}`,
+    info = await provider(c, "instance/fetch-instance");
+  if (
+    [info.webhookReceivedUrl, info.webhookDeliveryUrl].some(
+      (x) => x && x !== callback,
+    )
+  )
+    throw Error(
+      "Esta instância usa outro webhook. A conexão existente foi preservada.",
+    );
+  await provider(c, "webhook/update-webhook-received", "PUT", {
+    value: callback,
+    enabled: true,
+  });
+  await provider(c, "webhook/update-webhook-delivery", "PUT", {
+    value: callback,
+    enabled: true,
+  });
+  const verify = await provider(c, "instance/fetch-instance");
+  if (
+    verify.webhookReceivedUrl !== callback ||
+    verify.webhookDeliveryUrl !== callback
+  )
+    throw Error("O provedor ainda não confirmou os dois webhooks.");
+  await connection(workspace, "whatsapp", { enabled: true });
 }
 export async function handle(req: Request) {
   if (req.method === "OPTIONS") return new Response(null, { headers });
@@ -304,6 +379,18 @@ export async function handle(req: Request) {
       });
     return reply({ error: "Verificação recusada." }, 403);
   }
+  if (req.method === "GET" && callbackUrl.searchParams.has("cloud_whatsapp")) {
+    const verify = Deno.env.get("META_WHATSAPP_VERIFY_TOKEN");
+    if (
+      verify &&
+      callbackUrl.searchParams.get("hub.mode") === "subscribe" &&
+      callbackUrl.searchParams.get("hub.verify_token") === verify
+    )
+      return new Response(callbackUrl.searchParams.get("hub.challenge") || "", {
+        headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" },
+      });
+    return reply({ error: "Verificação recusada." }, 403);
+  }
   if (req.method !== "POST")
     return reply({ error: "Método não permitido." }, 405);
   try {
@@ -314,6 +401,79 @@ export async function handle(req: Request) {
       return reply({ error: "Solicitação muito grande." }, 413);
     const body = JSON.parse(raw || "{}"),
       url = new URL(req.url);
+    if (url.searchParams.has("pair_whatsapp")) {
+      const token = url.searchParams.get("pair_whatsapp") || "";
+      if (!/^[a-f0-9]{64}$/.test(token))
+        return reply({ error: "Link inválido." }, 404);
+      const c = await checked(
+        db.rpc("agency_workspace_pair_link", { p_token: token }),
+      );
+      if (!c) return reply({ error: "Link expirado ou desativado." }, 404);
+      const state = await account(c);
+      return reply({
+        connected: state.connected,
+        qrcode:
+          !state.connected && body.refresh === true
+            ? await fetchWorkspaceQr(c)
+            : null,
+      });
+    }
+    if (url.searchParams.has("cloud_whatsapp")) {
+      const secret = Deno.env.get("META_WHATSAPP_APP_SECRET") || "";
+      if (
+        !(await verifyMetaSignature(
+          raw,
+          req.headers.get("x-hub-signature-256") || "",
+          secret,
+        ))
+      )
+        return reply({ error: "Assinatura Meta inválida." }, 403);
+      if (body.object !== "whatsapp_business_account")
+        return reply({ ok: true });
+      for (const entry of (body.entry || []).slice(0, 50)) {
+        const phones = [
+          ...new Set(
+            (entry.changes || [])
+              .map((ch: any) =>
+                String(ch.value?.metadata?.phone_number_id || ""),
+              )
+              .filter((id: string) => /^[0-9]{5,30}$/.test(id)),
+          ),
+        ];
+        for (const phone of phones) {
+          const c = await checked(
+            db.rpc("agency_workspace_cloud_find", {
+              p_waba: String(entry.id),
+              p_phone: phone,
+            }),
+          );
+          if (!c?.active_account_id) continue;
+          for (const event of cloudWebhookEvents(
+            { object: body.object, entry: [entry] },
+            c,
+          )) {
+            await receiveOptOut(db, c.workspace_id, event);
+            await checked(
+              db.rpc("agency_workspace_ingest_message", {
+                p_workspace: c.workspace_id,
+                p_account: c.active_account_id,
+                p_event: {
+                  ...event,
+                  attribution: {
+                    ...event.attribution,
+                    ...(decodeClickRef(event.body)
+                      ? { cg_ref: decodeClickRef(event.body) }
+                      : {}),
+                  },
+                },
+              }),
+            );
+          }
+          await work(c.workspace_id);
+        }
+      }
+      return reply({ ok: true });
+    }
     const metaWorkspace = url.searchParams.get("meta_workspace");
     if (metaWorkspace) {
       if (!uuid(metaWorkspace))
@@ -369,6 +529,7 @@ export async function handle(req: Request) {
       if (!state.connected) return reply({ ok: true });
       const event = normalizeWhatsappEvent(body);
       if (event) {
+        await receiveOptOut(db, c.workspace_id, event);
         await checked(
           db.rpc("agency_workspace_ingest_message", {
             p_workspace: c.workspace_id,
@@ -575,6 +736,12 @@ export async function handle(req: Request) {
       "google_connect",
       "google_disconnect",
       "save_whatsapp",
+      "generate_whatsapp_pair_link",
+      "cloud_settings",
+      "cloud_begin",
+      "cloud_complete",
+      "whatsapp_preferences",
+      "save_whatsapp_preferences",
       "ai_settings",
       "save_ai_settings",
       "provider_settings",
@@ -837,6 +1004,134 @@ export async function handle(req: Request) {
         return reply({ error: "Sem acesso a este arquivo." }, 403);
       return reply(await asset(db, workspace, String(body.path || "")));
     }
+    if (
+      ["cloud_settings", "cloud_begin", "cloud_complete"].includes(body.action)
+    ) {
+      const app = cloudApp((k) => Deno.env.get(k));
+      const ready =
+        app.ready &&
+        (Deno.env.get("META_WHATSAPP_VERIFY_TOKEN") || "").length >= 16;
+      const existing = await connection(workspace);
+      if (body.action === "cloud_settings")
+        return reply({
+          configured: ready,
+          app_id: ready ? app.appId : null,
+          config_id: ready ? app.configId : null,
+          version: graphVersion,
+          webhook_url: `${base}/functions/v1/workspace-operations?cloud_whatsapp=1`,
+          connected: existing?.transport === "cloud" && existing.enabled,
+          phone_number_id:
+            existing?.transport === "cloud" ? existing.cloud_phone_id : null,
+          coexistence: existing?.transport === "cloud" && existing.coexistence,
+        });
+      await active(workspace);
+      if (!ready)
+        throw Error(
+          "O aplicativo Meta ainda precisa ser configurado no servidor.",
+        );
+      if (existing?.enabled)
+        throw Error(
+          "Desconecte a conexão atual antes de trocar de modalidade.",
+        );
+      if (body.action === "cloud_begin") {
+        if (!["business_app", "new_number"].includes(body.mode))
+          throw Error("Escolha a modalidade de conexão.");
+        const session = await checked(
+          db.rpc("agency_workspace_cloud_signup", {
+            p_workspace: workspace,
+            p_user: user.id,
+            p_mode: body.mode,
+          }),
+        );
+        return reply({
+          nonce: session.nonce,
+          app_id: app.appId,
+          config_id: app.configId,
+          version: graphVersion,
+        });
+      }
+      if (typeof body.nonce !== "string" || !/^[a-f0-9]{64}$/.test(body.nonce))
+        throw Error("Autorização inválida.");
+      const session = await checked(
+        db.rpc("agency_workspace_cloud_signup", {
+          p_workspace: workspace,
+          p_user: user.id,
+          p_mode: "new_number",
+          p_nonce: body.nonce,
+        }),
+      );
+      const token = await exchangeCloudCode(app, String(body.code || ""));
+      const info = await verifyCloudNumber(
+        String(body.waba_id || ""),
+        String(body.phone_number_id || ""),
+        token,
+      );
+      if (session.mode === "business_app" && !info.is_on_biz_app)
+        throw Error(
+          "A Meta não confirmou a coexistência com o WhatsApp Business. Confira a configuração do aplicativo.",
+        );
+      const pin = String(
+        body.pin || crypto.getRandomValues(new Uint32Array(1))[0] % 1000000,
+      ).padStart(6, "0");
+      if (!/^[0-9]{6}$/.test(pin))
+        throw Error("O PIN deve conter seis números.");
+      const c = await checked(
+        db.rpc("agency_workspace_cloud_setup", {
+          p_workspace: workspace,
+          p_values: {
+            waba_id: body.waba_id,
+            phone_number_id: body.phone_number_id,
+            token,
+            pin,
+            pipeline_id: body.pipeline_id,
+            stage_id: body.stage_id,
+            coexistence: !!info.is_on_biz_app,
+          },
+        }),
+      );
+      const subscribed = await cloudGraph(
+        `${c.waba_id}/subscribed_apps`,
+        token,
+        "POST",
+        {},
+      );
+      if (!subscribed.success)
+        throw Error("A Meta não confirmou a assinatura dos eventos.");
+      if (!info.is_on_biz_app) {
+        const registered = await cloudGraph(
+          `${c.cloud_phone_id}/register`,
+          token,
+          "POST",
+          { messaging_product: "whatsapp", pin },
+        );
+        if (!registered.success)
+          throw Error("A Meta não confirmou o registro do número.");
+      }
+      await connection(workspace, "whatsapp", { enabled: true });
+      try {
+        return reply(await account({ ...c, enabled: true }));
+      } catch (e) {
+        await connection(workspace, "whatsapp", {
+          enabled: false,
+          active_account_id: null,
+        });
+        throw e;
+      }
+    }
+    if (
+      ["whatsapp_preferences", "save_whatsapp_preferences"].includes(
+        body.action,
+      )
+    )
+      return reply(
+        await checked(
+          db.rpc("agency_workspace_whatsapp_preferences", {
+            p_workspace: workspace,
+            p_values:
+              body.action === "save_whatsapp_preferences" ? body.values : null,
+          }),
+        ),
+      );
     if (body.action === "integration_settings") {
       const c = await connection(workspace),
         h = await connection(workspace, "webhook");
@@ -848,7 +1143,10 @@ export async function handle(req: Request) {
         },
         whatsapp: c
           ? {
-              instance_id: c.instance_id,
+              instance_id: c.transport === "cloud" ? "" : c.instance_id,
+              transport: c.transport || "wapi",
+              cloud_phone_id: c.cloud_phone_id,
+              coexistence: c.coexistence,
               enabled: c.enabled,
               account_id: c.active_account_id,
               pipeline_id: c.pipeline_id,
@@ -865,8 +1163,25 @@ export async function handle(req: Request) {
           : null,
       });
     }
+    if (body.action === "generate_whatsapp_pair_link") {
+      await active(workspace);
+      const c = await connection(workspace);
+      if (!c || c.transport === "cloud")
+        throw Error("Configure uma instância por QR Code primeiro.");
+      await prepareWapi(c);
+      const link = await checked(
+        db.rpc("agency_workspace_pair_link", { p_workspace: workspace }),
+      );
+      return reply({
+        url: `${Deno.env.get("AGENCY_APP_URL") || "https://www.centraldogestor.site"}/conectar-whatsapp/${link.token}`,
+        expires_at: link.expires_at,
+      });
+    }
     if (body.action === "save_whatsapp") {
       await active(workspace);
+      const current = await connection(workspace);
+      if (current?.enabled && current.transport === "cloud")
+        throw Error("Desconecte a API oficial antes de configurar o QR Code.");
       if (
         !/^[\w-]{1,160}$/.test(body.instance_id) ||
         typeof body.token !== "string" ||
@@ -915,32 +1230,10 @@ export async function handle(req: Request) {
     }
     if (body.action === "connect_whatsapp") {
       if (!c) throw Error("Salve a instância primeiro.");
+      if (c.transport === "cloud")
+        throw Error("Use a aba API Oficial para conectar este número.");
       await active(workspace);
-      const callback = `${base}/functions/v1/workspace-operations?whatsapp=${c.webhook_secret}`,
-        info = await provider(c, "instance/fetch-instance");
-      if (
-        [info.webhookReceivedUrl, info.webhookDeliveryUrl].some(
-          (x) => x && x !== callback,
-        )
-      )
-        throw Error(
-          "Esta instância usa outro webhook. A conexão existente foi preservada.",
-        );
-      await provider(c, "webhook/update-webhook-received", "PUT", {
-        value: callback,
-        enabled: true,
-      });
-      await provider(c, "webhook/update-webhook-delivery", "PUT", {
-        value: callback,
-        enabled: true,
-      });
-      const verify = await provider(c, "instance/fetch-instance");
-      if (
-        verify.webhookReceivedUrl !== callback ||
-        verify.webhookDeliveryUrl !== callback
-      )
-        throw Error("O provedor ainda não confirmou os dois webhooks.");
-      await connection(workspace, "whatsapp", { enabled: true });
+      await prepareWapi(c);
       const state = await account({ ...c, enabled: true });
       const qrcode = state.connected ? null : await fetchWorkspaceQr(c);
       return reply({ ...state, qrcode });
@@ -958,6 +1251,7 @@ export async function handle(req: Request) {
       if (!state.connected || state.account_id !== body.account_id)
         throw Error("O número conectado mudou. Atualize a conversa.");
       const phone = whatsappPhone(body.phone);
+      if (c.transport === "cloud") await cloudWithinWindow(db, c, phone);
       if (
         !validWhatsappAddress(phone) ||
         !uuid(body.request_id) ||
