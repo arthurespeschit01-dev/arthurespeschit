@@ -1,3 +1,10 @@
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { useFlowContext } from "./useFlowContext";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -48,6 +55,10 @@ export default function TrackingLinks({
   const { user } = useAuth();
   const context = useFlowContext(workspace);
   const [editingId, setEditingId] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const [builder, setBuilder] = useState(false),
+    [copied, setCopied] = useState(false),
+    [copyError, setCopyError] = useState("");
   const [slug, setSlug] = useState("");
   const [account, setAccount] = useState(""),
     [stage, setStage] = useState(""),
@@ -121,7 +132,34 @@ export default function TrackingLinks({
         : url;
   return (
     <section className="space-y-4">
-      <h3 className="font-semibold">Links rastreáveis e atribuição</h3>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="font-semibold">Links rastreáveis e atribuição</h3>
+        <Button
+          onClick={() => {
+            setEditingId("");
+            setSaveError("");
+            setName("");
+            setSlug("");
+            setDestination("whatsapp");
+            setAccount(context.data?.accounts[0]?.id || "");
+            setPhone("");
+            setStage("");
+            setCapture(true);
+            setCodeStyle("visible");
+            setText("Olá! Gostaria de mais informações.");
+            setUtm({
+              source: "",
+              medium: "",
+              campaign: "",
+              content: "",
+              term: "",
+            });
+            setBuilder(true);
+          }}
+        >
+          Novo link rastreável
+        </Button>
+      </div>
       <p className="text-sm text-muted-foreground">
         O clique é registrado ao abrir o link. O lead é identificado ao enviar
         um formulário desta empresa ou a mensagem do WhatsApp com a referência
@@ -160,221 +198,261 @@ export default function TrackingLinks({
           </article>
         ))}
       </div>
-      <form
-        className="border rounded-xl p-4 bg-card grid sm:grid-cols-2 gap-3"
-        id="tracking-link-builder"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const values = {
-            workspace_id: workspace,
-            name,
-            slug: slug || null,
-            destination: target,
-            ...utm,
-            whatsapp_account_id: account || null,
-            stage_id: stage || null,
-            capture_lead: capture,
-            code_style: codeStyle,
-          };
-          void act(async () => {
-            const r = editingId
-              ? await workspaceDb
-                  .from("agency_workspace_tracking_links")
-                  .update(values)
-                  .eq("workspace_id", workspace)
-                  .eq("id", editingId)
-              : await workspaceDb
-                  .from("agency_workspace_tracking_links")
-                  .insert(values);
-            if (!r.error) setEditingId("");
-            return r;
-          });
+      <Dialog
+        open={builder}
+        onOpenChange={(open) => {
+          if (!busy) setBuilder(open);
         }}
       >
-        <label className="text-sm space-y-1">
-          Nome do link
-          <Input
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </label>
-        <label className="text-sm space-y-1">
-          Nome curto do link (opcional)
-          <Input
-            aria-label="Nome curto do link"
-            value={slug}
-            minLength={3}
-            maxLength={60}
-            pattern="[a-z0-9][a-z0-9-]{2,59}"
-            placeholder="google-comercial"
-            onChange={(e) => setSlug(e.target.value)}
-          />
-        </label>
-        <label className="text-sm space-y-1">
-          Destino
-          <select
-            aria-label="Destino"
-            className={selectClass}
-            value={destination}
-            onChange={(e) => setDestination(e.target.value)}
+        <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingId ? "Editar link rastreável" : "Novo link rastreável"}
+            </DialogTitle>
+            <DialogDescription>
+              Escolha o destino e a mensagem. Os parâmetros recebidos do anúncio
+              têm prioridade sobre a marcação fixa.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            className="grid sm:grid-cols-2 gap-3"
+            id="tracking-link-builder"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const values = {
+                workspace_id: workspace,
+                name,
+                slug: slug || null,
+                destination: target,
+                ...utm,
+                whatsapp_account_id: account || null,
+                stage_id: stage || null,
+                capture_lead: capture,
+                code_style: codeStyle,
+              };
+              setSaveError("");
+              void act(async () => {
+                try {
+                  const r = editingId
+                    ? await workspaceDb
+                        .from("agency_workspace_tracking_links")
+                        .update(values)
+                        .eq("workspace_id", workspace)
+                        .eq("id", editingId)
+                    : await workspaceDb
+                        .from("agency_workspace_tracking_links")
+                        .insert(values);
+                  if (r.error) setSaveError(r.error.message);
+                  if (!r.error) {
+                    setEditingId("");
+                    setBuilder(false);
+                  }
+                  return r;
+                } catch (e) {
+                  setSaveError((e as Error).message);
+                  throw e;
+                }
+              });
+            }}
           >
-            <option value="website">Site externo</option>
-            <option value="form">Formulário desta empresa</option>
-            <option value="whatsapp">WhatsApp</option>
-          </select>
-        </label>
-        {destination === "form" ? (
-          <label className="text-sm space-y-1">
-            Formulário
-            <select
-              aria-label="Formulário"
-              required
-              className={selectClass}
-              value={form}
-              onChange={(e) => setForm(e.target.value)}
-            >
-              <option value="">Selecione</option>
-              {q.data?.forms
-                .filter((f) => f.enabled)
-                .map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.title}
-                  </option>
-                ))}
-            </select>
-          </label>
-        ) : destination === "whatsapp" ? (
-          <>
             <label className="text-sm space-y-1">
-              WhatsApp com DDI
-              <Input
-                required={!account}
-                disabled={!!account}
-                pattern="[0-9+ ()-]{10,20}"
-                placeholder="5511999999999"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-              />
-            </label>
-            <label className="text-sm space-y-1">
-              Mensagem inicial
+              Nome do link
               <Input
                 required
-                maxLength={1000}
-                value={text}
-                onChange={(e) => setText(e.target.value)}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
               />
             </label>
-          </>
-        ) : (
-          <label className="text-sm space-y-1">
-            URL HTTPS
-            <Input
-              required
-              type="url"
-              pattern="https://.*"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-            />
-          </label>
-        )}
-        {(
-          [
-            ["source", "Origem (utm_source)"],
-            ["medium", "Meio (utm_medium)"],
-            ["campaign", "Campanha (utm_campaign)"],
-            ["content", "Anúncio/conteúdo (utm_content)"],
-            ["term", "Palavra-chave (utm_term)"],
-          ] as const
-        ).map(([key, label]) => (
-          <label key={key} className="text-sm space-y-1">
-            {label}
-            <Input
-              maxLength={200}
-              value={utm[key]}
-              onChange={(e) => setUtm({ ...utm, [key]: e.target.value })}
-            />
-          </label>
-        ))}
-        {destination === "whatsapp" && (
-          <>
-            <label className="text-sm">
-              WhatsApp que recebe
+            <label className="text-sm space-y-1">
+              Nome curto do link (opcional)
+              <Input
+                aria-label="Nome curto do link"
+                value={slug}
+                minLength={3}
+                maxLength={60}
+                pattern="[a-z0-9][a-z0-9-]{2,59}"
+                placeholder="google-comercial"
+                onChange={(e) => setSlug(e.target.value)}
+              />
+            </label>
+            <label className="text-sm space-y-1">
+              Destino
               <select
-                aria-label="WhatsApp que recebe"
-                className={selectClass + " w-full"}
-                value={account}
-                onChange={(e) => setAccount(e.target.value)}
+                aria-label="Destino"
+                className={selectClass}
+                value={destination}
+                onChange={(e) => setDestination(e.target.value)}
               >
-                <option value="">Informar número manualmente</option>
-                {context.data?.accounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.phone}
+                <option value="website">Site externo</option>
+                <option value="form">Formulário desta empresa</option>
+                <option value="whatsapp">WhatsApp</option>
+              </select>
+            </label>
+            {destination === "form" ? (
+              <label className="text-sm space-y-1">
+                Formulário
+                <select
+                  aria-label="Formulário"
+                  required
+                  className={selectClass}
+                  value={form}
+                  onChange={(e) => setForm(e.target.value)}
+                >
+                  <option value="">Selecione</option>
+                  {q.data?.forms
+                    .filter((f) => f.enabled)
+                    .map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.title}
+                      </option>
+                    ))}
+                </select>
+              </label>
+            ) : destination === "whatsapp" ? (
+              <>
+                <label className="text-sm space-y-1">
+                  WhatsApp com DDI
+                  <Input
+                    required={!account}
+                    disabled={!!account}
+                    pattern="[0-9+ ()-]{10,20}"
+                    placeholder="5511999999999"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
+                </label>
+                <label className="text-sm space-y-1">
+                  Mensagem inicial
+                  <Input
+                    required
+                    maxLength={1000}
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                  />
+                </label>
+              </>
+            ) : (
+              <label className="text-sm space-y-1">
+                URL HTTPS
+                <Input
+                  required
+                  type="url"
+                  pattern="https://.*"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                />
+              </label>
+            )}
+            {(
+              [
+                ["source", "Origem (utm_source)"],
+                ["medium", "Meio (utm_medium)"],
+                ["campaign", "Campanha (utm_campaign)"],
+                ["content", "Anúncio/conteúdo (utm_content)"],
+                ["term", "Palavra-chave (utm_term)"],
+              ] as const
+            ).map(([key, label]) => (
+              <label key={key} className="text-sm space-y-1">
+                {label}
+                <Input
+                  maxLength={200}
+                  value={utm[key]}
+                  onChange={(e) => setUtm({ ...utm, [key]: e.target.value })}
+                />
+              </label>
+            ))}
+            {destination === "whatsapp" && (
+              <>
+                <label className="text-sm">
+                  WhatsApp que recebe
+                  <select
+                    aria-label="WhatsApp que recebe"
+                    className={selectClass + " w-full"}
+                    value={account}
+                    onChange={(e) => setAccount(e.target.value)}
+                  >
+                    <option value="">Informar número manualmente</option>
+                    {context.data?.accounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.phone}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-sm">
+                  Código na mensagem
+                  <select
+                    aria-label="Código na mensagem"
+                    className={selectClass + " w-full"}
+                    value={codeStyle}
+                    onChange={(e) => setCodeStyle(e.target.value)}
+                  >
+                    <option value="visible">
+                      Referência visível (mais compatível)
+                    </option>
+                    <option value="invisible">Referência invisível</option>
+                  </select>
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  Não apague a referência. Alguns clientes de WhatsApp podem
+                  remover códigos invisíveis; nesses casos use a referência
+                  visível.
+                </p>
+              </>
+            )}
+            <label className="text-sm">
+              Etapa para novos contatos
+              <select
+                aria-label="Etapa dos contatos do link"
+                className={selectClass + " w-full"}
+                value={stage}
+                onChange={(e) => setStage(e.target.value)}
+              >
+                <option value="">Padrão da conexão</option>
+                {context.data?.stages?.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
                   </option>
                 ))}
               </select>
             </label>
-            <label className="text-sm">
-              Código na mensagem
-              <select
-                aria-label="Código na mensagem"
-                className={selectClass + " w-full"}
-                value={codeStyle}
-                onChange={(e) => setCodeStyle(e.target.value)}
-              >
-                <option value="visible">
-                  Referência visível (mais compatível)
-                </option>
-                <option value="invisible">Referência invisível</option>
-              </select>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={capture}
+                onChange={(e) => setCapture(e.target.checked)}
+              />
+              Criar oportunidade no CRM ao chegar uma conversa
             </label>
-            <p className="text-xs text-muted-foreground">
-              Não apague a referência. Alguns clientes de WhatsApp podem remover
-              códigos invisíveis; nesses casos use a referência visível.
+            <p className="sm:col-span-2 break-all text-xs text-muted-foreground">
+              Destino: {target || "Preencha o destino"}
             </p>
-          </>
-        )}
-        <label className="text-sm">
-          Etapa para novos contatos
-          <select
-            aria-label="Etapa dos contatos do link"
-            className={selectClass + " w-full"}
-            value={stage}
-            onChange={(e) => setStage(e.target.value)}
-          >
-            <option value="">Padrão da conexão</option>
-            {context.data?.stages?.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={capture}
-            onChange={(e) => setCapture(e.target.checked)}
-          />
-          Criar oportunidade no CRM ao chegar uma conversa
-        </label>
-        <p className="sm:col-span-2 break-all text-xs text-muted-foreground">
-          Destino: {target || "Preencha o destino"}
-        </p>
-        <Button disabled={busy || !target}>
-          {editingId ? "Salvar link" : "Criar link"}
-        </Button>
-        {editingId && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setEditingId("")}
-          >
-            Cancelar edição
-          </Button>
-        )}
-      </form>
+            {saveError && (
+              <p
+                role="alert"
+                className="sm:col-span-2 text-sm text-destructive"
+              >
+                {saveError}
+              </p>
+            )}
+            <Button disabled={busy || !target}>
+              {editingId ? "Salvar link" : "Criar link"}
+            </Button>
+            {editingId && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setEditingId("");
+                  setBuilder(false);
+                }}
+              >
+                Cancelar edição
+              </Button>
+            )}
+          </form>
+        </DialogContent>
+      </Dialog>
       {q.error && <p role="alert">{q.error.message}</p>}
       {links.map((l) => (
         <article key={l.id} className="border rounded-xl p-4 bg-card space-y-2">
@@ -382,10 +460,10 @@ export default function TrackingLinks({
             <div>
               <h4 className="font-semibold">{l.name}</h4>
               <p className="text-xs text-muted-foreground">
-                {l.clicks} cliques totais ·{" "}
-                {q.data?.clicks.filter((c) => c.link_id === l.id && c.lead_id)
-                  .length || 0}{" "}
-                cliques vinculados a leads entre os 100 mais recentes ·{" "}
+                {q.data?.summary.find((s) => s.id === l.id)?.clicks || 0}{" "}
+                cliques ·{" "}
+                {q.data?.summary.find((s) => s.id === l.id)?.conversations || 0}{" "}
+                conversas rastreadas · últimos 30 dias ·{" "}
                 {l.enabled ? "Ativo" : "Pausado"}
               </p>
             </div>
@@ -393,6 +471,8 @@ export default function TrackingLinks({
               enabled={!busy}
               edit={() => {
                 setEditingId(l.id);
+                setSaveError("");
+                setBuilder(true);
                 setName(l.name);
                 setSlug(l.slug || "");
                 setUtm({
@@ -407,7 +487,15 @@ export default function TrackingLinks({
                 setCapture(l.capture_lead !== false);
                 setCodeStyle(l.code_style || "visible");
                 const u = new URL(l.destination);
-                if (
+                const linkedForm = q.data?.forms.find(
+                  (f) =>
+                    u.origin === window.location.origin &&
+                    u.pathname === `/captura/${f.token}`,
+                );
+                if (linkedForm) {
+                  setDestination("form");
+                  setForm(linkedForm.id);
+                } else if (
                   ["wa.me", "api.whatsapp.com", "web.whatsapp.com"].includes(
                     u.hostname,
                   )
@@ -419,9 +507,6 @@ export default function TrackingLinks({
                   setDestination("website");
                   setUrl(l.destination);
                 }
-                document
-                  .getElementById("tracking-link-builder")
-                  ?.scrollIntoView({ behavior: "smooth" });
               }}
               toggle={() =>
                 void act(() =>
@@ -471,29 +556,71 @@ export default function TrackingLinks({
           )}
         </article>
       ))}
-      {code && (
-        <section className="border rounded-xl bg-card p-4 space-y-2">
-          <h4 className="font-semibold">Código para instalar no site</h4>
-          <p className="text-xs text-muted-foreground">
-            Cole antes de fechar &lt;/body&gt; ou como HTML personalizado no
-            Google Tag Manager. O código identifica cliques nos botões de
-            WhatsApp e preserva os dados do anúncio por até 90 dias neste
-            navegador. Instale um único código por página.
-          </p>
-          <textarea
-            aria-label="Código do site"
-            readOnly
-            className="w-full bg-background border p-3 text-xs"
-            value={code}
-          />
-          <Button
-            variant="outline"
-            onClick={() => void navigator.clipboard.writeText(code)}
-          >
-            Copiar código
-          </Button>
-        </section>
-      )}
+      <Dialog
+        open={!!code}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCode("");
+            setCopied(false);
+            setCopyError("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Código para instalar no site</DialogTitle>
+            <DialogDescription>
+              Instale uma vez na página que contém o botão de WhatsApp.
+            </DialogDescription>
+          </DialogHeader>
+          <section className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Cole antes de fechar &lt;/body&gt; ou como HTML personalizado no
+              Google Tag Manager. O código identifica cliques nos botões de
+              WhatsApp e preserva os dados do anúncio por até 90 dias neste
+              navegador. Instale um único código por página.
+            </p>
+            <textarea
+              aria-label="Código do site"
+              readOnly
+              className="w-full bg-background border p-3 text-xs"
+              value={code}
+            />
+            <Button
+              variant="outline"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(code);
+                  setCopied(true);
+                  setCopyError("");
+                } catch {
+                  setCopyError(
+                    "Não foi possível copiar automaticamente. Selecione o código acima e copie.",
+                  );
+                }
+              }}
+            >
+              {copied ? "Código copiado" : "Copiar código"}
+            </Button>
+            {copyError && (
+              <p role="alert" className="text-sm text-destructive">
+                {copyError}
+              </p>
+            )}
+            <ol className="text-sm list-decimal pl-5 space-y-2">
+              <li>Mantenha o anúncio apontando para o seu site.</li>
+              <li>
+                Após instalar, abra a página com os parâmetros do anúncio e
+                clique no botão de WhatsApp.
+              </li>
+              <li>
+                Envie a mensagem com a referência para associar o contato ao
+                clique. Clicar sem enviar não identifica a conversa.
+              </li>
+            </ol>
+          </section>
+        </DialogContent>
+      </Dialog>
       <section className="border rounded-xl p-4 space-y-3">
         <h4 className="font-semibold">Últimos cliques recebidos</h4>
         <p className="text-xs text-muted-foreground">

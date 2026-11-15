@@ -1,3 +1,5 @@
+import useFlowGraph from "@/hooks/useFlowGraph";
+import { outlets, connectionIssue, nextPosition } from "@/lib/flowEditing";
 import {
   importWorkflow,
   exportWorkflow,
@@ -20,7 +22,6 @@ import {
   MiniMap,
   Handle,
   Position,
-  applyNodeChanges,
   applyEdgeChanges,
   addEdge,
   type Node,
@@ -318,10 +319,16 @@ export default function WorkspaceFlows({
                   .update(values)
                   .eq("workspace_id", workspace)
                   .eq("id", f.id)
-              : await workspaceDb.from("agency_workspace_flows").insert(values);
+                  .select("*")
+                  .single()
+              : await workspaceDb
+                  .from("agency_workspace_flows")
+                  .insert(values)
+                  .select("*")
+                  .single();
             if (r.error) throw r.error;
             run(async () => ({ error: null }));
-            setEditing(null);
+            setEditing(r.data as WorkspaceFlow);
           }}
         />
       ) : (
@@ -502,34 +509,34 @@ function FlowEditor({
     [executionOpen, setExecutionOpen] = useState(false);
   const canvas = useRef<HTMLDivElement>(null);
   const [instance, setInstance] = useState<ReactFlowInstance | null>(null);
-  useEffect(() => {
-    if (!canvas.current || !instance) return;
-    let frame = 0;
-    const observer = new ResizeObserver(() => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        void instance.fitView({ padding: 0.15, minZoom: 0.2, maxZoom: 1 });
-      });
-    });
-    observer.observe(canvas.current);
-    return () => {
-      observer.disconnect();
-      cancelAnimationFrame(frame);
-    };
-  }, [instance]);
   const [name, setName] = useState(value.name),
     [enabled, setEnabled] = useState(value.enabled),
     [selected, setSelected] = useState(""),
-    [raw, setRaw] = useState<FlowNode[]>(value.definition.nodes),
-    [edges, setEdges] = useState<Edge[]>(
-      value.definition.edges.map((e) => ({
-        ...e,
-        sourceHandle: e.branch || null,
-        label:
-          e.branch === "yes" ? "Sim" : e.branch === "no" ? "Não" : undefined,
-      })),
-    ),
     [error, setError] = useState("");
+  const {
+    raw,
+    edges,
+    setRaw,
+    setEdges,
+    setGraph,
+    undo,
+    redo,
+    endGroup,
+    canUndo,
+    canRedo,
+  } = useFlowGraph({
+    nodes: value.definition.nodes,
+    edges: value.definition.edges.map((e) => ({
+      ...e,
+      sourceHandle: e.branch || null,
+      label: e.branch === "yes" ? "Sim" : e.branch === "no" ? "Não" : undefined,
+    })),
+  });
+  const [insertion, setInsertion] = useState<{
+    source: string;
+    branch: string | null;
+  } | null>(null);
+
   const [sizes, setSizes] = useState<
     Record<string, { width: number; height: number }>
   >({});
@@ -562,47 +569,69 @@ function FlowEditor({
     [raw, selected, sizes, edges, stages],
   );
   const current = raw.find((n) => n.id === selected);
-  const onNodesChange = useCallback((changes: NodeChange[]) => {
-    setSizes((prior) => {
-      let next = prior;
-      for (const c of changes) {
-        if (
-          c.type === "dimensions" &&
-          c.dimensions &&
-          (prior[c.id]?.width !== c.dimensions.width ||
-            prior[c.id]?.height !== c.dimensions.height)
-        ) {
-          next = { ...next, [c.id]: c.dimensions };
+  useEffect(() => endGroup(), [selected, endGroup]);
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      setSizes((prior) => {
+        let next = prior;
+        for (const c of changes) {
+          if (
+            c.type === "dimensions" &&
+            c.dimensions &&
+            (prior[c.id]?.width !== c.dimensions.width ||
+              prior[c.id]?.height !== c.dimensions.height)
+          ) {
+            next = { ...next, [c.id]: c.dimensions };
+          }
         }
-      }
-      return next;
-    });
-    setRaw((prior) => {
-      let next = prior;
-      for (const change of changes) {
-        if (change.type === "position" && change.position)
+        return next;
+      });
+      let next = raw;
+      const removed = new Set(
+        changes.filter((c) => c.type === "remove").map((c) => c.id),
+      );
+      for (const c of changes) {
+        if (c.type === "position" && c.position)
           next = next.map((n) =>
-            n.id === change.id ? { ...n, position: change.position! } : n,
+            n.id === c.id ? { ...n, position: c.position! } : n,
           );
-        if (change.type === "remove")
-          next = next.filter((n) => n.id !== change.id);
+        if (c.type === "select" && c.selected) setSelected(c.id);
       }
-      return next;
-    });
-    for (const c of changes) {
-      if (c.type === "select" && c.selected) setSelected(c.id);
-      if (c.type === "remove")
-        setEdges((prior) =>
-          prior.filter((e) => e.source !== c.id && e.target !== c.id),
-        );
-    }
-  }, []);
+      if (removed.size) next = next.filter((n) => !removed.has(n.id));
+      setGraph(
+        {
+          nodes: next,
+          edges: removed.size
+            ? edges.filter(
+                (e) => !removed.has(e.source) && !removed.has(e.target),
+              )
+            : edges,
+        },
+        changes.some((c) => c.type === "position") ? "drag" : undefined,
+      );
+      if (changes.some((c) => c.type === "position" && c.dragging === false))
+        endGroup();
+    },
+    [raw, edges, setGraph, endGroup],
+  );
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) =>
       setEdges((prior) => applyEdgeChanges(changes, prior)),
-    [],
+    [setEdges],
   );
-  const connect = (c: Connection) =>
+  const connect = (c: Connection) => {
+    const issue = connectionIssue(
+      raw,
+      edges,
+      c.source,
+      c.target,
+      c.sourceHandle,
+    );
+    if (issue) {
+      setError(issue);
+      return;
+    }
+    setError("");
     setEdges((prior) =>
       addEdge(
         {
@@ -617,11 +646,14 @@ function FlowEditor({
         prior,
       ),
     );
+  };
   const patch = (data: Record<string, unknown>) =>
-    setRaw((prior) =>
-      prior.map((n) =>
-        n.id === selected ? { ...n, data: { ...n.data, ...data } } : n,
-      ),
+    setRaw(
+      (prior) =>
+        prior.map((n) =>
+          n.id === selected ? { ...n, data: { ...n.data, ...data } } : n,
+        ),
+      "properties:" + selected,
     );
   const add = (
     type: string,
@@ -631,15 +663,21 @@ function FlowEditor({
   ) => {
     if (!manage || raw.length >= 40) return;
     const id = "node_" + crypto.randomUUID().slice(0, 8);
-    const rect = canvas.current?.getBoundingClientRect();
+    const parent = raw.find((n) => n.id === (insertion?.source || selected));
+    const outputs = parent ? outlets(parent) : [];
+    const chosen =
+      insertion?.branch ?? (outputs.length === 1 ? outputs[0].id : null);
+    const attach =
+      type !== "trigger" &&
+      !position &&
+      !!parent &&
+      (!!insertion || outputs.length === 1) &&
+      outputs.some((o) => o.id === chosen) &&
+      !edges.some(
+        (e) => e.source === parent.id && (e.sourceHandle || null) === chosen,
+      );
     const center =
-      position ||
-      (instance && rect
-        ? instance.screenToFlowPosition({
-            x: rect.left + rect.width * 0.4,
-            y: rect.top + rect.height * 0.5,
-          })
-        : { x: 160, y: 160 });
+      position || nextPosition(raw, attach ? parent : undefined, chosen);
     const data: Record<string, unknown> =
       type === "trigger"
         ? { event: event || "form_submitted", config_version: 2 }
@@ -699,10 +737,20 @@ function FlowEditor({
                                   subject: "Contato da equipe",
                                   participants: [],
                                 };
-    setRaw((prior) => [
-      ...prior,
-      { id, type, position: center, data: { ...data, label } },
-    ]);
+    const node = { id, type, position: center, data: { ...data, label } };
+    const edge: Edge = {
+      id: "edge_" + crypto.randomUUID().slice(0, 8),
+      source: parent?.id || "",
+      target: id,
+      sourceHandle: chosen,
+      label: chosen === "yes" ? "Sim" : chosen === "no" ? "Não" : undefined,
+    };
+    setGraph({
+      nodes: [...raw, node],
+      edges: attach ? [...edges, edge] : edges,
+    });
+    setInsertion(null);
+    setError("");
     setSelected(id);
     setCatalogOpen(false);
     if (instance)
@@ -769,6 +817,24 @@ function FlowEditor({
     if (r.error) throw r.error;
     return r.data as { node_id: string; message: string }[];
   };
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => {
+      if (
+        !manage ||
+        saving ||
+        !(event.ctrlKey || event.metaKey) ||
+        event.key.toLowerCase() !== "z"
+      )
+        return;
+      const el = event.target as HTMLElement;
+      if (el.closest("input,textarea,select,[contenteditable=true]")) return;
+      event.preventDefault();
+      if (event.shiftKey) redo();
+      else undo();
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [manage, saving, undo, redo]);
   const d = current?.data || {};
   const rule = (
     d.rules as { field: string; operator: string; value: string }[]
@@ -839,6 +905,7 @@ function FlowEditor({
                   })) as FlowEdge[],
                 },
               });
+              setAuditMessage("Funil salvo. Você pode continuar editando.");
             } catch (e) {
               setError((e as Error).message || "Não foi possível salvar.");
             } finally {
@@ -869,6 +936,20 @@ function FlowEditor({
           }}
         >
           Verificar blocos
+        </Button>
+        <Button
+          variant="outline"
+          disabled={!manage || saving || !canUndo}
+          onClick={undo}
+        >
+          Desfazer diagrama
+        </Button>
+        <Button
+          variant="outline"
+          disabled={!manage || saving || !canRedo}
+          onClick={redo}
+        >
+          Refazer diagrama
         </Button>
         <Button variant="outline" disabled={saving} onClick={close}>
           Fechar editor
@@ -905,6 +986,12 @@ function FlowEditor({
         >
           Organizar
         </Button>
+        <Button
+          variant="outline"
+          onClick={() => void instance?.fitView({ padding: 0.15 })}
+        >
+          Ver fluxo inteiro
+        </Button>
       </header>
       {error && (
         <p role="alert" className="text-destructive">
@@ -930,6 +1017,11 @@ function FlowEditor({
             value={catalogSearch}
             onChange={(e) => setCatalogSearch(e.target.value)}
           />
+          <p className="text-xs text-muted-foreground" role="status">
+            {insertion
+              ? "Escolha um bloco para conectar à saída selecionada."
+              : "Selecione o último bloco e clique em uma ação para continuar o fluxo."}
+          </p>
           {workflowCatalog.map((group, index) => (
             <details key={group.group} open className="border-b pb-3">
               <summary
@@ -1004,7 +1096,14 @@ function FlowEditor({
             onNodesChange={manage ? onNodesChange : undefined}
             onEdgesChange={manage ? onEdgesChange : undefined}
             onConnect={manage ? connect : undefined}
-            onNodeClick={(_, n) => setSelected(n.id)}
+            onNodeClick={(_, n) => {
+              setSelected(n.id);
+              setInsertion(null);
+            }}
+            onPaneClick={() => {
+              setSelected("");
+              setInsertion(null);
+            }}
             nodesDraggable={manage}
             nodesConnectable={manage}
             deleteKeyCode={manage ? ["Backspace", "Delete"] : null}
@@ -1188,6 +1287,35 @@ function FlowEditor({
                     />
                   </label>
                 )}
+                <div className="space-y-2 border-t pt-3">
+                  <p className="text-xs text-muted-foreground">
+                    Adicionar próximo passo
+                  </p>
+                  {outlets(current).map((output) => (
+                    <Button
+                      key={output.id || "next"}
+                      variant="outline"
+                      size="sm"
+                      disabled={edges.some(
+                        (e) =>
+                          e.source === current.id &&
+                          (e.sourceHandle || null) === output.id,
+                      )}
+                      onClick={() => {
+                        setInsertion({ source: current.id, branch: output.id });
+                        setCatalogOpen(true);
+                        setCatalogSearch("");
+                        document
+                          .querySelector<HTMLInputElement>(
+                            '[aria-label="Buscar bloco"]',
+                          )
+                          ?.focus();
+                      }}
+                    >
+                      Adicionar em {output.label}
+                    </Button>
+                  ))}
+                </div>
                 <Button
                   variant="outline"
                   size="sm"
@@ -1214,12 +1342,12 @@ function FlowEditor({
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    setRaw(raw.filter((n) => n.id !== selected));
-                    setEdges(
-                      edges.filter(
+                    setGraph({
+                      nodes: raw.filter((n) => n.id !== selected),
+                      edges: edges.filter(
                         (e) => e.source !== selected && e.target !== selected,
                       ),
-                    );
+                    });
                     setSelected("");
                   }}
                 >

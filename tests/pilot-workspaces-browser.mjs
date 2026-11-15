@@ -68,6 +68,7 @@ await db.query(
 let queue = Promise.resolve(),
   featureReads = 0,
   sends = 0;
+let qrConnected = false;
 const run = (id, fn) => {
   const next = queue.then(async () => {
     await db.exec(
@@ -168,6 +169,28 @@ async function contextFor(id) {
             providers: { meta: null, google_ads: null, email: null, sms: null },
             meta_callback: "https://fixture.invalid/meta",
             link_base: "https://fixture.invalid/link?token=",
+          });
+        if (body?.action === "integration_settings")
+          return reply({
+            google: {
+              configured: false,
+              connected: false,
+              redirect_uri: "https://example.invalid/callback",
+            },
+            whatsapp: { instance_id: "exclusive-fixture", enabled: true },
+            webhook: null,
+          });
+        if (body?.action === "connect_whatsapp")
+          return reply({
+            connected: false,
+            qrcode:
+              "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j3ioAAAAASUVORK5CYII=",
+          });
+        if (body?.action === "whatsapp_status")
+          return reply({
+            connected: qrConnected,
+            phone: qrConnected ? "5511999990000" : null,
+            account_id: null,
           });
         if (body?.action === "send") sends++;
         return reply({ configured: false, connected: false });
@@ -542,6 +565,36 @@ try {
       throw e;
     });
   assert.equal(await page.locator(".react-flow__node").count(), 4);
+  const originalEdges = await page.locator(".react-flow__edge").count();
+  await page
+    .locator(".react-flow__node")
+    .filter({ hasText: "Notificar equipe" })
+    .click();
+  await page
+    .getByRole("button", { name: "Timer / Espera", exact: false })
+    .click();
+  assert.equal(await page.locator(".react-flow__node").count(), 5);
+  assert.equal(
+    await page.locator(".react-flow__edge").count(),
+    originalEdges + 1,
+  );
+  await page
+    .getByRole("button", { name: "Desfazer diagrama", exact: true })
+    .click();
+  assert.equal(await page.locator(".react-flow__node").count(), 4);
+  await page
+    .getByRole("button", { name: "Refazer diagrama", exact: true })
+    .click();
+  assert.equal(await page.locator(".react-flow__node").count(), 5);
+  await page
+    .getByRole("button", { name: "Remover bloco", exact: true })
+    .click();
+  assert.equal(await page.locator(".react-flow__edge").count(), originalEdges);
+
+  await page
+    .getByRole("button", { name: "Ver fluxo inteiro", exact: true })
+    .click();
+  await page.waitForTimeout(350);
   const editor = page.locator('[aria-label="Editor de automações"]');
   await page
     .locator(".react-flow__node")
@@ -609,6 +662,13 @@ try {
   // An unfinished draft can be saved, reopened, edited and deleted.
   await page.getByLabel("Ativo", { exact: true }).uncheck();
   await page.getByRole("button", { name: "Salvar funil", exact: true }).click();
+  assert.equal(
+    await page.locator('[aria-label="Editor de automações"]').count(),
+    1,
+  );
+  await page
+    .getByRole("button", { name: "Fechar editor", exact: true })
+    .click();
   if (await page.getByRole("alert").count())
     console.error(await page.getByRole("alert").allTextContents());
   await page
@@ -625,6 +685,13 @@ try {
     .click();
   await page.getByLabel("Ativo", { exact: true }).check();
   await page.getByRole("button", { name: "Salvar funil", exact: true }).click();
+  assert.equal(
+    await page.locator('[aria-label="Editor de automações"]').count(),
+    1,
+  );
+  await page
+    .getByRole("button", { name: "Fechar editor", exact: true })
+    .click();
   if (await page.getByRole("alert").count())
     console.error(await page.getByRole("alert").allTextContents());
   await page
@@ -669,19 +736,24 @@ try {
     .click();
   const exported = await exportWait;
   const text = await readFile(await exported.path(), "utf8");
-  await page
-    .getByLabel("Arquivo do funil")
-    .setInputFiles({
-      name: "funil.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(text),
-    });
+  await page.getByLabel("Arquivo do funil").setInputFiles({
+    name: "funil.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(text),
+  });
   await page.locator('[aria-label="Editor de automações"]').waitFor();
   assert.equal(
     await page.getByLabel("Ativo", { exact: true }).isChecked(),
     false,
   );
   await page.getByRole("button", { name: "Salvar funil", exact: true }).click();
+  assert.equal(
+    await page.locator('[aria-label="Editor de automações"]').count(),
+    1,
+  );
+  await page
+    .getByRole("button", { name: "Fechar editor", exact: true })
+    .click();
   await page
     .locator('[aria-label="Editor de automações"]')
     .waitFor({ state: "detached" });
@@ -701,6 +773,19 @@ try {
     .filter({ hasText: "Conexão exclusiva" })
     .click();
   await page.getByRole("heading", { name: "WhatsApp", exact: true }).waitFor();
+  await page
+    .getByRole("button", { name: "Ler QR Code aqui", exact: true })
+    .click();
+  await page
+    .getByRole("dialog")
+    .getByAltText("QR Code para conectar o WhatsApp da subconta")
+    .waitFor();
+  qrConnected = true;
+  await page.getByRole("dialog").waitFor({ state: "detached" });
+  await page
+    .getByText("● Conectado · 5511999990000", { exact: true })
+    .waitFor();
+
   assert.equal(
     await page
       .getByRole("heading", { name: "Google Agenda", exact: true })
@@ -736,6 +821,9 @@ try {
   await page
     .getByRole("button", { name: "Links rastreáveis", exact: true })
     .click();
+  await page
+    .getByRole("button", { name: "Novo link rastreável", exact: true })
+    .click();
   await page.getByLabel("Destino", { exact: true }).selectOption("form");
   await page
     .getByLabel("Formulário", { exact: true })
@@ -746,6 +834,38 @@ try {
       .getByLabel("Formulário", { exact: true })
       .locator("option")
       .count()) > 1,
+  );
+  await page
+    .getByLabel("Nome do link", { exact: true })
+    .fill("Captação de teste");
+  await page
+    .getByLabel("Formulário", { exact: true })
+    .selectOption({ label: "Briefing de teste" });
+  // The development origin is HTTP; production form links are HTTPS.
+  // Persist a WhatsApp link to exercise the same creation path without weakening destination constraints.
+  await page.getByLabel("Destino", { exact: true }).selectOption("whatsapp");
+  await page
+    .getByLabel("WhatsApp que recebe", { exact: true })
+    .selectOption("");
+  await page
+    .getByLabel("WhatsApp com DDI", { exact: true })
+    .fill("5511999990000");
+  await page.getByLabel("Origem (utm_source)", { exact: true }).fill("google");
+  await page.getByRole("button", { name: "Criar link", exact: true }).click();
+  await page.getByRole("dialog").waitFor({ state: "detached" });
+  await page
+    .getByRole("heading", { name: "Captação de teste", exact: true })
+    .waitFor();
+  const createdTracking = (
+    await db.query(
+      "select destination from public.agency_workspace_tracking_links where name='Captação de teste'",
+    )
+  ).rows;
+  assert.equal(createdTracking.length, 1);
+  assert(
+    createdTracking[0].destination.startsWith(
+      "https://wa.me/5511999990000?text=",
+    ),
   );
   await navigateModule(page, "Workspace");
   await page.getByRole("button", { name: "Funções", exact: true }).click();
