@@ -1,5 +1,12 @@
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,12 +40,39 @@ export default function WorkspaceIntegrations({
           connected: boolean;
           redirect_uri: string;
         };
-        whatsapp: { instance_id: string; enabled: boolean } | null;
+        whatsapp: {
+          instance_id: string;
+          enabled: boolean;
+          stage_id: string;
+          pipeline_id: string;
+        } | null;
         webhook: { url: string; enabled: boolean } | null;
       }>("integration_settings", { workspace_id: workspace }),
     enabled: manage,
     refetchOnMount: "always",
   });
+  const status = useQuery({
+    queryKey: ["workspace-whatsapp-status", user?.id, workspace],
+    enabled: manage && kind === "whatsapp" && !!q.data?.whatsapp?.enabled,
+    queryFn: () =>
+      workspaceOperation<{ connected: boolean; phone: string | null }>(
+        "whatsapp_status",
+        { workspace_id: workspace },
+      ),
+    refetchInterval: qr ? 5000 : 30000,
+    retry: 1,
+  });
+  useEffect(() => {
+    if (status.data?.connected) {
+      setQr(null);
+      setMessage(
+        "WhatsApp conectado. O número já pode receber conversas nesta empresa.",
+      );
+    }
+  }, [status.data?.connected]);
+  useEffect(() => {
+    if (q.data?.whatsapp?.stage_id) setStage(q.data.whatsapp.stage_id);
+  }, [q.data?.whatsapp?.stage_id]);
   const act = async (action: string, values: Record<string, unknown> = {}) => {
     setBusy(true);
     setError("");
@@ -69,6 +103,7 @@ export default function WorkspaceIntegrations({
           : "Configuração salva.",
       );
       await q.refetch();
+      if (kind === "whatsapp") void status.refetch();
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -110,69 +145,124 @@ export default function WorkspaceIntegrations({
               </option>
             ))}
           </select>
+          <span className="block text-xs text-muted-foreground mt-1">
+            A etapa é aplicada ao salvar a configuração da integração.
+          </span>
         </label>
       )}
       {kind === "whatsapp" && (
         <section className="border rounded-xl p-4 bg-card space-y-3">
-          <h3 className="font-semibold">WhatsApp · W-API</h3>
+          <h3 className="font-semibold">WhatsApp por QR Code</h3>
+          <p className="text-sm">
+            {status.data?.connected
+              ? "● Conectado · " + status.data.phone
+              : q.data?.whatsapp
+                ? "Aguardando conexão do número"
+                : "1. Configure a instância exclusiva · 2. Leia o QR Code · 3. Comece a atender"}
+          </p>
+          {status.error && (
+            <p role="alert" className="text-destructive text-sm">
+              Não foi possível conferir a conexão: {status.error.message}
+            </p>
+          )}
           <p className="text-sm">
             {q.data?.whatsapp
               ? `Instância: ${q.data.whatsapp.instance_id} · ${q.data.whatsapp.enabled ? "Recebimento ativado" : "Não conectada"}`
               : "Nenhuma instância configurada."}
           </p>
-          <form
-            className="space-y-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void act("save_whatsapp", {
-                instance_id: instance.trim(),
-                token,
-              });
-            }}
-          >
-            <Input
-              aria-label="ID da instância WhatsApp"
-              autoComplete="off"
-              placeholder="ID de uma instância exclusiva desta empresa"
-              required
-              value={instance}
-              onChange={(e) => setInstance(e.target.value)}
-            />
-            <Input
-              aria-label="Token da instância WhatsApp"
-              type="password"
-              autoComplete="new-password"
-              placeholder="Token (não será exibido depois de salvar)"
-              required
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-            />
-            <Button disabled={busy || !stage}>Salvar instância</Button>
-          </form>
+          <details open={!q.data?.whatsapp}>
+            <summary className="text-sm cursor-pointer">
+              Configurar instância de WhatsApp
+            </summary>
+            <form
+              className="space-y-3 mt-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void act("save_whatsapp", {
+                  instance_id: instance.trim(),
+                  token,
+                });
+              }}
+            >
+              <Input
+                aria-label="ID da instância WhatsApp"
+                autoComplete="off"
+                placeholder="ID de uma instância exclusiva desta empresa"
+                required
+                value={instance}
+                onChange={(e) => setInstance(e.target.value)}
+              />
+              <Input
+                aria-label="Token da instância WhatsApp"
+                type="password"
+                autoComplete="new-password"
+                placeholder="Token (não será exibido depois de salvar)"
+                required
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+              />
+              <Button disabled={busy || !stage}>Salvar instância</Button>
+            </form>
+          </details>
           {q.data?.whatsapp && (
             <div className="flex gap-2 flex-wrap">
               <Button
                 disabled={busy}
                 onClick={() => void act("connect_whatsapp")}
               >
-                Conectar / mostrar QR Code
+                {status.data?.connected
+                  ? "Verificar conexão"
+                  : "Ler QR Code aqui"}
               </Button>
               <Button
                 variant="outline"
                 disabled={busy}
-                onClick={() => void act("disconnect_whatsapp")}
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      "Desativar o recebimento desta subconta? O histórico será preservado.",
+                    )
+                  )
+                    void act("disconnect_whatsapp");
+                }}
               >
                 Desconectar da subconta
               </Button>
             </div>
           )}
-          {qr && (
-            <img
-              src={qr}
-              alt="QR Code para conectar o WhatsApp da subconta"
-              className="max-w-64 w-full bg-white p-3 rounded-lg"
-            />
-          )}
+          <Dialog
+            open={!!qr}
+            onOpenChange={(open) => {
+              if (!open) setQr(null);
+            }}
+          >
+            <DialogContent className="max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Conectar WhatsApp</DialogTitle>
+                <DialogDescription>
+                  No celular, abra WhatsApp → Aparelhos conectados → Conectar
+                  aparelho. Escaneie este código.
+                </DialogDescription>
+              </DialogHeader>
+              {qr && (
+                <img
+                  src={qr}
+                  alt="QR Code para conectar o WhatsApp da subconta"
+                  className="w-64 max-w-full mx-auto bg-white p-3 rounded-lg"
+                />
+              )}
+              <p className="text-xs text-muted-foreground" role="status">
+                Conferindo a conexão automaticamente. Se o código expirar,
+                atualize abaixo.
+              </p>
+              <Button
+                disabled={busy}
+                onClick={() => void act("connect_whatsapp")}
+              >
+                {busy ? "Gerando código…" : "Atualizar QR Code"}
+              </Button>
+            </DialogContent>
+          </Dialog>
           <p className="text-xs text-muted-foreground">
             Os eventos recebidos e os enviados pelo telefone entram nas
             conversas pelo webhook de mensagens e de envio. O histórico anterior

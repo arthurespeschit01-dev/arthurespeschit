@@ -1,3 +1,4 @@
+import { fetchWorkspaceQr } from "../_shared/workspace-qr.ts";
 import { processWorkspaceAi } from "../_shared/workspace-ai.ts";
 import {
   decodeClickRef,
@@ -931,15 +932,7 @@ export async function handle(req: Request) {
         throw Error("O provedor ainda não confirmou os dois webhooks.");
       await connection(workspace, "whatsapp", { enabled: true });
       const state = await account({ ...c, enabled: true });
-      let qrcode = null;
-      if (!state.connected) {
-        const qr = await provider(c, "instance/qr-code");
-        const value = qr.qrcode || qr.qrCode || qr.value || "";
-        if (
-          /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=\s]+$/.test(value)
-        )
-          qrcode = value;
-      }
+      const qrcode = state.connected ? null : await fetchWorkspaceQr(c);
       return reply({ ...state, qrcode });
     }
     if (body.action === "whatsapp_status") {
