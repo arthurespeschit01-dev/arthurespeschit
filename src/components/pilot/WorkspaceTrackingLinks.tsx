@@ -11,6 +11,8 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { workspaceDb } from "@/lib/clientWorkspaces";
 import { dateLabel, selectClass } from "@/lib/workspaceCommercial";
@@ -63,21 +65,15 @@ export default function TrackingLinks({
   const [account, setAccount] = useState(""),
     [stage, setStage] = useState(""),
     [capture, setCapture] = useState(true),
-    [codeStyle, setCodeStyle] = useState("visible"),
+    [codeStyle, setCodeStyle] = useState("invisible"),
     [code, setCode] = useState("");
   const [name, setName] = useState(""),
-    [destination, setDestination] = useState("website"),
+    [destination, setDestination] = useState("whatsapp"),
     [url, setUrl] = useState(""),
     [form, setForm] = useState(""),
     [phone, setPhone] = useState(""),
     [text, setText] = useState("Olá! Gostaria de mais informações."),
-    [utm, setUtm] = useState({
-      source: "",
-      medium: "",
-      campaign: "",
-      content: "",
-      term: "",
-    });
+    [fixedTags, setFixedTags] = useState("");
   const q = useQuery({
     queryKey: ["tracking-attribution", user?.id, workspace],
     queryFn: async () => {
@@ -145,15 +141,9 @@ export default function TrackingLinks({
             setPhone("");
             setStage("");
             setCapture(true);
-            setCodeStyle("visible");
+            setCodeStyle("invisible");
             setText("Olá! Gostaria de mais informações.");
-            setUtm({
-              source: "",
-              medium: "",
-              campaign: "",
-              content: "",
-              term: "",
-            });
+            setFixedTags("");
             setBuilder(true);
           }}
         >
@@ -204,21 +194,33 @@ export default function TrackingLinks({
           if (!busy) setBuilder(open);
         }}
       >
-        <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
+        <DialogContent className="max-w-md sm:max-w-md max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingId ? "Editar link rastreável" : "Novo link rastreável"}
             </DialogTitle>
             <DialogDescription>
-              Escolha o destino e a mensagem. Os parâmetros recebidos do anúncio
-              têm prioridade sobre a marcação fixa.
+              Leva para o seu WhatsApp e diz de onde a conversa veio.
             </DialogDescription>
           </DialogHeader>
           <form
-            className="grid sm:grid-cols-2 gap-3"
+            className="space-y-4"
             id="tracking-link-builder"
             onSubmit={(e) => {
               e.preventDefault();
+              const tags = new URLSearchParams(fixedTags.replace(/^\?/, ""));
+              const utm = Object.fromEntries(
+                ["source", "medium", "campaign", "content", "term"].map((k) => [
+                  k,
+                  tags.get("utm_" + k) || "",
+                ]),
+              );
+              if (Object.values(utm).some((v) => v.length > 200)) {
+                setSaveError(
+                  "Cada marcação deve ter no máximo 200 caracteres.",
+                );
+                return;
+              }
               const values = {
                 workspace_id: workspace,
                 name,
@@ -255,16 +257,21 @@ export default function TrackingLinks({
               });
             }}
           >
-            <label className="text-sm space-y-1">
-              Nome do link
+            <label className="block text-sm space-y-1.5">
+              <span>Nome do link</span>
               <Input
+                aria-label="Nome do link"
                 required
                 value={name}
+                placeholder="Site principal"
                 onChange={(e) => setName(e.target.value)}
               />
+              <span className="block text-xs text-muted-foreground">
+                Aparece como origem do lead.
+              </span>
             </label>
-            <label className="text-sm space-y-1">
-              Nome curto do link (opcional)
+            <label className="block text-sm space-y-1.5">
+              <span>Nome curto do link</span>
               <Input
                 aria-label="Nome curto do link"
                 value={slug}
@@ -274,97 +281,15 @@ export default function TrackingLinks({
                 placeholder="google-comercial"
                 onChange={(e) => setSlug(e.target.value)}
               />
+              <span className="block text-xs text-muted-foreground break-all">
+                É como o link aparece no código: /functions/v1/link-rastreavel/
+                {slug || "nome-curto"}
+              </span>
             </label>
-            <label className="text-sm space-y-1">
-              Destino
-              <select
-                aria-label="Destino"
-                className={selectClass}
-                value={destination}
-                onChange={(e) => setDestination(e.target.value)}
-              >
-                <option value="website">Site externo</option>
-                <option value="form">Formulário desta empresa</option>
-                <option value="whatsapp">WhatsApp</option>
-              </select>
-            </label>
-            {destination === "form" ? (
-              <label className="text-sm space-y-1">
-                Formulário
-                <select
-                  aria-label="Formulário"
-                  required
-                  className={selectClass}
-                  value={form}
-                  onChange={(e) => setForm(e.target.value)}
-                >
-                  <option value="">Selecione</option>
-                  {q.data?.forms
-                    .filter((f) => f.enabled)
-                    .map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.title}
-                      </option>
-                    ))}
-                </select>
-              </label>
-            ) : destination === "whatsapp" ? (
-              <>
-                <label className="text-sm space-y-1">
-                  WhatsApp com DDI
-                  <Input
-                    required={!account}
-                    disabled={!!account}
-                    pattern="[0-9+ ()-]{10,20}"
-                    placeholder="5511999999999"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                  />
-                </label>
-                <label className="text-sm space-y-1">
-                  Mensagem inicial
-                  <Input
-                    required
-                    maxLength={1000}
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                  />
-                </label>
-              </>
-            ) : (
-              <label className="text-sm space-y-1">
-                URL HTTPS
-                <Input
-                  required
-                  type="url"
-                  pattern="https://.*"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                />
-              </label>
-            )}
-            {(
-              [
-                ["source", "Origem (utm_source)"],
-                ["medium", "Meio (utm_medium)"],
-                ["campaign", "Campanha (utm_campaign)"],
-                ["content", "Anúncio/conteúdo (utm_content)"],
-                ["term", "Palavra-chave (utm_term)"],
-              ] as const
-            ).map(([key, label]) => (
-              <label key={key} className="text-sm space-y-1">
-                {label}
-                <Input
-                  maxLength={200}
-                  value={utm[key]}
-                  onChange={(e) => setUtm({ ...utm, [key]: e.target.value })}
-                />
-              </label>
-            ))}
             {destination === "whatsapp" && (
               <>
-                <label className="text-sm">
-                  WhatsApp que recebe
+                <label className="block text-sm space-y-1.5">
+                  <span>WhatsApp que recebe</span>
                   <select
                     aria-label="WhatsApp que recebe"
                     className={selectClass + " w-full"}
@@ -378,55 +303,189 @@ export default function TrackingLinks({
                       </option>
                     ))}
                   </select>
+                  <span className="block text-xs text-muted-foreground">
+                    É para este número que a conversa vai. O número do botão do
+                    site é ignorado.
+                  </span>
                 </label>
-                <label className="text-sm">
-                  Código na mensagem
+                {!account && (
+                  <label className="block text-sm space-y-1.5">
+                    <span>WhatsApp com DDI</span>
+                    <Input
+                      required
+                      pattern="[0-9+ ()-]{10,20}"
+                      placeholder="5511999999999"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                    />
+                  </label>
+                )}
+                <label className="block text-sm space-y-1.5">
+                  <span>Mensagem pronta</span>
+                  <Textarea
+                    aria-label="Mensagem inicial"
+                    required
+                    maxLength={1000}
+                    rows={3}
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                  />
+                  <span className="block text-xs text-muted-foreground">
+                    Se o botão do site já tiver uma frase, ela é usada no lugar
+                    desta.
+                  </span>
+                </label>
+                <label className="block text-sm space-y-1.5">
+                  <span>Código na mensagem</span>
                   <select
                     aria-label="Código na mensagem"
                     className={selectClass + " w-full"}
                     value={codeStyle}
                     onChange={(e) => setCodeStyle(e.target.value)}
                   >
-                    <option value="visible">
-                      Referência visível (mais compatível)
+                    <option value="invisible">
+                      Invisível — a pessoa não vê nada diferente
                     </option>
-                    <option value="invisible">Referência invisível</option>
+                    <option value="visible">
+                      Visível — referência no final da mensagem
+                    </option>
                   </select>
+                  <span className="block text-xs text-muted-foreground">
+                    Alguns aplicativos removem códigos invisíveis. Se isso
+                    acontecer, use a referência visível.
+                  </span>
                 </label>
-                <p className="text-xs text-muted-foreground">
-                  Não apague a referência. Alguns clientes de WhatsApp podem
-                  remover códigos invisíveis; nesses casos use a referência
-                  visível.
-                </p>
               </>
             )}
-            <label className="text-sm">
-              Etapa para novos contatos
-              <select
-                aria-label="Etapa dos contatos do link"
-                className={selectClass + " w-full"}
-                value={stage}
-                onChange={(e) => setStage(e.target.value)}
-              >
-                <option value="">Padrão da conexão</option>
-                {context.data?.stages?.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={capture}
-                onChange={(e) => setCapture(e.target.checked)}
+            <fieldset className="border rounded-lg p-3 space-y-3">
+              <legend className="px-1 text-sm font-medium">
+                Quando a conversa chegar
+              </legend>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block text-sm space-y-1.5">
+                  <span>Origem no CRM</span>
+                  <select
+                    aria-label="Origem no CRM"
+                    className={selectClass + " w-full"}
+                    value={
+                      context.data?.stages.find((s) => s.id === stage)
+                        ?.pipeline_id || ""
+                    }
+                    onChange={(e) =>
+                      setStage(
+                        context.data?.stages.find(
+                          (s) => s.pipeline_id === e.target.value,
+                        )?.id || "",
+                      )
+                    }
+                  >
+                    <option value="">A origem padrão do CRM</option>
+                    {context.data?.pipelines.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block text-sm space-y-1.5">
+                  <span>Etapa</span>
+                  <select
+                    aria-label="Etapa dos contatos do link"
+                    className={selectClass + " w-full"}
+                    value={stage}
+                    onChange={(e) => setStage(e.target.value)}
+                  >
+                    <option value="">Padrão da conexão</option>
+                    {context.data?.stages
+                      .filter(
+                        (s) =>
+                          !stage ||
+                          s.pipeline_id ===
+                            context.data?.stages.find((x) => x.id === stage)
+                              ?.pipeline_id,
+                      )
+                      .map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+              </div>
+              <label className="flex items-center justify-between gap-3 text-sm">
+                <span>Criar oportunidade no CRM automaticamente</span>
+                <Switch
+                  aria-label="Criar oportunidade no CRM ao chegar uma conversa"
+                  checked={capture}
+                  onCheckedChange={setCapture}
+                />
+              </label>
+            </fieldset>
+            <label className="block text-sm space-y-1.5">
+              <span>Marcação fixa do link (opcional)</span>
+              <Input
+                aria-label="Marcação fixa do link"
+                placeholder="utm_source=instagram&utm_medium=bio"
+                value={fixedTags}
+                onChange={(e) => setFixedTags(e.target.value)}
               />
-              Criar oportunidade no CRM ao chegar uma conversa
+              <span className="block text-xs text-muted-foreground">
+                A marcação que vier do anúncio tem prioridade sobre esta.
+              </span>
             </label>
-            <p className="sm:col-span-2 break-all text-xs text-muted-foreground">
-              Destino: {target || "Preencha o destino"}
-            </p>
+            <details className="text-sm">
+              <summary className="cursor-pointer text-muted-foreground">
+                Outros destinos: site ou formulário
+              </summary>
+              <div className="space-y-3 pt-3">
+                <label className="block space-y-1.5">
+                  <span>Destino</span>
+                  <select
+                    aria-label="Destino"
+                    className={selectClass + " w-full"}
+                    value={destination}
+                    onChange={(e) => setDestination(e.target.value)}
+                  >
+                    <option value="whatsapp">WhatsApp</option>
+                    <option value="website">Site externo</option>
+                    <option value="form">Formulário desta empresa</option>
+                  </select>
+                </label>
+                {destination === "form" && (
+                  <label className="block space-y-1.5">
+                    <span>Formulário</span>
+                    <select
+                      aria-label="Formulário"
+                      required
+                      className={selectClass + " w-full"}
+                      value={form}
+                      onChange={(e) => setForm(e.target.value)}
+                    >
+                      <option value="">Selecione</option>
+                      {q.data?.forms
+                        .filter((f) => f.enabled)
+                        .map((f) => (
+                          <option key={f.id} value={f.id}>
+                            {f.title}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                )}
+                {destination === "website" && (
+                  <label className="block space-y-1.5">
+                    <span>URL HTTPS</span>
+                    <Input
+                      required
+                      type="url"
+                      pattern="https://.*"
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
+                    />
+                  </label>
+                )}
+              </div>
+            </details>
             {saveError && (
               <p
                 role="alert"
@@ -435,21 +494,26 @@ export default function TrackingLinks({
                 {saveError}
               </p>
             )}
-            <Button disabled={busy || !target}>
-              {editingId ? "Salvar link" : "Criar link"}
-            </Button>
-            {editingId && (
+            <div className="flex justify-end gap-2 border-t pt-3">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => {
-                  setEditingId("");
-                  setBuilder(false);
-                }}
+                disabled={busy}
+                onClick={() => setBuilder(false)}
               >
-                Cancelar edição
+                Cancelar
               </Button>
-            )}
+              <Button
+                disabled={
+                  busy ||
+                  !target ||
+                  !name.trim() ||
+                  (destination === "whatsapp" && !account && !phone.trim())
+                }
+              >
+                {editingId ? "Salvar link" : "Criar link"}
+              </Button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>
@@ -475,13 +539,21 @@ export default function TrackingLinks({
                 setBuilder(true);
                 setName(l.name);
                 setSlug(l.slug || "");
-                setUtm({
-                  source: l.source,
-                  medium: l.medium || "",
-                  campaign: l.campaign,
-                  content: l.content || "",
-                  term: l.term || "",
-                });
+                setFixedTags(
+                  new URLSearchParams(
+                    Object.fromEntries(
+                      Object.entries({
+                        source: l.source,
+                        medium: l.medium,
+                        campaign: l.campaign,
+                        content: l.content,
+                        term: l.term,
+                      })
+                        .filter(([, v]) => !!v)
+                        .map(([k, v]) => ["utm_" + k, v!]),
+                    ),
+                  ).toString(),
+                );
                 setAccount(l.whatsapp_account_id || "");
                 setStage(l.stage_id || "");
                 setCapture(l.capture_lead !== false);

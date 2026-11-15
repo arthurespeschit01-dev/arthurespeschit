@@ -18,7 +18,8 @@ export function useFlowContext(workspace: string) {
         workspaceDb
           .from("agency_workspace_stages")
           .select("id,name,pipeline_id")
-          .eq("workspace_id", workspace),
+          .eq("workspace_id", workspace)
+          .order("position", { ascending: true }),
       ]);
       if (p.error) throw p.error;
       if (a.error) throw a.error;

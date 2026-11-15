@@ -824,6 +824,18 @@ try {
   await page
     .getByRole("button", { name: "Novo link rastreável", exact: true })
     .click();
+  assert.equal(
+    await page.getByLabel("Código na mensagem", { exact: true }).inputValue(),
+    "invisible",
+  );
+  assert.equal(
+    await page.getByLabel("Marcação fixa do link", { exact: true }).count(),
+    1,
+  );
+  await page.screenshot({ path: "/workspace/work/tracking-dialog-pilot.png" });
+  await page
+    .getByText("Outros destinos: site ou formulário", { exact: true })
+    .click();
   await page.getByLabel("Destino", { exact: true }).selectOption("form");
   await page
     .getByLabel("Formulário", { exact: true })
@@ -850,7 +862,16 @@ try {
   await page
     .getByLabel("WhatsApp com DDI", { exact: true })
     .fill("5511999990000");
-  await page.getByLabel("Origem (utm_source)", { exact: true }).fill("google");
+  await page
+    .getByLabel("Marcação fixa do link", { exact: true })
+    .fill("utm_source=google");
+  await page
+    .getByLabel("Origem no CRM", { exact: true })
+    .selectOption({ index: 1 });
+  const trackingStage = await page
+    .getByLabel("Etapa dos contatos do link", { exact: true })
+    .inputValue();
+  assert(trackingStage);
   await page.getByRole("button", { name: "Criar link", exact: true }).click();
   await page.getByRole("dialog").waitFor({ state: "detached" });
   await page
@@ -858,10 +879,13 @@ try {
     .waitFor();
   const createdTracking = (
     await db.query(
-      "select destination from public.agency_workspace_tracking_links where name='Captação de teste'",
+      "select destination,source,code_style,stage_id from public.agency_workspace_tracking_links where name='Captação de teste'",
     )
   ).rows;
   assert.equal(createdTracking.length, 1);
+  assert.equal(createdTracking[0].source, "google");
+  assert.equal(createdTracking[0].code_style, "invisible");
+  assert.equal(createdTracking[0].stage_id, trackingStage);
   assert(
     createdTracking[0].destination.startsWith(
       "https://wa.me/5511999990000?text=",
