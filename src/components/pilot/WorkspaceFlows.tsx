@@ -1,3 +1,9 @@
+import {
+  importWorkflow,
+  exportWorkflow,
+  bindImportedWorkflow,
+  downloadText,
+} from "@/lib/workflowTransfer";
 import FlowTriggerFields, { StagePicker } from "./FlowTriggerFields";
 import { useFlowContext } from "./useFlowContext";
 import FlowExecutions from "./FlowExecutions";
@@ -200,8 +206,52 @@ export default function WorkspaceFlows({
       }[]
     >([]),
     [stepError, setStepError] = useState("");
+  const importFile = useRef<HTMLInputElement>(null);
+  const [transferError, setTransferError] = useState("");
   return (
     <div className="space-y-4">
+      {transferError && (
+        <p role="alert" className="text-destructive text-sm">
+          {transferError}
+        </p>
+      )}
+      {manage && (
+        <input
+          ref={importFile}
+          type="file"
+          accept=".json,application/json"
+          aria-label="Arquivo do funil"
+          className="sr-only"
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (!file) return;
+            try {
+              if (file.size > 100000)
+                throw Error("Use um arquivo JSON de até 100 KB.");
+              const flow = importWorkflow(await file.text());
+              setEditing(
+                bindImportedWorkflow(flow, {
+                  source_id: [
+                    ...forms.map((f) => f.id),
+                    ...calendars.map((c) => c.id),
+                  ],
+                  stage_id: stages.map((s) => s.id),
+                  from_stage_id: stages.map((s) => s.id),
+                  to_stage_id: stages.map((s) => s.id),
+                  entry_stage_id: stages.map((s) => s.id),
+                  pipeline_id: stages.map((s) => s.pipeline_id),
+                  calendar_id: calendars.map((c) => c.id),
+                  user_id: members.map((m) => m.user_id),
+                }),
+              );
+              setTransferError("");
+            } catch (error) {
+              setTransferError((error as Error).message);
+            }
+          }}
+        />
+      )}
       <div className="flex justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold">Funis e automações</h2>
@@ -211,29 +261,37 @@ export default function WorkspaceFlows({
           </p>
         </div>
         {manage && (
-          <Button
-            onClick={() =>
-              setEditing({
-                id: "",
-                name: "Novo funil",
-                enabled: false,
-                version: 1,
-                definition: {
-                  nodes: [
-                    {
-                      id: "trigger",
-                      type: "trigger",
-                      position: { x: 120, y: 80 },
-                      data: { event: "form_submitted" },
-                    },
-                  ],
-                  edges: [],
-                },
-              })
-            }
-          >
-            Novo funil
-          </Button>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              onClick={() => importFile.current?.click()}
+            >
+              Importar funil
+            </Button>
+            <Button
+              onClick={() =>
+                setEditing({
+                  id: "",
+                  name: "Novo funil",
+                  enabled: false,
+                  version: 1,
+                  definition: {
+                    nodes: [
+                      {
+                        id: "trigger",
+                        type: "trigger",
+                        position: { x: 120, y: 80 },
+                        data: { event: "form_submitted" },
+                      },
+                    ],
+                    edges: [],
+                  },
+                })
+              }
+            >
+              Novo funil
+            </Button>
+          </div>
         )}
       </div>
       {editing ? (
@@ -319,6 +377,17 @@ export default function WorkspaceFlows({
                 >
                   Execuções ({runs.filter((r) => r.flow_id === f.id).length})
                 </Button>
+                {manage && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      downloadText("funil-central.json", exportWorkflow(f))
+                    }
+                  >
+                    Exportar JSON
+                  </Button>
+                )}
               </div>
             </article>
           ))}

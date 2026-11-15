@@ -1,3 +1,4 @@
+import WorkspaceCrmTools from "@/components/pilot/WorkspaceCrmTools";
 import WorkspaceNavigation from "@/components/pilot/WorkspaceNavigation";
 import WorkspaceCommercial from "@/components/pilot/WorkspaceCommercial";
 import { useState } from "react";
@@ -325,6 +326,7 @@ function WorkspaceView() {
       refetchOnMount: "always",
     });
   const [pipelineId, setPipelineId] = useState(""),
+    [crmView, setCrmView] = useState("kanban"),
     [leadDialog, setLeadDialog] = useState<WorkspaceLead | "new" | null>(null),
     [pipelineDialog, setPipelineDialog] = useState<"new" | "edit" | null>(null),
     [workspaceDialog, setWorkspaceDialog] = useState(false),
@@ -338,7 +340,9 @@ function WorkspaceView() {
   const data = query.data,
     w = data?.workspace;
   const pipeline =
-      data?.pipelines.find((p) => p.id === pipelineId) || data?.pipelines[0],
+      data?.pipelines.find((p) => p.id === pipelineId) ||
+      data?.pipelines.find((p) => p.is_default) ||
+      data?.pipelines[0],
     stages = data?.stages.filter((s) => s.pipeline_id === pipeline?.id) || [],
     leads = data?.leads.filter((l) => l.pipeline_id === pipeline?.id) || [];
   const base = `/laboratorio/subcontas/${workspaceId}`,
@@ -519,6 +523,7 @@ function WorkspaceView() {
                   {data?.pipelines.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
+                      {p.is_default ? " · Padrão" : ""}
                     </option>
                   ))}
                 </select>
@@ -534,6 +539,22 @@ function WorkspaceView() {
                     onSelect={() => setPipelineDialog("edit")}
                   >
                     Configurar pipeline
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={
+                      !manage || !pipeline || pipeline.is_default || busy
+                    }
+                    onSelect={() =>
+                      pipeline &&
+                      void operation(() =>
+                        workspaceDb.rpc("agency_workspace_default_pipeline", {
+                          p_workspace: workspaceId,
+                          p_pipeline: pipeline.id,
+                        }),
+                      )
+                    }
+                  >
+                    Definir como origem padrão
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     className="text-destructive"
@@ -599,28 +620,30 @@ function WorkspaceView() {
                 </div>
                 <section className="border rounded-xl bg-card p-4 space-y-4">
                   <h2 className="font-semibold">Distribuição por etapa</h2>
-                  {stages.map((s) => {
-                    const count = leads.filter(
-                      (l) => l.stage_id === s.id,
-                    ).length;
-                    return (
-                      <div key={s.id} className="space-y-2">
-                        <div className="flex justify-between gap-3 text-sm">
-                          <span className="break-words">{s.name}</span>
-                          <span className="font-semibold">{count}</span>
+                  {stages
+                    .filter((s) => s.show_on_dashboard !== false)
+                    .map((s) => {
+                      const count = leads.filter(
+                        (l) => l.stage_id === s.id,
+                      ).length;
+                      return (
+                        <div key={s.id} className="space-y-2">
+                          <div className="flex justify-between gap-3 text-sm">
+                            <span className="break-words">{s.name}</span>
+                            <span className="font-semibold">{count}</span>
+                          </div>
+                          <div className="h-2 rounded-full bg-secondary overflow-hidden">
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                background: s.color,
+                                width: `${leads.length ? (count / leads.length) * 100 : 0}%`,
+                              }}
+                            />
+                          </div>
                         </div>
-                        <div className="h-2 rounded-full bg-secondary overflow-hidden">
-                          <div
-                            className="h-full rounded-full"
-                            style={{
-                              background: s.color,
-                              width: `${leads.length ? (count / leads.length) * 100 : 0}%`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
                   {!leads.length && (
                     <p className="text-sm text-muted-foreground">
                       Os indicadores serão atualizados quando você cadastrar e
@@ -636,6 +659,15 @@ function WorkspaceView() {
             )}
             {section === "crm" && (
               <>
+                <WorkspaceCrmTools
+                  workspace={workspaceId}
+                  leads={leads}
+                  stages={data?.stages || []}
+                  write={enabled}
+                  selectLead={setLeadDialog}
+                  view={crmView}
+                  onViewChange={setCrmView}
+                />
                 <Input
                   aria-label="Buscar leads na subconta"
                   placeholder="Buscar por nome, telefone ou e-mail…"
@@ -652,7 +684,10 @@ function WorkspaceView() {
                   </Button>
                 )}
                 <div
-                  className="flex gap-3 overflow-x-auto pb-4 items-start"
+                  className={
+                    (crmView !== "kanban" ? "hidden " : "") +
+                    "flex gap-3 overflow-x-auto pb-4 items-start"
+                  }
                   aria-label="Pipeline da empresa"
                 >
                   {stages.map((s) => (

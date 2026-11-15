@@ -5,6 +5,7 @@ export type CaptureField = Omit<FormField, "type"> & {
   type: FormField["type"] | "tel";
 };
 export interface CaptureForm {
+  folder_id?: string | null;
   presentation?: import("@/components/pilot/WorkspaceFormRunner").FormPresentation;
   id: string;
   workspace_id: string;
@@ -93,6 +94,7 @@ export interface FlowRun {
 export async function commercialData(workspace: string, manage: boolean) {
   const tables = [
     "forms",
+    "form_folders",
     "form_submissions",
     "form_views",
     "calendars",

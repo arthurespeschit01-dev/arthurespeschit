@@ -97,7 +97,9 @@ export function trackingRedirect(
     ["wa.me", "api.whatsapp.com", "web.whatsapp.com"].includes(target.hostname)
   ) {
     const text =
-      target.searchParams.get("text") || "Olá! Gostaria de mais informações.";
+      incoming?.searchParams.get("text")?.slice(0, 2000) ||
+      target.searchParams.get("text") ||
+      "Olá! Gostaria de mais informações.";
     target.searchParams.set(
       "text",
       text +

@@ -30,6 +30,20 @@ export default function FlowConditions({
     ["email", "E-mail"],
     ["phone", "Telefone"],
     ["name", "Nome"],
+    ...[
+      "utm_source",
+      "utm_medium",
+      "utm_campaign",
+      "utm_content",
+      "utm_term",
+      "gclid",
+      "gbraid",
+      "wbraid",
+      "fbclid",
+    ].map((k) => [
+      k,
+      k.startsWith("utm_") ? "UTM " + k.slice(4) : k.toUpperCase(),
+    ]),
     ...forms.flatMap((f) =>
       f.fields.map((x) => ["answer:" + x.id, "Resposta: " + x.label]),
     ),
@@ -77,6 +91,9 @@ export default function FlowConditions({
               ["filled", "Preenchido"],
               ["not_filled", "Não preenchido"],
               ["greater_than", "Maior que"],
+              ["less_than", "Menor que"],
+              ["starts_with", "Começa com"],
+              ["ends_with", "Termina com"],
             ].map(([k, v]) => (
               <option key={k} value={k}>
                 {v}

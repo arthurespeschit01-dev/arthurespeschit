@@ -1,3 +1,4 @@
+import WorkspaceSalesDashboard from "./WorkspaceSalesDashboard";
 import WorkspaceNotificationInbox from "./WorkspaceNotificationInbox";
 import { Link } from "react-router-dom";
 import WorkspaceProviders from "./WorkspaceProviders";
@@ -251,6 +252,7 @@ export default function WorkspaceCommercial({
         <WorkspaceForms
           workspace={workspace}
           forms={forms}
+          folders={data.form_folders || []}
           responses={responses}
           stages={stages}
           manage={manage}
@@ -290,6 +292,7 @@ export default function WorkspaceCommercial({
         />
       ) : (
         <>
+          <WorkspaceSalesDashboard workspace={workspace} />
           <WorkspaceNotificationInbox workspace={workspace} />
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
             {[
