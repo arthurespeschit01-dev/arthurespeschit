@@ -77,3 +77,33 @@ it("a new ad click clears identifiers and campaign fields from the preceding pla
   expect(attrs.gclid).toBeUndefined();
   expect(attrs.utm_campaign).toBeUndefined();
 });
+
+it("supports public slugs, existing Meta browser cookie and an override slug", () => {
+  const doc = document.implementation.createHTMLDocument();
+  Object.defineProperty(doc, "cookie", { value: "_fbp=fb.1.12345.browser1" });
+  const a = doc.createElement("a");
+  a.href = "https://wa.me/5511999990000?text=Meu%20pedido";
+  a.setAttribute("data-central-link", "outro-link");
+  doc.body.append(a);
+  a.addEventListener("click", (e) => e.preventDefault());
+  new Function(
+    "document",
+    "location",
+    "localStorage",
+    "URL",
+    "WeakMap",
+    trackingSiteScript("https://central.invalid/function", "google-comercial"),
+  )(
+    doc,
+    new URL("https://site.invalid/?fbclid=meta-click"),
+    localStorage,
+    URL,
+    WeakMap,
+  );
+  a.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  const url = new URL(a.href);
+  expect(url.searchParams.get("link")).toBe("outro-link");
+  expect(url.searchParams.get("fbp")).toBe("fb.1.12345.browser1");
+  expect(url.searchParams.get("fbc")).toMatch(/^fb\.1\.[0-9]+\.meta-click$/);
+  expect(url.searchParams.get("text")).toBe("Meu pedido");
+});

@@ -4,6 +4,7 @@ import {
   decodeClickRef,
   googleConversionCsv,
   trackingSiteScript,
+  validTrackingKey,
 } from "../_shared/workspace-tracking.ts";
 import {
   workspaceFormDefinition,
@@ -238,7 +239,7 @@ export async function handle(req: Request) {
   }
   if (req.method === "GET" && callbackUrl.searchParams.has("tracking_script")) {
     const token = callbackUrl.searchParams.get("tracking_script") || "";
-    if (!/^[a-f0-9]{64}$/.test(token))
+    if (!validTrackingKey(token))
       return reply({ error: "Link inválido." }, 404);
     return new Response(
       trackingSiteScript(callbackUrl.origin + callbackUrl.pathname, token),
@@ -268,7 +269,10 @@ export async function handle(req: Request) {
     });
   }
   if (req.method === "GET" && callbackUrl.searchParams.get("link")) {
-    const incoming = attribution(Object.fromEntries(callbackUrl.searchParams));
+    const incoming = attribution(
+      Object.fromEntries(callbackUrl.searchParams),
+      req,
+    );
     const resolved = await checked(
       db.rpc("agency_workspace_resolve_tracking_link", {
         p_token: callbackUrl.searchParams.get("link"),
@@ -276,7 +280,13 @@ export async function handle(req: Request) {
       }),
     );
     if (!resolved) return reply({ error: "Link indisponível." }, 404);
-    return Response.redirect(trackingRedirect(resolved, callbackUrl), 302);
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: trackingRedirect(resolved, callbackUrl),
+        "Cache-Control": "no-store",
+      },
+    });
   }
   if (req.method === "GET" && callbackUrl.searchParams.get("meta_workspace")) {
     const workspace = callbackUrl.searchParams.get("meta_workspace")!;

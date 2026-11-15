@@ -1,3 +1,4 @@
+import { trackingUrls } from "@/lib/trackingUrls";
 import {
   Dialog,
   DialogContent,
@@ -42,13 +43,11 @@ interface Click {
 export default function TrackingLinks({
   workspace,
   links,
-  base,
   busy,
   act,
 }: {
   workspace: string;
   links: Link[];
-  base: string;
   busy: boolean;
   act: (fn: () => PromiseLike<unknown>) => Promise<void>;
 }) {
@@ -60,6 +59,7 @@ export default function TrackingLinks({
     [copied, setCopied] = useState(false),
     [copyError, setCopyError] = useState("");
   const [slug, setSlug] = useState("");
+  const [installationLink, setInstallationLink] = useState("");
   const [account, setAccount] = useState(""),
     [stage, setStage] = useState(""),
     [capture, setCapture] = useState(true),
@@ -538,18 +538,23 @@ export default function TrackingLinks({
             conversas · Google:{" "}
             {q.data?.summary.find((s) => s.id === l.id)?.google || 0}
           </p>
-          <ShareLink url={base + (l.slug || l.token)} />
+          <ShareLink
+            url={trackingUrls(window.location.origin, l.slug || l.token).direct}
+          />
           {/^https:\/\/(wa\.me|api\.whatsapp\.com|web\.whatsapp\.com)\//.test(
             l.destination,
           ) && (
             <Button
               variant="outline"
               size="sm"
-              onClick={() =>
-                setCode(
-                  `<script src="${base.replace("?link=", "?tracking_script=") + l.token}" defer></script>`,
-                )
-              }
+              onClick={() => {
+                const urls = trackingUrls(
+                  window.location.origin,
+                  l.slug || l.token,
+                );
+                setCode(urls.snippet);
+                setInstallationLink(urls.direct);
+              }}
             >
               Código do site
             </Button>
@@ -570,15 +575,16 @@ export default function TrackingLinks({
           <DialogHeader>
             <DialogTitle>Código para instalar no site</DialogTitle>
             <DialogDescription>
-              Instale uma vez na página que contém o botão de WhatsApp.
+              Instale uma vez no &lt;head&gt; de todas as páginas do site.
             </DialogDescription>
           </DialogHeader>
           <section className="space-y-3">
             <p className="text-xs text-muted-foreground">
-              Cole antes de fechar &lt;/body&gt; ou como HTML personalizado no
-              Google Tag Manager. O código identifica cliques nos botões de
-              WhatsApp e preserva os dados do anúncio por até 90 dias neste
-              navegador. Instale um único código por página.
+              Cole no &lt;head&gt; de todas as páginas ou como HTML
+              personalizado no Google Tag Manager, com acionamento All Pages. O
+              código identifica cliques nos botões de WhatsApp e preserva os
+              dados do anúncio por até 90 dias neste navegador. Instale um único
+              código por página.
             </p>
             <textarea
               aria-label="Código do site"
@@ -608,7 +614,14 @@ export default function TrackingLinks({
               </p>
             )}
             <ol className="text-sm list-decimal pl-5 space-y-2">
-              <li>Mantenha o anúncio apontando para o seu site.</li>
+              <li>
+                Mantenha o anúncio apontando para o seu site e a marcação
+                automática do Google Ads ativada.
+              </li>
+              <li>
+                Para um botão usar outro link, adicione
+                data-central-link="outro-nome-curto" ao botão.
+              </li>
               <li>
                 Após instalar, abra a página com os parâmetros do anúncio e
                 clique no botão de WhatsApp.
@@ -618,6 +631,22 @@ export default function TrackingLinks({
                 clique. Clicar sem enviar não identifica a conversa.
               </li>
             </ol>
+            <div className="space-y-2 border-t pt-3">
+              <h4 className="font-medium text-sm">
+                Sem site? Use o link direto
+              </h4>
+              <p className="text-xs text-muted-foreground">
+                Para bio, e-mail ou QR Code. Em anúncios que levam ao seu site,
+                mantenha o endereço do site como destino do anúncio.
+              </p>
+              <ShareLink url={installationLink} />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Este código registra a origem. As conversões nas plataformas
+              dependem da conexão Meta/Google e de regras de conversão ativas.
+              Configure o consentimento e a política de privacidade do site para
+              o armazenamento dos identificadores.
+            </p>
           </section>
         </DialogContent>
       </Dialog>

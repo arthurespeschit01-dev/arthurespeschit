@@ -252,7 +252,6 @@ export default function WorkspaceProviders({
         <TrackingLinks
           workspace={workspace}
           links={d.links}
-          base={d.config.link_base}
           busy={busy}
           act={act}
         />
