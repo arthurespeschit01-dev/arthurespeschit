@@ -170,6 +170,14 @@ async function contextFor(id) {
             meta_callback: "https://fixture.invalid/meta",
             link_base: "https://fixture.invalid/link?token=",
           });
+        if (body?.action === "cloud_settings")
+          return reply({
+            configured: false,
+            connected: false,
+            webhook_url: "https://fixture.invalid/meta-whatsapp",
+          });
+        if (body?.action === "whatsapp_preferences")
+          return reply({ optout_enabled: true, phrases: ["parar", "sair"] });
         if (body?.action === "integration_settings")
           return reply({
             google: {
@@ -786,6 +794,27 @@ try {
     .getByText("● Conectado · 5511999990000", { exact: true })
     .waitFor();
 
+  await page
+    .getByRole("tab", { name: "API Oficial (Meta)", exact: true })
+    .click();
+  await page
+    .getByRole("heading", { name: "WhatsApp API Oficial", exact: true })
+    .waitFor();
+  assert(
+    await page
+      .getByRole("button", {
+        name: "Conectar meu número do WhatsApp Business",
+        exact: true,
+      })
+      .isDisabled(),
+  );
+  await page.getByText("Ativação pendente:", { exact: false }).waitFor();
+  await page
+    .getByRole("heading", { name: "Descadastro automático", exact: true })
+    .waitFor();
+  await page
+    .getByRole("tab", { name: "WhatsApp por QR Code", exact: true })
+    .click();
   assert.equal(
     await page
       .getByRole("heading", { name: "Google Agenda", exact: true })

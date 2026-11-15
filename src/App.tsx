@@ -18,6 +18,7 @@ import ScrollToTop from "./components/ScrollToTop";
 const PilotWorkspaces = lazy(() => import("./pages/PilotWorkspaces"));
 const Chamados = lazy(() => import("./pages/Chamados"));
 const ClientPortal = lazy(() => import("./pages/ClientPortal"));
+const WorkspaceWhatsAppPair = lazy(() => import("./pages/WorkspaceWhatsAppPair"));
 const WorkspacePublic = lazy(() => import("./pages/WorkspacePublic"));
 const WorkspaceInvitation = lazy(() => import("./pages/WorkspacePublic").then(m=>({default:m.WorkspaceInvitation})));
 const PublicForm = lazy(() => import("./pages/PublicForm"));
@@ -200,6 +201,7 @@ const App = () => (
         <Routes>
           <Route path="/portal/:token" element={<ClientPortal />} />
           <Route path="/formulario/:token" element={<PublicForm />} />
+          <Route path="/conectar-whatsapp/:token" element={<WorkspaceWhatsAppPair />} />
           <Route path="/captura/:token" element={<WorkspacePublic />} />
           <Route path="/reservar/:token" element={<WorkspacePublic />} />
           <Route path="/*" element={<AuthProvider><PilotVisualTheme/><Routes>

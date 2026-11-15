@@ -1,3 +1,5 @@
+import WorkspaceWhatsAppOptOut from "./WorkspaceWhatsAppOptOut";
+import WorkspaceOfficialWhatsApp from "./WorkspaceOfficialWhatsApp";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +26,8 @@ export default function WorkspaceIntegrations({
   kind?: "whatsapp" | "google" | "webhook";
 }) {
   const { user } = useAuth();
+  const [pairLink, setPairLink] = useState("");
+  const [waTab, setWaTab] = useState<"qr" | "official">("qr");
   const [instance, setInstance] = useState(""),
     [token, setToken] = useState(""),
     [stage, setStage] = useState(stages[0]?.id || ""),
@@ -42,6 +46,9 @@ export default function WorkspaceIntegrations({
         };
         whatsapp: {
           instance_id: string;
+          transport?: "wapi" | "cloud";
+          cloud_phone_id?: string;
+          coexistence?: boolean;
           enabled: boolean;
           stage_id: string;
           pipeline_id: string;
@@ -51,6 +58,9 @@ export default function WorkspaceIntegrations({
     enabled: manage,
     refetchOnMount: "always",
   });
+  useEffect(() => {
+    if (q.data?.whatsapp?.transport === "cloud") setWaTab("official");
+  }, [q.data?.whatsapp?.transport]);
   const status = useQuery({
     queryKey: ["workspace-whatsapp-status", user?.id, workspace],
     enabled: manage && kind === "whatsapp" && !!q.data?.whatsapp?.enabled,
@@ -93,6 +103,9 @@ export default function WorkspaceIntegrations({
         window.location.assign(r.url);
         return;
       }
+      if (action === "generate_whatsapp_pair_link" && r.url) setPairLink(r.url);
+      if (["save_whatsapp", "disconnect_whatsapp"].includes(action))
+        setPairLink("");
       setQr(r.qrcode || null);
       setToken("");
       setMessage(
@@ -131,6 +144,37 @@ export default function WorkspaceIntegrations({
         reconfigurada.
       </p>
       {q.error && <p role="alert">{q.error.message}</p>}
+      {kind === "whatsapp" && (
+        <>
+          <p className="text-sm text-muted-foreground">
+            Seus números e o que cada um pode fazer.
+          </p>
+          <div
+            role="tablist"
+            aria-label="Modalidade de conexão WhatsApp"
+            className="inline-flex rounded-lg bg-muted p-1 gap-1"
+          >
+            <Button
+              role="tab"
+              aria-selected={waTab === "qr"}
+              variant={waTab === "qr" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setWaTab("qr")}
+            >
+              WhatsApp por QR Code
+            </Button>
+            <Button
+              role="tab"
+              aria-selected={waTab === "official"}
+              variant={waTab === "official" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setWaTab("official")}
+            >
+              API Oficial (Meta)
+            </Button>
+          </div>
+        </>
+      )}
       {kind !== "google" && (
         <label className="block text-sm">
           Etapa de entrada dos novos contatos
@@ -150,15 +194,62 @@ export default function WorkspaceIntegrations({
           </span>
         </label>
       )}
-      {kind === "whatsapp" && (
+      {kind === "whatsapp" && waTab === "official" && (
+        <>
+          <WorkspaceOfficialWhatsApp
+            workspace={workspace}
+            connectionVerified={
+              q.data?.whatsapp?.transport === "cloud" && status.data?.connected
+            }
+            statusError={status.error?.message}
+            stage={stage}
+            pipeline={stages.find((s) => s.id === stage)?.pipeline_id || ""}
+            blocked={
+              !!q.data?.whatsapp?.enabled &&
+              q.data.whatsapp.transport !== "cloud"
+            }
+            onConnected={async () => {
+              await q.refetch();
+              await status.refetch();
+            }}
+          />
+          {q.data?.whatsapp?.transport === "cloud" &&
+            q.data.whatsapp.enabled && (
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      "Desativar a conexão oficial nesta subconta? O histórico será preservado.",
+                    )
+                  )
+                    void act("disconnect_whatsapp");
+                }}
+              >
+                Desconectar API oficial da subconta
+              </Button>
+            )}
+        </>
+      )}
+      {kind === "whatsapp" && waTab === "qr" && (
         <section className="border rounded-xl p-4 bg-card space-y-3">
-          <h3 className="font-semibold">WhatsApp por QR Code</h3>
+          <h3 className="font-semibold">Conexões · WhatsApp por QR Code</h3>
+          {q.data?.whatsapp?.transport === "cloud" &&
+            q.data.whatsapp.enabled && (
+              <p className="text-sm">
+                A API oficial está ativa. Desconecte-a na outra aba antes de
+                configurar o QR Code.
+              </p>
+            )}
           <p className="text-sm">
-            {status.data?.connected
+            {status.data?.connected && q.data?.whatsapp?.transport !== "cloud"
               ? "● Conectado · " + status.data.phone
-              : q.data?.whatsapp
-                ? "Aguardando conexão do número"
-                : "1. Configure a instância exclusiva · 2. Leia o QR Code · 3. Comece a atender"}
+              : q.data?.whatsapp?.transport === "cloud"
+                ? "Nenhuma conexão por QR Code ativa"
+                : q.data?.whatsapp
+                  ? "Aguardando conexão do número"
+                  : "1. Configure a instância exclusiva · 2. Leia o QR Code · 3. Comece a atender"}
           </p>
           {status.error && (
             <p role="alert" className="text-destructive text-sm">
@@ -166,7 +257,7 @@ export default function WorkspaceIntegrations({
             </p>
           )}
           <p className="text-sm">
-            {q.data?.whatsapp
+            {q.data?.whatsapp && q.data.whatsapp.transport !== "cloud"
               ? `Instância: ${q.data.whatsapp.instance_id} · ${q.data.whatsapp.enabled ? "Recebimento ativado" : "Não conectada"}`
               : "Nenhuma instância configurada."}
           </p>
@@ -201,10 +292,19 @@ export default function WorkspaceIntegrations({
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
               />
-              <Button disabled={busy || !stage}>Salvar instância</Button>
+              <Button
+                disabled={
+                  busy ||
+                  !stage ||
+                  (!!q.data?.whatsapp?.enabled &&
+                    q.data.whatsapp.transport === "cloud")
+                }
+              >
+                Salvar instância
+              </Button>
             </form>
           </details>
-          {q.data?.whatsapp && (
+          {q.data?.whatsapp && q.data.whatsapp.transport !== "cloud" && (
             <div className="flex gap-2 flex-wrap">
               <Button
                 disabled={busy}
@@ -228,6 +328,29 @@ export default function WorkspaceIntegrations({
               >
                 Desconectar da subconta
               </Button>
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() => void act("generate_whatsapp_pair_link")}
+              >
+                Gerar link de conexão
+              </Button>
+            </div>
+          )}
+          {pairLink && (
+            <div className="rounded-lg border p-3 space-y-2">
+              <label className="block text-sm">
+                Link de conexão · válido por 15 minutos
+                <Input
+                  aria-label="Link de conexão WhatsApp"
+                  readOnly
+                  value={pairLink}
+                />
+              </label>
+              <p className="text-xs text-muted-foreground">
+                Envie para quem vai escanear. O link permite somente conectar o
+                número e é invalidado ao gerar outro.
+              </p>
             </div>
           )}
           <Dialog
@@ -244,6 +367,11 @@ export default function WorkspaceIntegrations({
                   aparelho. Escaneie este código.
                 </DialogDescription>
               </DialogHeader>
+              {error && (
+                <p role="alert" className="text-sm text-destructive">
+                  {error}
+                </p>
+              )}
               {qr && (
                 <img
                   src={qr}
@@ -270,6 +398,7 @@ export default function WorkspaceIntegrations({
           </p>
         </section>
       )}
+      {kind === "whatsapp" && <WorkspaceWhatsAppOptOut workspace={workspace} />}
       {kind === "google" && (
         <section className="border rounded-xl p-4 bg-card space-y-3">
           <h3 className="font-semibold">Google Agenda</h3>
@@ -361,7 +490,7 @@ export default function WorkspaceIntegrations({
           {message}
         </p>
       )}
-      {error && (
+      {error && !qr && (
         <p role="alert" className="text-sm text-destructive">
           {error}
         </p>
