@@ -1,6 +1,21 @@
 {
   "rewrites": [
     {
+      "source": "/rastreio.js",
+      "has": [
+        {
+          "type": "query",
+          "key": "link",
+          "value": "(?<trackingKey>[a-z0-9][a-z0-9-]{2,63})"
+        }
+      ],
+      "destination": "https://dycyskikaljvokaxsxnh.supabase.co/functions/v1/workspace-operations?tracking_script=:trackingKey"
+    },
+    {
+      "source": "/functions/v1/link-rastreavel/:trackingKey",
+      "destination": "https://dycyskikaljvokaxsxnh.supabase.co/functions/v1/workspace-operations?link=:trackingKey"
+    },
+    {
       "source": "/prospeccao",
       "destination": "https://vertice-gmn.vercel.app/"
     },
