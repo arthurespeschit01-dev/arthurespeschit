@@ -817,7 +817,7 @@ try {
     .click();
   assert.equal(
     await page
-      .getByRole("heading", { name: "Google Agenda", exact: true })
+      .getByRole("heading", { name: "Google Agenda", exact: true, level: 2 })
       .count(),
     0,
   );
@@ -827,6 +827,95 @@ try {
       .count(),
     0,
   );
+  // Calendar navigation and local appointment details use the same workspace rows.
+  await navigateModule(page, "Agendamentos");
+  await page.getByRole("button", { name: "Criar agenda", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Salvar agenda", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Novo agendamento", exact: true })
+    .click();
+  await page
+    .getByLabel("Nome do contato", { exact: true })
+    .fill("Compromisso calendário");
+  const today = new Date();
+  const localDay = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  await page
+    .getByLabel("Data e hora", { exact: true })
+    .fill(localDay + "T14:30");
+  await page.getByRole("button", { name: "Agendar", exact: true }).click();
+  const calendarView = page.getByRole("region", {
+    name: "Calendário de agendamentos",
+    exact: true,
+  });
+  await calendarView
+    .getByRole("button", { name: /14:30 Compromisso calendário/ })
+    .click();
+  await page
+    .getByLabel("Status do agendamento de Compromisso calendário")
+    .waitFor();
+  await calendarView
+    .getByRole("button", { name: "Semana", exact: true })
+    .click();
+  await calendarView
+    .getByRole("button", { name: /14:30 Compromisso calendário/ })
+    .waitFor();
+  await calendarView
+    .getByRole("button", { name: "Próximo período", exact: true })
+    .click();
+  assert.equal(
+    await calendarView
+      .getByRole("button", { name: /14:30 Compromisso calendário/ })
+      .count(),
+    0,
+  );
+  await calendarView.getByRole("button", { name: "Hoje", exact: true }).click();
+  await calendarView
+    .getByRole("button", { name: /14:30 Compromisso calendário/ })
+    .waitFor();
+  await page.getByRole("button", { name: "Lista", exact: true }).click();
+  await page
+    .getByLabel("Status do agendamento de Compromisso calendário")
+    .selectOption("cancelled");
+  await page.getByRole("button", { name: "Calendário", exact: true }).click();
+  await calendarView
+    .getByRole("button", { name: /14:30 Compromisso calendário/ })
+    .waitFor();
+  // Remove this scenario's fixtures before the independent workspace-deletion scenario.
+  await run(null, () =>
+    db.query(
+      "delete from agency_workspace_appointments where workspace_id=$1 and name=$2",
+      [alpha, "Compromisso calendário"],
+    ),
+  );
+  await run(null, () =>
+    db.query(
+      "delete from agency_workspace_calendars where workspace_id=$1 and title=$2",
+      [alpha, "Reunião"],
+    ),
+  );
+  await navigateModule(page, "Geral");
+  await page.getByRole("link", { name: /Google Agenda/ }).click();
+  await page
+    .getByRole("heading", { name: "Google Agenda", exact: true, level: 2 })
+    .waitFor();
+  assert.equal(
+    await page
+      .getByText("URI de retorno para configurar no Google Cloud", {
+        exact: true,
+      })
+      .count(),
+    0,
+  );
+  assert.equal(
+    await page
+      .getByText("https://fixture.invalid/google", { exact: true })
+      .count(),
+    0,
+  );
+  await navigateModule(page, "Geral");
+  await page.getByRole("link", { name: /Conexão exclusiva/ }).click();
   // Reproduce the SDK buffering stub and verify login opens synchronously on click.
   let completedMeta = 0,
     metaConnected = false;
@@ -947,7 +1036,7 @@ try {
   await navigateModule(page, "Geral");
   await page.getByRole("link", { name: "Google Agenda", exact: false }).click();
   await page
-    .getByRole("heading", { name: "Google Agenda", exact: true })
+    .getByRole("heading", { name: "Google Agenda", exact: true, level: 2 })
     .first()
     .waitFor();
   assert.equal(

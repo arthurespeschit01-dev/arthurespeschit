@@ -18,6 +18,7 @@ import {
   selectClass,
 } from "@/lib/workspaceCommercial";
 import { RecordMenu, ShareLink, Empty } from "./CommercialShared";
+import WorkspaceCalendarView from "./WorkspaceCalendarView";
 const statuses: Record<string, string> = {
   confirmed: "Confirmado",
   completed: "Realizado",
@@ -47,6 +48,8 @@ export default function WorkspaceScheduling({
     [phone, setPhone] = useState(""),
     [when, setWhen] = useState(""),
     [calendar, setCalendar] = useState("");
+  const [view, setView] = useState<"calendar" | "list">("calendar");
+  const [selected, setSelected] = useState<string | null>(null);
   const c = calendars.find((c) => c.id === calendar) || calendars[0];
   return (
     <div className="space-y-5">
@@ -130,13 +133,46 @@ export default function WorkspaceScheduling({
           </article>
         ))}
       </div>
+      <div className="flex gap-2" aria-label="Visualização de agendamentos">
+        <Button
+          variant={view === "calendar" ? "default" : "outline"}
+          aria-pressed={view === "calendar"}
+          onClick={() => setView("calendar")}
+        >
+          Calendário
+        </Button>
+        <Button
+          variant={view === "list" ? "default" : "outline"}
+          aria-pressed={view === "list"}
+          onClick={() => setView("list")}
+        >
+          Lista
+        </Button>
+      </div>
+      {view === "calendar" && (
+        <WorkspaceCalendarView
+          appointments={appointments}
+          onSelect={(id) => {
+            setSelected(id);
+            setTimeout(
+              () =>
+                document
+                  .getElementById(`appointment-${id}`)
+                  ?.scrollIntoView({ behavior: "smooth", block: "center" }),
+              0,
+            );
+          }}
+        />
+      )}
       <section className="space-y-2">
         <h3 className="font-semibold">Compromissos</h3>
-        {appointments
+        {[...appointments]
+          .filter((a) => view === "list" || a.id === selected)
           .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
           .map((a) => (
             <article
               key={a.id}
+              id={`appointment-${a.id}`}
               className="border rounded-xl p-4 bg-card flex flex-wrap gap-3 justify-between items-center"
             >
               <div>
