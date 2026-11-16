@@ -1,3 +1,4 @@
+import AccountNameSettings from "@/components/AccountNameSettings";
 import AgencyWorkspaceSettings from "@/components/AgencyWorkspaceSettings";
 import {useLocation} from "react-router-dom";
 import {Link} from 'react-router-dom';
@@ -113,6 +114,7 @@ function AgencyLegacySettings() {
         <h1 className="text-2xl font-bold text-foreground">Configurações</h1>
       </div>
 
+      <AccountNameSettings />
       <section className="rounded-xl border bg-card p-4 sm:p-6 space-y-4" aria-labelledby="settings-resources"><h2 id="settings-resources" className="text-lg font-semibold">Processos e materiais</h2><p className="text-sm text-muted-foreground">Organize os processos e consulte os materiais de apoio da agência.</p><div className="grid sm:grid-cols-2 gap-3">{settingsResources.map(item=><Link key={item.to} to={item.to} className="rounded-lg border p-4 hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><h3 className="font-medium">{item.label}</h3><p className="text-xs text-muted-foreground mt-1">{item.description}</p></Link>)}</div></section>
       <section className="rounded-xl border bg-card p-5 space-y-3"><h2 className="text-lg font-semibold">Conta principal</h2><p className="text-sm text-muted-foreground">Configure a equipe e as integrações da própria Central.</p><div className="grid sm:grid-cols-2 gap-3">{[["whatsapp","WhatsApp · QR Code e API oficial"],["equipe","Funções, permissões e membros"],["google-agenda","Google Agenda"],["rastreamento","Rastreamento de anúncios"],["webhooks","Webhooks"],["canais","E-mail e SMS"],["creditos","Créditos e consumo"]].map(([key,label])=><Link key={key} to={`/configuracoes/${key}`} className="rounded-lg border p-4 hover:bg-secondary">{label}</Link>)}</div></section>
 

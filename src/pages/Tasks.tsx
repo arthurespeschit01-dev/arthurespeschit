@@ -1,3 +1,4 @@
+import {useResponsibleName} from "@/hooks/useResponsibleName";
 import {readAllRows} from '@/lib/readAllRows';
 import {isClosedTask,closedInPeriod,taskDay} from '@/lib/taskViews';
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -123,7 +124,7 @@ export default function Tasks() {
   const [newComment, setNewComment] = useState('');
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
-  const selfName=String(user?.user_metadata?.full_name||user?.user_metadata?.name||user?.email||'Minha conta').slice(0,120);
+  const selfName=useResponsibleName();
   const [form, setForm] = useState({
     title: '', description: '', status: 'pendente', priority: 'média', assignee_name:'',assignee_user_id:null as string|null,area:'',
     start_date: '', end_date: '', client_id: '',
@@ -274,7 +275,7 @@ export default function Tasks() {
     const now = new Date();
     const todayStr = String(summary.today)||taskDay(now.toISOString());
 
-    return tasks.filter(t => {
+    return tasks.map(t => ({...t,assignee_name:t.assignee_user_id===userId||t.assignee_name===user?.email?selfName:(t.assignee_name||'').includes('@')?'Responsável anterior':t.assignee_name})).filter(t => {
       const matchSearch = t.title.toLowerCase().includes(search.toLowerCase()) ||
         (t.description || '').toLowerCase().includes(search.toLowerCase()) || t.assignee_name.toLowerCase().includes(search.toLowerCase()) || clients.find(c=>c.id===t.client_id)?.name.toLowerCase().includes(search.toLowerCase());
       const matchStatus = filterStatus === 'todos' || t.status === filterStatus;
@@ -316,7 +317,7 @@ export default function Tasks() {
       if(view==='historico')return (b.closed_at||'').localeCompare(a.closed_at||'');
       return (a.end_date||'9999').localeCompare(b.end_date||'9999')||a.title.localeCompare(b.title,'pt-BR');
     });
-  }, [tasks, search, filterStatus, filterPeriod, dateFrom, dateTo,view,historyPeriod,historyFrom,historyTo,filterClient,filterPriority,filterAssignee,filterArea,sort,clients,summary.today,userId]);
+  }, [tasks, search, filterStatus, filterPeriod, dateFrom, dateTo,view,historyPeriod,historyFrom,historyTo,filterClient,filterPriority,filterAssignee,filterArea,sort,clients,summary.today,userId,selfName,user?.email]);
 
   const getClientName = (clientId: string | null) => {
     if (!clientId) return null;
@@ -521,7 +522,7 @@ export default function Tasks() {
                     <Badge variant="outline" className={`text-[10px] ${pc.color}`}>{pc.label}</Badge>
                   </div>
                   {detailTask.area&&<Badge variant="outline">{detailTask.area}</Badge>}
-                  {detailTask.assignee_name&&<p className="text-xs text-muted-foreground">Responsável: {detailTask.assignee_name}</p>}
+                  {detailTask.assignee_name&&<p className="text-xs text-muted-foreground">Responsável: {detailTask.assignee_user_id===userId?selfName:(detailTask.assignee_name||'').includes('@')?'Responsável anterior':detailTask.assignee_name}</p>}
                   {clientName && <p className="text-sm text-primary mt-1">{clientName}</p>}
                   {(detailTask.start_date || detailTask.end_date) && (
                     <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
