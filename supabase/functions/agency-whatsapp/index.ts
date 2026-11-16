@@ -105,6 +105,9 @@ Deno.serve(async (request) => {
     } = await auth.auth.getUser();
     if (authError || !user)
       return respond({ error: "Entre na sua conta novamente." }, 401);
+    const centralAccess = await auth.rpc("agency_central_access");
+    if (centralAccess.error || centralAccess.data !== true)
+      return respond({ error: "Acesso exclusivo à subconta autorizada." }, 403);
     const { data: connection, error: connectionError } = await db
       .from("agency_whatsapp_connections")
       .select("*")

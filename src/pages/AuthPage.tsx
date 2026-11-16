@@ -5,7 +5,7 @@ import { Mail, Lock, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import logoCentralGestor from '@/assets/logo-central-gestor.png';
 
-export default function AuthPage({initialEmail = ""}: {initialEmail?: string} = {}) {
+export default function AuthPage({initialEmail = "", workspaceName}: {initialEmail?: string; workspaceName?:string} = {}) {
   const { signIn,signUp } = useAuth();
   const [mode,setMode]=useState<'login'|'signup'>('login');
   const [confirmPassword,setConfirmPassword]=useState('');
@@ -38,7 +38,7 @@ export default function AuthPage({initialEmail = ""}: {initialEmail?: string} = 
       if(mode==='signup'){
         const result=await signUp(email,password);
         if(result.requiresConfirmation){setConfirmationSent(true);setPassword('');setConfirmPassword('')}
-        else toast.success('Conta criada. Sua Central está pronta para começar!');
+        else toast.success(workspaceName?'Conta criada. Aceite o convite para acessar a subconta.':'Conta criada. Sua Central está pronta para começar!');
       }else {await signIn(email, password);toast.success('Login realizado com sucesso!')}
     } catch (err: unknown) {
       const message=err instanceof Error?err.message:'Não foi possível acessar sua conta. Tente novamente.';
@@ -88,7 +88,7 @@ export default function AuthPage({initialEmail = ""}: {initialEmail?: string} = 
                 {confirmationSent?'Confira seu e-mail':mode==='signup'?'Crie sua conta':'Bem-vindo de volta'}
               </h2>
               <p className="text-sm text-muted-foreground mt-1">
-                {confirmationSent?'Se o cadastro puder ser concluído, você receberá um link de confirmação.':mode==='signup'?'Sua agência começa do zero, com seus próprios clientes e tarefas.':'Entre para continuar na Central do Gestor'}
+                {confirmationSent?'Se o cadastro puder ser concluído, você receberá um link de confirmação.':workspaceName?`Entre para acessar ${workspaceName}. Seu acesso fica limitado à subconta autorizada.`:mode==='signup'?'Sua agência começa do zero, com seus próprios clientes e tarefas.':'Entre para continuar na Central do Gestor'}
               </p>
             </div>
 

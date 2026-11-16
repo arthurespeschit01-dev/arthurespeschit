@@ -1,6 +1,12 @@
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
-export async function verifyAgencyBrowser(db, owner, workspace) {
+export async function verifyAgencyBrowser(
+  db,
+  owner,
+  workspace,
+  scoped = false,
+  forbidden = "",
+) {
   const browser = await chromium.launch({
     headless: true,
     executablePath: "/usr/bin/chromium",
@@ -78,6 +84,18 @@ export async function verifyAgencyBrowser(db, owner, workspace) {
                   },
                 },
           );
+        if (name === "agency_login_access") {
+          if (!scoped)
+            return reply({
+              central_allowed: true,
+              workspaces: [],
+              invitation_path: null,
+            });
+          const r = await run(() =>
+            db.query("select agency_login_access() result"),
+          );
+          return reply(r.rows[0].result);
+        }
         if (name === "profiles")
           return reply([{ user_id: owner, onboarding_completed: true }]);
         if (url.pathname.includes("/rpc/")) {
@@ -138,6 +156,28 @@ export async function verifyAgencyBrowser(db, owner, workspace) {
     const page = await context.newPage();
     page.on("pageerror", (e) => errors.push(e.message));
     const base = process.env.TEST_APP_URL || "http://localhost:8081";
+    if (scoped) {
+      for (const path of [
+        "/",
+        "/configuracoes",
+        "/subcontas",
+        `/subcontas/${forbidden}`,
+        "/financeiro",
+      ]) {
+        await page.goto(base + path);
+        await page.waitForURL(`**/subcontas/${workspace}`);
+        await page.getByRole("button", { name: "Sair", exact: true }).waitFor();
+        assert.equal(
+          await page.getByText("Voltar à Central", { exact: true }).count(),
+          0,
+        );
+      }
+      assert.deepEqual(errors, []);
+      console.log(
+        "PASS invited browser: root/settings/finance/other workspace URLs redirect only to assigned subaccount, no Central navigation",
+      );
+      return;
+    }
     await page.goto(base + "/comercial/agendamentos");
     await page
       .getByLabel("Título do agendamento")

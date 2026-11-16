@@ -10,3 +10,5 @@
 - Keep complete WhatsApp history and provider/account isolation intact when modifying integrations.
 
 - Main-account collaboration uses the explicit private agency_account_workspaces binding and /conta/* routes. Its owner-only context and permission-checked adapters may synchronize that owner’s commercial CRM, calendar and legacy form summaries. This exception never applies to client subaccounts, financial data, global WhatsApp credentials or history. Keep the binding server-controlled.
+
+- Invited identities use workspace-only access stored server-side in agency_private.workspace_only_users. Do not auto-provision an agency for invited signup, infer access from user_metadata, render AppLayout before agency_login_access allows it, or grant invitations organization membership. Keep legacy restrictive RLS and module/workspace checks. Revocation must not unlock Central. Normal independent agency owners retain their existing access.

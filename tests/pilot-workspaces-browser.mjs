@@ -251,6 +251,7 @@ async function contextFor(id) {
         if (body?.action === "send") sends++;
         return reply({ configured: false, connected: false });
       }
+      if (table === "agency_login_access") { const r=await run(id,()=>db.query("select id,name,account_kind from agency_client_workspaces where status='active'"));return reply({central_allowed:id===pilot||id===other,workspaces:r.rows,invitation_path:null}); }
       if (table === "profiles")
         return reply([{ user_id: id, onboarding_completed: true }]);
       if (

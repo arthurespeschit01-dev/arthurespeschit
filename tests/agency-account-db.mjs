@@ -367,12 +367,13 @@ try {
     ).rows[0].rows.length,
     1,
   );
-  if (process.env.ACCOUNT_BROWSER) {
+  if (process.env.ACCOUNT_BROWSER && !process.env.INVITED_ACCESS) {
     const { verifyAgencyBrowser } = await import(
       "./agency-account-browser.mjs"
     );
     await verifyAgencyBrowser(db, owner, w);
   }
+  if(process.env.INVITED_ACCESS) { const {verifyInvitedAccess}=await import("./invited-access-checks.mjs");await verifyInvitedAccess(db,owner); }
   console.log(
     "PASS primary account: isolated owner context, existing CRM preserved and synchronized both ways, custom invitation role, read-only enforcement, foreign denial and scoped calendar CRUD",
   );
