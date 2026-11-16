@@ -27,6 +27,7 @@ const secret = "a".repeat(64);
 
 const accountFixtures=(next:typeof fetch):typeof fetch => ((input:RequestInfo|URL,init?:RequestInit)=>{
  const url=new URL(String(input));
+ if(url.pathname.endsWith('/rpc/agency_central_access'))return Promise.resolve(json(true));
  if(url.pathname.endsWith('/agency_whatsapp_messages') && init?.method==='HEAD')return Promise.resolve(new Response(null,{headers:{'content-range':'*/0'}}));
  if(url.pathname.endsWith('/agency_whatsapp_account_state'))return Promise.resolve(json(init?.method&&init.method!=='GET'?null:[{user_id:'owner-a',account_id:'account-a',connected:true,checked_at:new Date().toISOString()}]));
  if(url.pathname.endsWith('/agency_whatsapp_accounts'))return Promise.resolve(json({id:'account-a',phone:'5511999990000'}));
@@ -328,6 +329,7 @@ Deno.test('provider-ID recovery replaces a LID only inside its verified sender a
 Deno.test('Central sends owned audio using provider media endpoint and saves a playable private file',async()=>{
  const original=globalThis.fetch;let sent=0,saved=false,kind='';
  globalThis.fetch=accountFixtures((async(input:RequestInfo|URL,init?:RequestInit)=>{const url=new URL(String(input));const method=init?.method||'GET';const body=init?.body&&typeof init.body==='string'?JSON.parse(init.body):{};
+ if(url.pathname.endsWith('/rpc/agency_central_access'))return json(true);
  if(url.pathname.includes('/auth/'))return json({id:'owner-a'});
  if(url.pathname.endsWith('/agency_whatsapp_connections'))return json([{user_id:'owner-a',instance_id:'dedicated',token:'fixture',webhook_secret:secret}]);
  if(url.pathname.includes('/storage/v1/object/list/'))return json([{name:'audio.webm',metadata:{size:120,mimetype:'audio/webm'}}]);
@@ -341,3 +343,5 @@ Deno.test('Central sends owned audio using provider media endpoint and saves a p
  }) as typeof fetch);
  try{const result=await handler(request({action:'send',phone:'5511999990000',account_id:'account-a',text:'',media_path:'owner-a/account-a/outgoing/uuid/audio.webm',request_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'}));check(result.status===200,'audio accepted: '+await result.text());check(sent===1&&saved&&kind==='audio','one media send and private playable history saved');}finally{globalThis.fetch=original}
 });
+
+Deno.test("workspace-only identity cannot configure or read Central WhatsApp",async()=>{const original=globalThis.fetch;globalThis.fetch=((input:RequestInfo|URL)=>{const path=new URL(String(input)).pathname;if(path.includes('/auth/'))return Promise.resolve(json({id:'invited'}));if(path.endsWith('/rpc/agency_central_access'))return Promise.resolve(json(false));throw new Error('Central data must not be accessed');}) as typeof fetch;try{const result=await handler(request({action:'configure',instance_id:'forbidden',token:'forbidden'}));check(result.status===403,'workspace-only identity denied');}finally{globalThis.fetch=original;}});

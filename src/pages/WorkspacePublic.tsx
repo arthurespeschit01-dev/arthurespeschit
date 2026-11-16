@@ -272,7 +272,7 @@ export function WorkspaceInvitation() {
                   <strong>{q.data?.email}</strong>. Depois, aceite o convite
                   nesta mesma página.
                 </p>
-                <AuthPage initialEmail={q.data?.email} />
+                <AuthPage initialEmail={q.data?.email} workspaceName={q.data?.name} />
               </>
             ) : (
               <>

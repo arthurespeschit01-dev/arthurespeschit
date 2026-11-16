@@ -101,3 +101,5 @@ Deno.test("calendar API requires an authenticated user", async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+Deno.test("workspace-only identity cannot connect Central calendar",async()=>{const original=globalThis.fetch;globalThis.fetch=((input:RequestInfo|URL)=>{const path=new URL(String(input)).pathname;let value:unknown;if(path.includes('/auth/'))value={id:'invited'};else if(path.endsWith('/rpc/agency_central_access'))value=false;else throw new Error('Central data must not be accessed');return Promise.resolve(new Response(JSON.stringify(value),{headers:{'Content-Type':'application/json'}}));}) as typeof fetch;try{const result=await handler(new Request('https://edge.invalid',{method:'POST',headers:{authorization:'Bearer fixture'},body:JSON.stringify({action:'connect'})}));check(result.status===403,'workspace-only identity denied');}finally{globalThis.fetch=original;}});

@@ -1,3 +1,4 @@
+import { useLoginAccess } from "@/hooks/useLoginAccess";
 import WorkspaceCrmTools from "@/components/pilot/WorkspaceCrmTools";
 import WorkspaceNavigation from "@/components/pilot/WorkspaceNavigation";
 import WorkspaceCommercial from "@/components/pilot/WorkspaceCommercial";
@@ -89,6 +90,8 @@ function WorkspaceGate({ children }: { children: React.ReactNode }) {
 }
 export default function PilotWorkspaces() {
   const location = useLocation();
+  const access = useLoginAccess();
+  const {signOut} = useAuth();
   return (
     <WorkspaceGate>
       <div className="min-h-dvh bg-background text-foreground">
@@ -110,12 +113,12 @@ export default function PilotWorkspaces() {
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <Button variant="outline" asChild>
+            {access.data?.central_allowed ? <Button variant="outline" asChild>
               <Link to="/">
                 <ArrowLeft size={16} />
                 <span className="hidden sm:inline">Voltar à Central</span>
               </Link>
-            </Button>
+            </Button> : <Button variant="outline" onClick={()=>void signOut()}>Sair</Button>}
           </div>
         </header>
         <Routes>

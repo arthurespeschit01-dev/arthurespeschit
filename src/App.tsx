@@ -1,3 +1,4 @@
+import AccountAccessBoundary from "./components/AccountAccessBoundary";
 import PilotVisualTheme from "./components/PilotVisualTheme";
 import { Suspense, useEffect } from "react";
 import { lazyWithRetry as lazy } from "@/lib/lazyWithRetry";
@@ -104,10 +105,11 @@ function LegacyWorkspaceRedirect() {
 
 function ProtectedRoutes() {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-background"><div className="text-muted-foreground">Carregando...</div></div>;
-  if (!user) return <AuthPage />;
+  if (!user) return <AuthPage workspaceName={/^\/(subcontas|conta)\//.test(location.pathname) ? "sua subconta" : undefined} />;
   return (
-    <Routes>
+    <AccountAccessBoundary><Routes>
       <Route
         path="/subcontas/*"
         element={<RouteBoundary><Suspense fallback={<PageFallback />}><PilotWorkspaces /></Suspense></RouteBoundary>}
@@ -146,7 +148,7 @@ function ProtectedRoutes() {
           </RouteBoundary>
         </AppLayout>
       } />
-    </Routes>
+    </Routes></AccountAccessBoundary>
   );
 }
 

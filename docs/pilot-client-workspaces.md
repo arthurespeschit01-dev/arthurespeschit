@@ -73,3 +73,12 @@ Invitations are public capability links with login/signup on the same page. Acce
 Invitation email is sent server-side through Resend using `RESEND_API_KEY` and the verified sender `notificacoes@centraldogestor.site`. Claims serialize sends, enforce resend/rate limits and prevent arbitrary recipient changes. Provider acceptance is recorded separately from an error; the UI never treats invitation creation as email delivery. The invite link remains usable after a provider error. No live emails or Google events are sent by automated tests.
 
 Validation: `ACCOUNT_BROWSER=1 node tests/agency-account-db.mjs`, `node tests/pilot-workspaces-browser.mjs`, and the invite/Google Deno contract tests.
+
+
+## Invitation-only login isolation
+
+`agency_login_access()` is the authenticated routing authority. Workspace-only identities never mount the Central layout; root, settings, finance and unauthorized workspace URLs redirect to their permitted workspace or own pending invitation. With no remaining access they see a sign-out screen. Workspace chrome offers sign-out, not a link to Central. Public invite authentication names the company and preserves the invitation through signup confirmation.
+
+The private `workspace_only_users` registry is server-controlled and durable after revocation. New signup with a live email-matched invitation skips agency bootstrap; existing empty invited identities are backfilled without deleting data. Existing independent business owners are preserved. Accepting a first invitation on an empty identity establishes the same restriction. User metadata cannot override it. Legacy tables have mandatory restrictive RLS in addition to their original policies; organization/Storage membership helpers honor the restriction. New legacy tables must preserve this condition. Client workspace membership and custom module permissions are unchanged. Central WhatsApp/Calendar authenticated endpoints deny workspace-only identities before reading provider settings.
+
+Run `npm run test:invited-access` for real PostgreSQL plus browser checks of signup, direct URL isolation, API denials, metadata spoofing, revocation and owner regressions.
