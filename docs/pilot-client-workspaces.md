@@ -2,9 +2,9 @@
 
 ## Availability
 
-`/laboratorio/subcontas` is a restricted product pilot. The menu is visible only when `agency_pilot_status()` returns true. Direct URLs are guarded too. Enrollment lives in `agency_private.pilot_accounts`, which has no browser grants. End users cannot enable global enrollment via profile metadata, arbitrary membership writes or request parameters; explicit workspace invitations grant only that workspace. Enrollment is per user, not per agency. Do not publish the actual enrolled identity here.
+The owner authorized general release of all existing subaccount modules. `/subcontas` is the standard authenticated area for client subaccounts. The old `/laboratorio/subcontas/*` routes redirect while preserving path/query/hash. The menu and shared product design are available to all signed-in accounts. Authentication is checked through `agency_workspace_status()`; no allowlist enrollment is required.
 
-The database checks the allowlist on every workspace operation. Disabling an enrollment immediately denies data access even if a browser still has a cached menu. The public status RPC returns only the requesting user's boolean. Privileged policy helpers live in the unexposed `agency_private` schema, have fixed search paths, check `auth.uid()` and accept no arbitrary acting-user parameter.
+Every workspace operation still enforces owner/member access and module roles in PostgreSQL. Only organization owners may create subaccounts under their own organization. Invitations grant only the selected workspace. Archive restrictions, signed public links, secret redaction, provider capabilities and account isolation are preserved. The historical `pilot_accounts` table remains private and unchanged for compatibility; it no longer controls runtime availability. Legacy RPC names remain compatible for older clients.
 
 ## Current delivery
 
@@ -21,7 +21,7 @@ The database checks the allowlist on every workspace operation. Disabling an enr
 
 | Purpose | Source |
 | --- | --- |
-| Pilot eligibility | `src/hooks/usePilotAccess.ts`, `agency_private.pilot_accounts`, `agency_pilot_status()` |
+| Product access | `src/hooks/useWorkspaceAccess.ts`, `agency_workspace_status()`, scoped workspace RLS |
 | Workspace shell, selector, dashboard and CRM | `src/pages/PilotWorkspaces.tsx` |
 | Create/edit dialogs | `src/components/pilot/WorkspaceDialogs.tsx` |
 | Scoped queries, models and readable errors | `src/lib/clientWorkspaces.ts` |
@@ -31,7 +31,7 @@ The database checks the allowlist on every workspace operation. Disabling an enr
 
 The organization is derived from the authenticated owner when creating a subaccount. Workspace owner and organization cannot be reassigned by editing a row. Leads, stages and pipelines cannot be transferred between workspaces by changing `workspace_id`. Composite foreign keys reject leads linked to another workspace's stage or pipeline.
 
-Roles `owner`, `admin`, `agent` and `viewer` are modeled in `agency_workspace_members`. A viewer is read-only. The product owner explicitly authorized workspace-scoped invitations: a confirmed invited email may accept access to that workspace without being enrolled in the private pilot allowlist. Disabling the owning pilot still removes access for its workspace members. Removing a membership immediately removes that scope. Invitations cannot grant access to another workspace or the agency.
+Roles `owner`, `admin`, `agent` and `viewer` are modeled in `agency_workspace_members`. A viewer is read-only. A confirmed invited email may accept access only to that workspace. Removing membership immediately removes that scope; it does not remove the user’s independent ability to use their own subaccounts. Invitations cannot grant access to another workspace or the agency.
 
 ## Connected commercial modules
 
@@ -43,9 +43,9 @@ Timers and internal actions run each minute through `pilot-workspace-automations
 
 ## Operations
 
-Use Supabase Auth's supported signup/admin interfaces to provision accounts. Do not insert or hash credentials manually in Auth tables. Passwords belong to Auth and a password manager, never this repository. Enrollment is an administrative operation on the private allowlist after confirming the intended user. Do not auto-enroll signups or match user-editable metadata.
+Use Supabase Auth's supported signup/admin interfaces to provision accounts. Do not insert or hash credentials manually in Auth tables. Passwords belong to Auth and a password manager, never this repository. No pilot enrollment is required for product access. Never use user-editable metadata to grant workspace permissions.
 
-Tests use synthetic users and local PGlite databases. They do not send emails, write to production or message WhatsApp contacts. A denied/non-pilot identity, foreign workspace IDs, read-only roles, archive restrictions and unchanged legacy records are part of the database suite.
+Tests use synthetic users and local PGlite databases. They do not send emails, write to production or message WhatsApp contacts. A foreign-account identity, foreign workspace IDs, read-only roles, archive restrictions and unchanged legacy records are part of the database suite.
 
 ## Professional editor and tracking update
 
@@ -54,3 +54,9 @@ See [professional workspace workflows](workspace-professional-workflows.md) for 
 ## WhatsApp connection transports
 
 See [pilot WhatsApp connections](pilot-whatsapp-connections.md) for separate QR/Meta setup, the Embedded Signup v4 prerequisites, delegated pairing link boundaries, private opt-out enforcement, supported paths and release limitations. A pilot workspace keeps one primary transport; switching requires disabling the current connection and never copies or moves the agency connection.
+
+## General release verification
+
+`20261116125048_workspace_standard_release.sql` removes the reviewed runtime allowlist joins, retains every workspace predicate/ACL, adds the standard status RPC and updates existing cron commands in place without duplicate jobs. `tests/workspace-standard-db.mjs` verifies unrestricted own-account enrollment, cross-account denial, viewer restrictions, immutable ownership, archive/anonymous denial, private settings and legacy preservation. The expansion and Cloud suites run with `STANDARD_WORKSPACES=1`; the browser suite now verifies an unenrolled account can create its own workspace while foreign workspaces remain inaccessible.
+
+General availability does not create provider accounts or bypass Meta/Google approval requirements. Each company configures its own integrations.

@@ -14,7 +14,7 @@ import {
 } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
-import { usePilotAccess } from "@/hooks/usePilotAccess";
+import { useWorkspaceAccess } from "@/hooks/useWorkspaceAccess";
 import ThemeToggle from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,12 +66,12 @@ function Menu({
     </DropdownMenu>
   );
 }
-function PilotGate({ children }: { children: React.ReactNode }) {
-  const access = usePilotAccess();
+function WorkspaceGate({ children }: { children: React.ReactNode }) {
+  const access = useWorkspaceAccess();
   if (access.isPending)
     return (
       <p role="status" className="p-8 text-muted-foreground">
-        Verificando acesso ao piloto…
+        Verificando acesso às subcontas…
       </p>
     );
   if (access.isError)
@@ -89,7 +89,7 @@ function PilotGate({ children }: { children: React.ReactNode }) {
 }
 export default function PilotWorkspaces() {
   return (
-    <PilotGate>
+    <WorkspaceGate>
       <div className="min-h-dvh bg-background text-foreground">
         <header className="min-h-16 border-b flex items-center justify-between gap-3 px-4 sm:px-6 py-3">
           <div className="flex gap-3 items-center min-w-0">
@@ -101,7 +101,7 @@ export default function PilotWorkspaces() {
             <div className="min-w-0">
               <p className="font-semibold truncate">Central do Gestor</p>
               <p className="text-xs text-muted-foreground">
-                Subcontas de clientes · Piloto
+                Subcontas de clientes
               </p>
             </div>
           </div>
@@ -116,12 +116,12 @@ export default function PilotWorkspaces() {
           </div>
         </header>
         <Routes>
-          <Route path="subcontas" element={<WorkspaceList />} />
-          <Route path="subcontas/:workspaceId/*" element={<WorkspaceRoute />} />
-          <Route path="*" element={<Navigate to="subcontas" replace />} />
+          <Route path="/" element={<WorkspaceList />} />
+          <Route path=":workspaceId/*" element={<WorkspaceRoute />} />
+          <Route path="*" element={<Navigate to="/subcontas" replace />} />
         </Routes>
       </div>
-    </PilotGate>
+    </WorkspaceGate>
   );
 }
 function WorkspaceList() {
@@ -138,7 +138,7 @@ function WorkspaceList() {
     queryFn: async () => {
       const r = await workspaceDb.rpc("agency_workspace_identity");
       if (r.error) throw r.error;
-      return r.data as { pilot_owner: boolean };
+      return r.data as { can_create: boolean };
     },
   });
   const [dialog, setDialog] = useState<ClientWorkspace | "new" | null>(null),
@@ -188,7 +188,7 @@ function WorkspaceList() {
             trabalhar.
           </p>
         </div>
-        {identity.data?.pilot_owner && (
+        {identity.data?.can_create && (
           <Button onClick={() => setDialog("new")}>
             <Plus size={16} />
             Nova subconta
@@ -196,9 +196,9 @@ function WorkspaceList() {
         )}
       </div>
       <div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
-        Esta área está disponível ao piloto e aos membros convidados para cada
-        empresa. Nenhum cliente, tarefa ou conversa da agência é copiado para as
-        subcontas.
+        Gerencie as subcontas dos seus clientes e acesse as empresas para as
+        quais você foi convidado. Nenhum cliente, tarefa ou conversa da agência
+        é copiado para as subcontas.
       </div>
       <div className="flex gap-3 flex-wrap">
         <Input
@@ -275,9 +275,7 @@ function WorkspaceList() {
                   {w.description || "CRM independente para esta empresa."}
                 </p>
                 <Button variant="outline" asChild>
-                  <Link to={`/laboratorio/subcontas/${w.id}`}>
-                    Abrir subconta
-                  </Link>
+                  <Link to={`/subcontas/${w.id}`}>Abrir subconta</Link>
                 </Button>
               </article>
             ))}
@@ -297,7 +295,7 @@ function WorkspaceList() {
           workspace={dialog === "new" ? undefined : dialog}
           onClose={() => setDialog(null)}
           onSaved={refresh}
-          onCreated={(id) => navigate(`/laboratorio/subcontas/${id}`)}
+          onCreated={(id) => navigate(`/subcontas/${id}`)}
         />
       )}
     </main>
@@ -345,7 +343,7 @@ function WorkspaceView() {
       data?.pipelines[0],
     stages = data?.stages.filter((s) => s.pipeline_id === pipeline?.id) || [],
     leads = data?.leads.filter((l) => l.pipeline_id === pipeline?.id) || [];
-  const base = `/laboratorio/subcontas/${workspaceId}`,
+  const base = `/subcontas/${workspaceId}`,
     section =
       location.pathname.split("/").pop() === workspaceId
         ? "inicio"
@@ -421,7 +419,7 @@ function WorkspaceView() {
       <div className="p-8 space-y-3">
         <p>Subconta não encontrada ou sem acesso.</p>
         <Button asChild>
-          <Link to="/laboratorio/subcontas">Voltar às subcontas</Link>
+          <Link to="/subcontas">Voltar às subcontas</Link>
         </Button>
       </div>
     );
@@ -445,7 +443,7 @@ function WorkspaceView() {
               setSearch("");
               setLeadDialog(null);
               setPipelineDialog(null);
-              navigate(`/laboratorio/subcontas/${e.target.value}`);
+              navigate(`/subcontas/${e.target.value}`);
             }}
           >
             {all.data?.map((c) => (
@@ -462,7 +460,7 @@ function WorkspaceView() {
           permissions={data?.permissions.modules}
         />
         <Button variant="ghost" asChild className="w-full justify-start">
-          <Link to="/laboratorio/subcontas">
+          <Link to="/subcontas">
             <ArrowLeft size={16} />
             Todas as subcontas
           </Link>

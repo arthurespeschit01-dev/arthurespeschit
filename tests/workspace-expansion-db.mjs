@@ -94,6 +94,18 @@ try {
         "utf8",
       ),
     );
+  if (process.env.STANDARD_WORKSPACES) {
+    await db.exec(
+      await readFile(
+        new URL(
+          "../supabase/migrations/20261116125048_workspace_standard_release.sql",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    );
+    await db.exec("delete from agency_private.pilot_accounts");
+  }
   const as = async (id) => {
     await db.exec("reset role;set role authenticated");
     await db.query("select set_config('request.jwt.claim.sub',$1,false)", [id]);
@@ -368,7 +380,7 @@ try {
   await as(member);
   assert.equal(
     (await db.query("select agency_pilot_status() enabled")).rows[0].enabled,
-    false,
+    !!process.env.STANDARD_WORKSPACES,
   );
   await db.exec("reset role");
   // Conditions, timers, graph snapshots and later CRM/assignment actions run without a browser.
@@ -1312,11 +1324,46 @@ try {
     custom,
   ]);
   await as(owner);
-  const settingsRole=(await db.query('select agency_workspace_save_role($1,null,$2) id',[w,JSON.stringify({name:'Integrações sem administração',permissions:{settings:'manage'},notifications:{}})])).rows[0].id;
-  await db.query('select agency_workspace_assign_role($1,$2,$3,true)',[w,member,settingsRole]);
-  await as(member);const settingsAbilities=(await db.query('select agency_workspace_permissions($1) value',[w])).rows[0].value;assert.equal(settingsAbilities.modules.settings.manage,true);assert.equal(settingsAbilities.can_manage,false);assert.equal(settingsAbilities.modules.team.manage,false);
-  await assert.rejects(()=>db.query('select agency_workspace_save_role($1,null,$2)',[w,JSON.stringify({name:'Escalada proibida',admin_total:true,permissions:{},notifications:{}})]));
-  await assert.rejects(()=>db.query('select agency_workspace_assign_role($1,$2,$3,true)',[w,member,custom]));
+  const settingsRole = (
+    await db.query("select agency_workspace_save_role($1,null,$2) id", [
+      w,
+      JSON.stringify({
+        name: "Integrações sem administração",
+        permissions: { settings: "manage" },
+        notifications: {},
+      }),
+    ])
+  ).rows[0].id;
+  await db.query("select agency_workspace_assign_role($1,$2,$3,true)", [
+    w,
+    member,
+    settingsRole,
+  ]);
+  await as(member);
+  const settingsAbilities = (
+    await db.query("select agency_workspace_permissions($1) value", [w])
+  ).rows[0].value;
+  assert.equal(settingsAbilities.modules.settings.manage, true);
+  assert.equal(settingsAbilities.can_manage, false);
+  assert.equal(settingsAbilities.modules.team.manage, false);
+  await assert.rejects(() =>
+    db.query("select agency_workspace_save_role($1,null,$2)", [
+      w,
+      JSON.stringify({
+        name: "Escalada proibida",
+        admin_total: true,
+        permissions: {},
+        notifications: {},
+      }),
+    ]),
+  );
+  await assert.rejects(() =>
+    db.query("select agency_workspace_assign_role($1,$2,$3,true)", [
+      w,
+      member,
+      custom,
+    ]),
+  );
   await as(owner);
   await db.query(
     "update agency_client_workspaces set status='archived' where id=$1",

@@ -175,14 +175,12 @@ export default function WorkspaceCommercial({
           </p>
           <div className="flex flex-wrap gap-3 mt-5">
             <Button asChild>
-              <Link to={"/laboratorio/subcontas/" + workspace + "/conversas"}>
+              <Link to={"/subcontas/" + workspace + "/conversas"}>
                 Abrir conversas
               </Link>
             </Button>
             <Button variant="outline" asChild>
-              <Link to={"/laboratorio/subcontas/" + workspace + "/crm"}>
-                Acessar CRM
-              </Link>
+              <Link to={"/subcontas/" + workspace + "/crm"}>Acessar CRM</Link>
             </Button>
           </div>
         </header>

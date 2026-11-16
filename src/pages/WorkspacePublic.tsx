@@ -274,7 +274,7 @@ export function WorkspaceInvitation() {
                   .then(async ({ data, error }) => {
                     if (error) throw error;
                     await client.invalidateQueries();
-                    navigate(`/laboratorio/subcontas/${data}`, {
+                    navigate(`/subcontas/${data}`, {
                       replace: true,
                     });
                   })
