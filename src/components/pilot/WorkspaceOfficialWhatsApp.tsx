@@ -1,9 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { workspaceOperation } from "@/lib/workspaceCommercial";
-import { loadMetaSdk, launchMetaSignup } from "@/lib/metaWhatsAppSignup";
+import {
+  loadMetaSdk,
+  currentMetaSdk,
+  launchMetaSignup,
+} from "@/lib/metaWhatsAppSignup";
 interface Settings {
   configured: boolean;
   app_id: string | null;
@@ -39,9 +43,16 @@ export default function WorkspaceOfficialWhatsApp({
 }) {
   const { user } = useAuth(),
     client = useQueryClient();
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
+  const [phase, setPhase] = useState<"authorizing" | "finishing" | null>(null);
+  const busy = phase !== null;
+  const [activeMode, setActiveMode] = useState<
+    "business_app" | "new_number" | null
+  >(null);
+  const [error, setError] = useState(""),
     [sdkReady, setSdkReady] = useState(false);
+  const [sdkAttempt, setSdkAttempt] = useState(0);
+  const attempt = useRef<AbortController | null>(null);
+  useEffect(() => () => attempt.current?.abort(), []);
   const key = ["workspace-official-whatsapp", user?.id, workspace];
   const settings = useQuery({
     queryKey: key,
@@ -50,11 +61,13 @@ export default function WorkspaceOfficialWhatsApp({
         workspace_id: workspace,
       }),
     refetchOnWindowFocus: false,
+    refetchOnMount: "always",
   });
   useEffect(() => {
     setSdkReady(false);
     if (!settings.data?.configured || !settings.data.app_id) return;
     let active = true;
+    setError("");
     loadMetaSdk(settings.data.app_id, settings.data.version)
       .then(() => {
         if (active) setSdkReady(true);
@@ -69,6 +82,7 @@ export default function WorkspaceOfficialWhatsApp({
     settings.data?.configured,
     settings.data?.app_id,
     settings.data?.version,
+    sdkAttempt,
   ]);
   const enabled =
     !!settings.data?.configured && !blocked && !settings.data.connected;
@@ -108,11 +122,27 @@ export default function WorkspaceOfficialWhatsApp({
       );
       return;
     }
-    setBusy(true);
+    setActiveMode(mode);
+    setPhase("authorizing");
     setError("");
     try {
-      const sdk = await loadMetaSdk(session.data.app_id, session.data.version);
-      const result = await launchMetaSignup(sdk, session.data.config_id, mode);
+      const sdk = currentMetaSdk(session.data.app_id, session.data.version);
+      if (!sdk)
+        throw Error(
+          "O login da Meta ainda não está pronto. Recarregue a página e tente novamente.",
+        );
+      const controller = new AbortController();
+      attempt.current = controller;
+      // Invoke FB.login synchronously in the click handler, without awaiting a loader or network request.
+      const authorization = launchMetaSignup(
+        sdk,
+        session.data.config_id,
+        mode,
+        controller.signal,
+      );
+      const result = await authorization;
+      if (controller.signal.aborted) return;
+      setPhase("finishing");
       await workspaceOperation("cloud_complete", {
         workspace_id: workspace,
         ...result,
@@ -125,7 +155,8 @@ export default function WorkspaceOfficialWhatsApp({
     } catch (e) {
       setError((e as Error).message);
     } finally {
-      setBusy(false);
+      attempt.current = null;
+      setPhase(null);
       await client.invalidateQueries({ queryKey: [...key, "session"] });
     }
   };
@@ -208,12 +239,26 @@ export default function WorkspaceOfficialWhatsApp({
                 }
                 onClick={() => void start(mode)}
               >
-                {busy ? "Conectando…" : label}
+                {busy && activeMode === mode ? "Conectando…" : label}
               </Button>
             </article>
           );
         })}
       </div>
+      {busy && (
+        <div role="status" className="border rounded-lg p-3 space-y-2 text-sm">
+          <p>
+            {phase === "authorizing"
+              ? "Conclua a autorização na janela da Meta. Se ela não apareceu, confira o indicador de pop-up bloqueado na barra do navegador."
+              : "Validando a autorização e conectando o número. Aguarde a confirmação."}
+          </p>
+          {phase === "authorizing" && (
+            <Button variant="outline" onClick={() => attempt.current?.abort()}>
+              Cancelar conexão
+            </Button>
+          )}
+        </div>
+      )}
       {!settings.isPending && !settings.data?.configured && !settings.error && (
         <div className="border rounded-lg p-3 space-y-2 text-sm">
           <p>
@@ -231,6 +276,14 @@ export default function WorkspaceOfficialWhatsApp({
             <p className="break-all mt-2">{settings.data?.webhook_url}</p>
           </details>
         </div>
+      )}
+      {settings.data?.configured && !sdkReady && error && (
+        <Button
+          variant="outline"
+          onClick={() => setSdkAttempt((value) => value + 1)}
+        >
+          Tentar carregar o login da Meta novamente
+        </Button>
       )}
       {blocked && (
         <p className="text-sm">
