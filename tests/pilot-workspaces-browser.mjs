@@ -827,6 +827,122 @@ try {
       .count(),
     0,
   );
+  // Reproduce the SDK buffering stub and verify login opens synchronously on click.
+  let completedMeta = 0,
+    metaConnected = false;
+  await page.route("**/functions/v1/workspace-operations", async (route) => {
+    const request = route.request();
+    if (request.method() !== "POST") return route.fallback();
+    const body = request.postDataJSON();
+    let value;
+    if (body.action === "cloud_settings")
+      value = {
+        configured: true,
+        connected: metaConnected,
+        app_id: "123456789",
+        config_id: "987654321",
+        version: "v27.0",
+        webhook_url: "https://fixture.invalid/meta",
+      };
+    else if (body.action === "cloud_begin")
+      value = {
+        nonce: "a".repeat(64),
+        app_id: "123456789",
+        config_id: "987654321",
+        version: "v27.0",
+      };
+    else if (body.action === "integration_settings")
+      value = {
+        google: {
+          configured: false,
+          connected: false,
+          redirect_uri: "https://fixture.invalid/google",
+        },
+        whatsapp: metaConnected ? { transport: "cloud", enabled: true } : null,
+        webhook: null,
+      };
+    else if (body.action === "cloud_complete") {
+      assert.equal(body.code, "fixture-code");
+      assert.equal(body.phone_number_id, "654321");
+      completedMeta++;
+      metaConnected = true;
+      value = { connected: true };
+    } else return route.fallback();
+    return route.fulfill({
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+      body: JSON.stringify(value),
+    });
+  });
+  await page.route("https://connect.facebook.net/pt_BR/sdk.js", (route) =>
+    route.fulfill({
+      contentType: "application/javascript",
+      body: `
+    window.FB={init:function(){},login:function(){throw Error('Buffering SDK used');}};
+    setTimeout(function(){window.FB={init:function(){},login:function(callback,options){
+      window.__metaEventType=window.event&&window.event.type;
+      if(!navigator.userActivation.isActive)throw Error('Login lost user activation');
+      window.__metaMode=options.extras.featureType||'new_number';
+      window.open('/meta-popup-fixture','meta-fixture','width=500,height=600');
+      window.__completeMeta=function(){callback({authResponse:{code:'fixture-code'}});window.dispatchEvent(new MessageEvent('message',{origin:'https://www.facebook.com',data:JSON.stringify({type:'WA_EMBEDDED_SIGNUP',event:'FINISH',data:{waba_id:'123456',phone_number_id:'654321'}})}));};
+    }};window.fbAsyncInit&&window.fbAsyncInit();},80);
+  `,
+    }),
+  );
+  await page.route("**/meta-popup-fixture", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: "<h1>Autorização Meta de teste</h1>",
+    }),
+  );
+  await navigateModule(page, "Geral");
+  await page
+    .getByRole("link", { name: "WhatsApp", exact: false })
+    .filter({ hasText: "Conexão exclusiva" })
+    .click();
+  await page
+    .getByRole("tab", { name: "API Oficial (Meta)", exact: true })
+    .click();
+  const newNumber = page.getByRole("button", {
+    name: "Conectar número novo",
+    exact: true,
+  });
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll("button")].some(
+      (b) => b.textContent === "Conectar número novo" && !b.disabled,
+    ),
+  );
+  const popupPromise = page.waitForEvent("popup");
+  await newNumber.click();
+  const metaPopup = await popupPromise;
+  assert.equal(await page.evaluate(() => window.__metaEventType), "click");
+  await page
+    .getByRole("button", { name: "Cancelar conexão", exact: true })
+    .click();
+  await page
+    .getByRole("alert")
+    .filter({ hasText: "Conexão cancelada" })
+    .waitFor();
+  assert.equal(completedMeta, 0);
+  await metaPopup.close();
+  const businessButton = page.getByRole("button", {
+    name: "Conectar meu número do WhatsApp Business",
+    exact: true,
+  });
+  const secondPopup = page.waitForEvent("popup");
+  await businessButton.click();
+  const businessPopup = await secondPopup;
+  assert.equal(
+    await page.evaluate(() => window.__metaMode),
+    "whatsapp_business_app_onboarding",
+  );
+  await page.evaluate(() => window.__completeMeta());
+  await page.getByText("Conectado", { exact: true }).waitFor();
+  assert.equal(completedMeta, 1);
+  await businessPopup.close();
   await navigateModule(page, "Geral");
   await page.getByRole("link", { name: "Google Agenda", exact: false }).click();
   await page

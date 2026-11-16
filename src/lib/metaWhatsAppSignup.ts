@@ -1,43 +1,80 @@
-interface FacebookSdk {
+export interface FacebookSdk {
   init(options: Record<string, unknown>): void;
   login(
-    callback: (response: { authResponse?: { code?: string } }) => void,
+    callback: (response: {
+      authResponse?: { code?: string };
+      error?: { message?: string };
+    }) => void,
     options: Record<string, unknown>,
   ): void;
 }
-const facebook = () => (window as unknown as { FB?: FacebookSdk }).FB;
-let loading: Promise<FacebookSdk> | undefined;
-export function loadMetaSdk(appId: string, version: string) {
-  if (!loading)
-    loading = new Promise<FacebookSdk>((resolve, reject) => {
-      const finish = () => {
-        const sdk = facebook();
-        if (!sdk) {
-          reject(Error("O login da Meta não carregou."));
-          return;
-        }
+interface MetaWindow {
+  FB?: FacebookSdk;
+  fbAsyncInit?: () => void;
+}
+const metaWindow = () => window as unknown as MetaWindow;
+let loading: Promise<void> | undefined;
+let initialized: string | undefined;
+export function currentMetaSdk(
+  appId: string,
+  version: string,
+): FacebookSdk | null {
+  return initialized === `${appId}:${version}` ? metaWindow().FB || null : null;
+}
+export function loadMetaSdk(appId: string, version: string): Promise<void> {
+  const identity = `${appId}:${version}`;
+  if (initialized === identity && metaWindow().FB) return Promise.resolve();
+  if (initialized && metaWindow().FB) {
+    try {
+      metaWindow().FB!.init({ appId, version, cookie: true, xfbml: false });
+      initialized = identity;
+      return Promise.resolve();
+    } catch {
+      return Promise.reject(
+        Error("Não foi possível configurar o login da Meta."),
+      );
+    }
+  }
+  if (loading) return loading;
+  loading = new Promise<void>((resolve, reject) => {
+    const host = metaWindow();
+    const previous = host.fbAsyncInit;
+    const script = document.createElement("script");
+    const cleanup = () => {
+      clearTimeout(timer);
+      if (host.fbAsyncInit === ready) host.fbAsyncInit = previous;
+    };
+    const fail = () => {
+      cleanup();
+      loading = undefined;
+      script.remove();
+      reject(
+        Error(
+          "Não foi possível inicializar a Meta. Confira a conexão ou bloqueadores e tente novamente.",
+        ),
+      );
+    };
+    const ready = () => {
+      try {
+        previous?.();
+        const sdk = host.FB;
+        if (!sdk) throw Error("SDK indisponível");
         sdk.init({ appId, version, cookie: true, xfbml: false });
-        resolve(sdk);
-      };
-      if (facebook()) {
-        finish();
-        return;
+        initialized = identity;
+        cleanup();
+        resolve();
+      } catch {
+        fail();
       }
-      const script = document.createElement("script");
-      script.src = "https://connect.facebook.net/pt_BR/sdk.js";
-      script.async = true;
-      script.onload = finish;
-      script.onerror = () => {
-        loading = undefined;
-        script.remove();
-        reject(
-          Error(
-            "Não foi possível carregar a Meta. Confira bloqueadores e conexão.",
-          ),
-        );
-      };
-      document.head.append(script);
-    });
+    };
+    const timer = setTimeout(fail, 15000);
+    // sdk.js first exposes a buffering stub. Only fbAsyncInit signals that the real SDK is ready.
+    host.fbAsyncInit = ready;
+    script.src = "https://connect.facebook.net/pt_BR/sdk.js";
+    script.async = true;
+    script.onerror = fail;
+    document.head.append(script);
+  });
   return loading;
 }
 export function metaSignupEvent(origin: string, input: unknown) {
@@ -78,6 +115,7 @@ export function launchMetaSignup(
   sdk: FacebookSdk,
   configId: string,
   mode: "business_app" | "new_number",
+  signal?: AbortSignal,
 ) {
   return new Promise<{
     code: string;
@@ -92,6 +130,7 @@ export function launchMetaSignup(
       window.removeEventListener("message", receive);
       clearTimeout(timeout);
       clearTimeout(assetTimer);
+      signal?.removeEventListener("abort", abort);
     };
     const finish = () => {
       if (!done && code && ids) {
@@ -106,6 +145,7 @@ export function launchMetaSignup(
       cleanup();
       reject(Error(message));
     };
+    const abort = () => fail("Conexão cancelada. Você pode tentar novamente.");
     const receive = (e: MessageEvent) => {
       const result = metaSignupEvent(e.origin, e.data);
       if (!result) return;
@@ -120,10 +160,16 @@ export function launchMetaSignup(
       () => fail("O tempo para conectar terminou. Tente novamente."),
       300000,
     );
+    if (signal?.aborted) {
+      abort();
+      return;
+    }
+    signal?.addEventListener("abort", abort, { once: true });
     window.addEventListener("message", receive);
     try {
       sdk.login(
         (response) => {
+          if (done) return;
           code = response.authResponse?.code || "";
           if (!code) {
             fail("A autorização não foi concluída na Meta.");

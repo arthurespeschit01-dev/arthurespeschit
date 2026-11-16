@@ -42,6 +42,12 @@ The official tab reports activation pending and disables the connect buttons whe
 
 Production audit before implementation found **no pilot connection**, while the agency had one separate legacy connection. No real number was paired or moved and no WhatsApp message was sent during automated verification. The owner previously confirmed there is no configured Meta app/Cloud number yet.
 
+## SDK initialization and popup lifecycle
+
+The SDK loader waits for Meta's `fbAsyncInit` callback, not the bootstrap script's `load` event. The bootstrap can expose a buffering `FB` stub; caching that object caused a pending login with no popup or callback. The initialized SDK is obtained from the current `window.FB` inside the click handler, and `FB.login` is invoked before any await/network request.
+
+Loading has a bounded timeout and a manual retry. An authorization can be cancelled locally without submitting a late SDK result. Once the authorization is returned, the UI distinguishes server validation from popup authorization; cancellation is no longer offered during registration. Reopening the official tab refetches server configuration rather than retaining the application-wide stale cache.
+
 ## Validation
 
 - Isolated PostgreSQL/RLS: nonce expiry/replay and workspace/user boundaries, denied browser secret access, duplicate phone rejection, active-transport replacement refusal, message deduplication, opt-out scope, W-API restoration and unchanged legacy fixtures.
