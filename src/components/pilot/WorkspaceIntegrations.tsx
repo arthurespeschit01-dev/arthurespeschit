@@ -431,14 +431,10 @@ export default function WorkspaceIntegrations({
           </div>
           {!q.data?.google?.configured && (
             <p className="text-sm text-muted-foreground">
-              As credenciais OAuth do Google precisam ser configuradas no
-              servidor antes de conectar.
+              A conexão com o Google Agenda ainda não está disponível. Entre em
+              contato com o responsável pela sua conta para ativá-la.
             </p>
           )}
-          <details className="text-xs text-muted-foreground">
-            <summary>URI de retorno para configurar no Google Cloud</summary>
-            <p className="break-all mt-2">{q.data?.google?.redirect_uri}</p>
-          </details>
         </section>
       )}
       {kind === "webhook" && (

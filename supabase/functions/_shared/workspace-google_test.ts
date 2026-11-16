@@ -79,6 +79,25 @@ Deno.test(
       assertEquals(requests[1].body.id, "cg22222222222242228222222222222222");
       assertEquals(updates[0].google_synced_at, appointment.updated_at);
       assertEquals(updates[0].google_sync_error, null);
+      // Editing reuses the provider event; cancelling deletes that same event.
+      requests.length = 0;
+      globalThis.fetch = (input, init) => {
+        requests.push({
+          url: String(input),
+          method: init?.method || "GET",
+          body: init?.body ? JSON.parse(String(init.body)) : null,
+        });
+        return Promise.resolve(Response.json({}));
+      };
+      appointment.name = "Contato atualizado";
+      await syncGoogle(db, workspace);
+      assertEquals(requests.length, 1);
+      assertEquals(requests[0].method, "PUT");
+      assertEquals(requests[0].body.summary, "Contato atualizado");
+      appointment.status = "cancelled";
+      await syncGoogle(db, workspace);
+      assertEquals(requests[1].method, "DELETE");
+      assertEquals(requests[1].url, requests[0].url);
     } finally {
       globalThis.fetch = original;
     }
