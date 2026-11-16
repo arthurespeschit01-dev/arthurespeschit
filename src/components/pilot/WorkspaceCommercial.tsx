@@ -1,3 +1,4 @@
+import AgencyWhatsAppSettings from "../AgencyWhatsAppSettings";
 import AgencyCalendar from "../AgencyCalendar";
 import AgencyPreviousForms from "../AgencyPreviousForms";
 import WorkspaceSalesDashboard from "./WorkspaceSalesDashboard";
@@ -101,6 +102,7 @@ export default function WorkspaceCommercial({
       .catch((e) => setError(workspaceError(e)))
       .finally(() => setBusy(false));
   };
+  if(primary && section === "whatsapp") return <AgencyWhatsAppSettings workspace={workspace} stages={stages} manage={manage} />;
   if (primary && section === "agendamentos")
     return <AgencyCalendar workspace={workspace} />;
   if (["rastreamento", "canais", "creditos"].includes(section))

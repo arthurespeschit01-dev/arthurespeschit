@@ -19,7 +19,9 @@ export default function WorkspaceIntegrations({
   stages,
   manage,
   kind = "whatsapp",
+  primary = false,
 }: {
+  primary?: boolean;
   workspace: string;
   stages: WorkspaceStage[];
   manage: boolean;
@@ -139,9 +141,9 @@ export default function WorkspaceIntegrations({
             : "Webhooks externos"}
       </h2>
       <p className="text-sm text-muted-foreground">
-        As credenciais desta subconta ficam separadas das conexões da sua
-        agência. Uma instância já usada em outra integração não será
-        reconfigurada.
+        {primary
+          ? "Conecte o WhatsApp da Central por QR Code ou pela API oficial da Meta. As conexões das subcontas permanecem separadas."
+          : "As credenciais desta subconta ficam separadas das conexões da sua agência. Uma instância já usada em outra integração não será reconfigurada."}
       </p>
       {q.error && <p role="alert">{q.error.message}</p>}
       {kind === "whatsapp" && (
@@ -221,13 +223,13 @@ export default function WorkspaceIntegrations({
                 onClick={() => {
                   if (
                     window.confirm(
-                      "Desativar a conexão oficial nesta subconta? O histórico será preservado.",
+                      `Desativar a conexão oficial ${primary ? "da Central" : "nesta subconta"}? O histórico será preservado.`,
                     )
                   )
                     void act("disconnect_whatsapp");
                 }}
               >
-                Desconectar API oficial da subconta
+                Desconectar API oficial {primary ? "da Central" : "da subconta"}
               </Button>
             )}
         </>
@@ -320,13 +322,13 @@ export default function WorkspaceIntegrations({
                 onClick={() => {
                   if (
                     window.confirm(
-                      "Desativar o recebimento desta subconta? O histórico será preservado.",
+                      `Desativar o recebimento ${primary ? "da Central" : "desta subconta"}? O histórico será preservado.`,
                     )
                   )
                     void act("disconnect_whatsapp");
                 }}
               >
-                Desconectar da subconta
+                Desconectar {primary ? "da Central" : "da subconta"}
               </Button>
               <Button
                 variant="outline"
@@ -375,7 +377,7 @@ export default function WorkspaceIntegrations({
               {qr && (
                 <img
                   src={qr}
-                  alt="QR Code para conectar o WhatsApp da subconta"
+                  alt={`QR Code para conectar o WhatsApp ${primary ? "da Central" : "da subconta"}`}
                   className="w-64 max-w-full mx-auto bg-white p-3 rounded-lg"
                 />
               )}

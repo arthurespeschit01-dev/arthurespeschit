@@ -14,6 +14,10 @@ export async function verifyAgencyBrowser(
   const context = await browser.newContext();
   let queue = Promise.resolve();
   const errors = [];
+  const whatsappMode = !!process.env.ACCOUNT_WHATSAPP;
+  let connection = null,
+    connected = false;
+  const whatsappCalls = [];
   const run = (fn) => {
     const next = queue.then(async () => {
       await db.exec("reset role;set role authenticated");
@@ -70,7 +74,71 @@ export async function verifyAgencyBrowser(
             email_confirmed_at: "2026-01-01",
             app_metadata: {},
           });
-        if (url.pathname.includes("/functions/"))
+        if (url.pathname.includes("/functions/")) {
+          if (body?.action === "configuration")
+            return reply({ configured: whatsappMode });
+          if (
+            whatsappMode &&
+            [
+              "integration_settings",
+              "save_whatsapp",
+              "connect_whatsapp",
+              "disconnect_whatsapp",
+              "whatsapp_status",
+              "cloud_settings",
+              "whatsapp_preferences",
+            ].includes(body?.action)
+          ) {
+            assert.equal(
+              body.workspace_id,
+              workspace,
+              "main WhatsApp must use the owner-bound context",
+            );
+            whatsappCalls.push(body.action);
+            if (body.action === "integration_settings")
+              return reply({
+                whatsapp: connection,
+                google: { configured: true, connected: false },
+                webhook: null,
+              });
+            if (body.action === "save_whatsapp") {
+              connection = {
+                enabled: true,
+                transport: "wapi",
+                instance_id: body.instance_id,
+                stage_id: body.stage_id,
+                pipeline_id: body.pipeline_id,
+              };
+              return reply({ ok: true });
+            }
+            if (body.action === "connect_whatsapp")
+              return reply({
+                connected: false,
+                qrcode:
+                  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j3ioAAAAASUVORK5CYII=",
+              });
+            if (body.action === "disconnect_whatsapp") {
+              connection.enabled = false;
+              return reply({ ok: true });
+            }
+            if (body.action === "whatsapp_status")
+              return reply({
+                connected,
+                account_id: connected
+                  ? "11111111-1111-4111-8111-111111111111"
+                  : null,
+                phone: connected ? "5511999990000" : null,
+              });
+            if (body.action === "cloud_settings")
+              return reply({
+                configured: false,
+                connected: false,
+                app_id: null,
+                config_id: null,
+                version: "v27.0",
+              });
+            return reply({ optout_enabled: true, phrases: ["parar"] });
+          }
           return reply(
             body?.action === "team_settings"
               ? { email_configured: true }
@@ -84,6 +152,7 @@ export async function verifyAgencyBrowser(
                   },
                 },
           );
+        }
         if (name === "agency_login_access") {
           if (!scoped)
             return reply({
@@ -156,6 +225,85 @@ export async function verifyAgencyBrowser(
     const page = await context.newPage();
     page.on("pageerror", (e) => errors.push(e.message));
     const base = process.env.TEST_APP_URL || "http://localhost:8081";
+    if (whatsappMode) {
+      await page.goto(base + "/configuracoes/whatsapp");
+      await page
+        .getByRole("tab", { name: "WhatsApp por QR Code", exact: true })
+        .waitFor();
+      await page
+        .getByText("Conexão anterior da Central", { exact: true })
+        .waitFor();
+      assert.equal(
+        await page
+          .getByRole("button", {
+            name: "Configurar instância e token",
+            exact: true,
+          })
+          .count(),
+        0,
+        "legacy connector stays mounted only when explicitly opened",
+      );
+      await page
+        .getByLabel("ID da instância WhatsApp")
+        .fill("central-exclusive");
+      await page
+        .getByLabel("Token da instância WhatsApp")
+        .fill("synthetic-token");
+      await page
+        .getByRole("button", { name: "Salvar instância", exact: true })
+        .click();
+      await page
+        .getByRole("button", { name: "Ler QR Code aqui", exact: true })
+        .click();
+      await page
+        .getByAltText("QR Code para conectar o WhatsApp da Central")
+        .waitFor();
+      await page.keyboard.press("Escape");
+      page.once("dialog", (dialog) => dialog.accept());
+      await page
+        .getByRole("button", { name: "Desconectar da Central", exact: true })
+        .click();
+      await page
+        .getByRole("tab", { name: "API Oficial (Meta)", exact: true })
+        .click();
+      await page
+        .getByRole("button", {
+          name: "Conectar meu número do WhatsApp Business",
+          exact: true,
+        })
+        .waitFor();
+      await page
+        .getByRole("button", { name: "Conectar número novo", exact: true })
+        .waitFor();
+      connection = { enabled: true, transport: "cloud" };
+      connected = true;
+      await page.goto(base + "/comercial/conversas");
+      await page
+        .getByText(
+          "Conversas do número conectado nesta conta, por QR Code ou API oficial da Meta.",
+          { exact: true },
+        )
+        .waitFor();
+      await page
+        .getByRole("button", { name: "Nova conversa", exact: true })
+        .waitFor();
+      assert.equal(
+        await page
+          .getByRole("tab", { name: "Conexão da conta · QR Code / Meta" })
+          .getAttribute("aria-selected"),
+        "true",
+      );
+      await page
+        .getByRole("tab", { name: "Conexão anterior e histórico", exact: true })
+        .waitFor();
+      assert(whatsappCalls.includes("connect_whatsapp"));
+      assert(whatsappCalls.includes("cloud_settings"));
+      assert.deepEqual(errors, []);
+      console.log(
+        "PASS main WhatsApp browser: scoped W-API configuration and QR, official Meta signup options, common transport inbox and preserved legacy source",
+      );
+      return;
+    }
     if (scoped) {
       for (const path of [
         "/",

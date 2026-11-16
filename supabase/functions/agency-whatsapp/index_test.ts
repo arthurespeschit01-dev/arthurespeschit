@@ -77,6 +77,8 @@ Deno.test(
         "login is mandatory",
       );
       loggedIn = true;
+      const configuration=await handler(request({action:'configuration'}));
+      check(configuration.status===200&&JSON.stringify(await configuration.json())==='{"configured":true}','configuration metadata exposes only availability');
       const result = await handler(
         request({ action: "status", user_id: "attacker" }),
       );

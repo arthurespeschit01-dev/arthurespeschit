@@ -82,3 +82,12 @@ Validation: `ACCOUNT_BROWSER=1 node tests/agency-account-db.mjs`, `node tests/pi
 The private `workspace_only_users` registry is server-controlled and durable after revocation. New signup with a live email-matched invitation skips agency bootstrap; existing empty invited identities are backfilled without deleting data. Existing independent business owners are preserved. Accepting a first invitation on an empty identity establishes the same restriction. User metadata cannot override it. Legacy tables have mandatory restrictive RLS in addition to their original policies; organization/Storage membership helpers honor the restriction. New legacy tables must preserve this condition. Client workspace membership and custom module permissions are unchanged. Central WhatsApp/Calendar authenticated endpoints deny workspace-only identities before reading provider settings.
 
 Run `npm run test:invited-access` for real PostgreSQL plus browser checks of signup, direct URL isolation, API denials, metadata spoofing, revocation and owner regressions.
+
+
+## Main WhatsApp connection parity
+
+`/configuracoes/whatsapp` uses the same workspace integration component as subaccounts: exclusive W-API instance setup, QR pairing/polling, and official Meta Embedded Signup for Business-app coexistence or a new number. The explicit primary account binding scopes credentials, stages, Cloud callbacks, outbox and messages. No client subaccount credentials or transport are reused.
+
+`/comercial/conversas` chooses the primary workspace inbox once a new connection is configured. If the agency already has its original W-API integration, it remains accessible as “Conexão anterior e histórico”, and its configuration is available on demand in the WhatsApp settings. Neither connection is silently migrated, disconnected or overwritten; the original complete message/media history and provider/account isolation remain intact. The metadata-only `agency-whatsapp` configuration action returns only a boolean after the Central authorization guard.
+
+Validation: `npm run test:main-whatsapp` covers the main route, scoped W-API configuration, QR dialog, official Meta choices and inbox source selection without contacting live providers. Real Meta onboarding still depends on the provider's account approval and number eligibility, as for client subaccounts.

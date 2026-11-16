@@ -114,6 +114,7 @@ Deno.serve(async (request) => {
       .eq("user_id", user.id)
       .maybeSingle();
     if (connectionError) throw connectionError;
+    if (body.action === "configuration") return respond({ configured: !!connection });
     if (body.action === "configure") {
       const instanceId = String(body.instance_id || "").trim();
       if (!/^[\w-]{1,160}$/.test(instanceId))
