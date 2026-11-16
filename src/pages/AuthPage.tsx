@@ -5,13 +5,13 @@ import { Mail, Lock, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import logoCentralGestor from '@/assets/logo-central-gestor.png';
 
-export default function AuthPage() {
+export default function AuthPage({initialEmail = ""}: {initialEmail?: string} = {}) {
   const { signIn,signUp } = useAuth();
   const [mode,setMode]=useState<'login'|'signup'>('login');
   const [confirmPassword,setConfirmPassword]=useState('');
   const [confirmationSent,setConfirmationSent]=useState(false);
   const [error,setError]=useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);

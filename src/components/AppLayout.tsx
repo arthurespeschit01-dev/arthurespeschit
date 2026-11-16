@@ -46,6 +46,7 @@ const comercialSubItems = [
   { to: '/comercial/crm', label: 'CRM', icon: Users },
   { to: '/comercial/formularios', label: 'Formulários', icon: FileText },
   { to: '/comercial/agendamentos', label: 'Agendamentos', icon: ClipboardList },
+  { to: '/comercial/funis', label: 'Funis e automações', icon: ClipboardList },
 ];
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar:collapsed';

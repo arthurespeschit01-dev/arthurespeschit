@@ -8,3 +8,5 @@
 - Read `docs/pilot-client-workspaces.md` before extending subaccounts. New modules must use the same workspace boundaries; WhatsApp, forms and calendars must not reuse global agency connections.
 - Apply additive migrations, test RLS with actual PostgreSQL behavior and verify original fixture rows are unchanged. Do not wipe or reseed production to test a feature.
 - Keep complete WhatsApp history and provider/account isolation intact when modifying integrations.
+
+- Main-account collaboration uses the explicit private agency_account_workspaces binding and /conta/* routes. Its owner-only context and permission-checked adapters may synchronize that owner’s commercial CRM, calendar and legacy form summaries. This exception never applies to client subaccounts, financial data, global WhatsApp credentials or history. Keep the binding server-controlled.

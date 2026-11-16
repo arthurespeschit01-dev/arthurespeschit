@@ -35,7 +35,8 @@ export default function AuthCallback() {
         return;
       }
 
-      window.location.replace('/');
+      const next = new URL(window.location.href).searchParams.get('next') || '';
+      window.location.replace(/^\/convite-equipe\/[a-f0-9]{64}$/.test(next) ? next : '/');
     };
 
     finish().catch(() => {

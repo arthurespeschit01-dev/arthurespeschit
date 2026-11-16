@@ -1,3 +1,4 @@
+import AuthPage from "./AuthPage";
 import { presentationStyle } from "@/lib/workspaceFormPresentation";
 import WorkspaceFormRunner, {
   type FormPresentation,
@@ -229,7 +230,7 @@ export default function WorkspacePublic() {
 }
 export function WorkspaceInvitation() {
   const { token = "" } = useParams(),
-    { user } = useAuth(),
+    { user, signOut, loading } = useAuth(),
     navigate = useNavigate(),
     client = useQueryClient();
   const [busy, setBusy] = useState(false),
@@ -237,7 +238,14 @@ export function WorkspaceInvitation() {
   const q = useQuery({
     queryKey: ["workspace-invite", token, user?.id],
     queryFn: () =>
-      workspaceOperation<{ name: string; role: string }>("public_invite", {
+      workspaceOperation<{
+        name: string;
+        role: string;
+        role_name?: string;
+        email: string;
+        status: string;
+        account_kind?: string;
+      }>("public_invite", {
         token,
       }),
     retry: false,
@@ -254,36 +262,67 @@ export function WorkspaceInvitation() {
           <>
             <p>
               Você foi convidado para <strong>{q.data?.name}</strong>, com
-              acesso de <strong>{roles[q.data?.role || ""]}</strong>.
+              acesso de{" "}
+              <strong>{q.data?.role_name || roles[q.data?.role || ""]}</strong>.
             </p>
-            <p className="text-sm text-muted-foreground">
-              Você está usando {user?.email}. É necessário entrar com o e-mail
-              confirmado que recebeu o convite. O acesso será limitado a esta
-              subconta.
-            </p>
-            <Button
-              disabled={busy}
-              onClick={() => {
-                setBusy(true);
-                setError("");
-                void Promise.resolve(
-                  workspaceDb.rpc("agency_workspace_accept_invite", {
-                    p_token: token,
-                  }),
-                )
-                  .then(async ({ data, error }) => {
-                    if (error) throw error;
-                    await client.invalidateQueries();
-                    navigate(`/subcontas/${data}`, {
-                      replace: true,
-                    });
-                  })
-                  .catch((e) => setError(e.message))
-                  .finally(() => setBusy(false));
-              }}
-            >
-              {busy ? "Aceitando…" : "Aceitar convite"}
-            </Button>
+            {!user && !loading ? (
+              <>
+                <p className="text-sm">
+                  Entre ou crie sua conta usando{" "}
+                  <strong>{q.data?.email}</strong>. Depois, aceite o convite
+                  nesta mesma página.
+                </p>
+                <AuthPage initialEmail={q.data?.email} />
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Você está usando {user?.email}. É necessário entrar com o
+                  e-mail confirmado que recebeu o convite. O acesso será
+                  limitado a esta subconta.
+                </p>
+                <Button
+                  disabled={
+                    busy ||
+                    loading ||
+                    user?.email?.toLowerCase() !== q.data?.email?.toLowerCase()
+                  }
+                  onClick={() => {
+                    setBusy(true);
+                    setError("");
+                    void Promise.resolve(
+                      workspaceDb.rpc("agency_workspace_accept_invite", {
+                        p_token: token,
+                      }),
+                    )
+                      .then(async ({ data, error }) => {
+                        if (error) throw error;
+                        await client.invalidateQueries();
+                        navigate(
+                          `/${q.data?.account_kind === "agency" ? "conta" : "subcontas"}/${data}`,
+                          {
+                            replace: true,
+                          },
+                        );
+                      })
+                      .catch((e) => setError(e.message))
+                      .finally(() => setBusy(false));
+                  }}
+                >
+                  {busy ? "Aceitando…" : "Aceitar convite"}
+                </Button>
+                {user &&
+                  user.email?.toLowerCase() !==
+                    q.data?.email?.toLowerCase() && (
+                    <p role="alert" className="text-sm">
+                      Este convite é para {q.data?.email}.{" "}
+                      <Button variant="outline" onClick={() => void signOut()}>
+                        Entrar com outra conta
+                      </Button>
+                    </p>
+                  )}
+              </>
+            )}
           </>
         )}
         {error && (
