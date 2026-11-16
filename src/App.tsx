@@ -2,7 +2,7 @@ import PilotVisualTheme from "./components/PilotVisualTheme";
 import { Suspense, useEffect } from "react";
 import { lazyWithRetry as lazy } from "@/lib/lazyWithRetry";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate, useLocation } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -97,6 +97,11 @@ function RouteBoundary({ children }: { children: React.ReactNode }) {
   return <ErrorBoundary>{children}</ErrorBoundary>;
 }
 
+function LegacyWorkspaceRedirect() {
+  const location = useLocation();
+  return <Navigate to={location.pathname.replace(/^\/laboratorio(?:\/subcontas)?/, "/subcontas") + location.search + location.hash} replace />;
+}
+
 function ProtectedRoutes() {
   const { user, loading } = useAuth();
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-background"><div className="text-muted-foreground">Carregando...</div></div>;
@@ -105,9 +110,10 @@ function ProtectedRoutes() {
     <Routes>
       <Route path="/convite-equipe/:token" element={<Suspense fallback={<PageFallback />}><WorkspaceInvitation /></Suspense>} />
       <Route
-        path="/laboratorio/*"
+        path="/subcontas/*"
         element={<RouteBoundary><Suspense fallback={<PageFallback />}><PilotWorkspaces /></Suspense></RouteBoundary>}
       />
+      <Route path="/laboratorio/*" element={<LegacyWorkspaceRedirect />} />
       <Route path="/bloqueado" element={<Navigate to="/" replace />} />
       <Route path="*" element={
         <AppLayout key={user.id}>

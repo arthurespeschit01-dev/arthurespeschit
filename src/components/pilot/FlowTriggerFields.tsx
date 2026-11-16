@@ -272,7 +272,7 @@ export default function FlowTriggerFields({
           <Link
             target="_blank"
             className="text-xs text-primary underline"
-            to={"/laboratorio/subcontas/" + workspace + "/rastreamento"}
+            to={"/subcontas/" + workspace + "/rastreamento"}
           >
             Abrir conexão e webhook da Meta
           </Link>

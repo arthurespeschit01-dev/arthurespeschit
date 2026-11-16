@@ -54,6 +54,7 @@ for (const name of [
   "20261114033021_workspace_tracking_and_flow_audit.sql",
   "20261114034242_workspace_ai_conversion_rules.sql",
   "20261114151246_workspace_crm_and_flow_parity.sql",
+  "20261116125048_workspace_standard_release.sql",
 ])
   await db.exec(
     await readFile(
@@ -61,10 +62,7 @@ for (const name of [
       "utf8",
     ),
   );
-await db.query(
-  "insert into agency_private.pilot_accounts(user_id,enabled) values($1,true)",
-  [pilot],
-);
+// All authenticated accounts use subaccounts without pilot enrollment.
 let queue = Promise.resolve(),
   featureReads = 0,
   sends = 0;
@@ -205,7 +203,10 @@ async function contextFor(id) {
       }
       if (table === "profiles")
         return reply([{ user_id: id, onboarding_completed: true }]);
-      if (table === "agency_pilot_status") {
+      if (
+        table === "agency_workspace_status" ||
+        table === "agency_pilot_status"
+      ) {
         const r = await run(id, () =>
           db.query("select agency_pilot_status() allowed"),
         );
@@ -438,7 +439,7 @@ try {
   page.setDefaultTimeout(20000);
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("dialog", (d) => d.accept());
-  await page.goto(base + "/laboratorio/subcontas");
+  await page.goto(base + "/subcontas");
   await page
     .getByRole("button", { name: "Nova subconta", exact: true })
     .click();
@@ -1507,26 +1508,47 @@ try {
   await context.close();
   const foreign = await contextFor(other),
     foreignPage = await foreign.newPage();
-  const beforeReads = featureReads;
+  // The former non-pilot can create their own subaccount, but cannot read another owner's data.
   await foreignPage.goto(base + "/laboratorio/subcontas");
-  await foreignPage.waitForURL(base + "/");
-  assert.equal(featureReads, beforeReads);
+  await foreignPage.waitForURL(base + "/subcontas");
+  await foreignPage
+    .getByRole("button", { name: "Nova subconta", exact: true })
+    .waitFor();
   assert.equal(
     await foreignPage
-      .getByRole("link", {
-        name: "Subcontas de clientes (piloto)",
-        exact: true,
-      })
+      .getByRole("heading", { name: "Empresa Beta", exact: true })
       .count(),
     0,
   );
+  assert.equal(
+    await foreignPage
+      .getByText("Subcontas de clientes · Piloto", { exact: true })
+      .count(),
+    0,
+  );
+  await foreignPage
+    .getByRole("button", { name: "Nova subconta", exact: true })
+    .click();
+  await foreignPage
+    .getByLabel("Nome da empresa", { exact: true })
+    .fill("Empresa independente");
+  await foreignPage
+    .getByRole("button", { name: "Criar subconta", exact: true })
+    .click();
+  await foreignPage
+    .getByRole("heading", { name: "Empresa independente", exact: true })
+    .waitFor();
+  await foreignPage.goto(base + "/subcontas/" + alpha);
+  await foreignPage
+    .getByText("Subconta não encontrada ou sem acesso.", { exact: true })
+    .waitFor();
   await foreign.close();
   await queue;
   await db.exec("reset role");
   assert.deepEqual((await db.query("select * from clients")).rows, before);
   assert.equal(sends, 0);
   console.log(
-    "PASS browser→RLS database: create isolated subaccounts, lead edits/moves, real dashboard, pipeline edits, workspace switching, archive/delete, mobile and non-pilot denial; legacy data unchanged",
+    "PASS browser→RLS database: create isolated subaccounts, lead edits/moves, real dashboard, pipeline edits, workspace switching, archive/delete, mobile and general availability with cross-account isolation; legacy data unchanged",
   );
 } catch (e) {
   console.error(e);

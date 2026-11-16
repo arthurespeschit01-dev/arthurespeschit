@@ -113,8 +113,8 @@ async function open(kind) {
       return kind === "failure"
         ? reply({ message: "Identity unavailable" }, 500)
         : reply({ pilot_owner: kind === "owner" });
-    if (name === "agency_pilot_status")
-      return reply(kind === "owner" || kind === "invited");
+    if (name === "agency_pilot_status" || name === "agency_workspace_status")
+      return reply(true);
     if (name === "agency_task_summary")
       return reply({
         pendente: preview ? 4 : 1,
@@ -267,7 +267,7 @@ try {
           .waitFor();
     assert.equal(
       await ordinary.page.locator("html").getAttribute("data-product-skin"),
-      null,
+      "pilot",
     );
     assert.deepEqual(
       await signature(owner.page),
@@ -354,8 +354,8 @@ try {
     await c.page.waitForTimeout(kind === "failure" ? 2200 : 200);
     assert.equal(
       await c.page.locator("html").getAttribute("data-product-skin"),
-      null,
-      kind + " must keep original design",
+      "pilot",
+      kind + " receives the standard product design",
     );
     await c.ctx.close();
   }
@@ -364,7 +364,7 @@ try {
   await owner.ctx.close();
   await ordinary.ctx.close();
   console.log(
-    "PASS pilot owner only: light/dark dashboard, tasks and clients; unchanged page content/controls; task views/dialogs, mobile, logout cleanup; invited/ordinary/failure keep original styling; no writes.",
+    "PASS standard design for all authenticated accounts: light/dark dashboard, tasks and clients; unchanged page content/controls; task views/dialogs, mobile, logout cleanup; invited/ordinary accounts share the design, independent of experimental identity RPC; no writes.",
   );
 } finally {
   await browser.close();

@@ -16,7 +16,7 @@ export default function WorkspaceSettings({
   workspace: string;
 }) {
   const [search, setSearch] = useState("");
-  const base = "/laboratorio/subcontas/" + workspace;
+  const base = "/subcontas/" + workspace;
   const groups = [
     {
       name: "Workspace e equipe",

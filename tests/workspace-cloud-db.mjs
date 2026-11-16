@@ -104,6 +104,18 @@ try {
       "utf8",
     ),
   );
+  if (process.env.STANDARD_WORKSPACES) {
+    await db.exec(
+      await readFile(
+        new URL(
+          "../supabase/migrations/20261116125048_workspace_standard_release.sql",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    );
+    await db.exec("delete from agency_private.pilot_accounts");
+  }
   const as = async (id) => {
     await db.exec("reset role;set role authenticated");
     await db.query("select set_config('request.jwt.claim.sub',$1,false)", [id]);
