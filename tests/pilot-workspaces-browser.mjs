@@ -1050,9 +1050,158 @@ try {
     0,
   );
   await navigateModule(page, "Geral");
+
+  // Keep customer setup concise without removing existing advanced credentials.
+  let providerSave;
+  await page.route("**/functions/v1/workspace-operations", async (route) => {
+    const request = route.request();
+    if (request.method() !== "POST") return route.fallback();
+    const body = request.postDataJSON();
+    let data;
+    if (body.action === "provider_settings")
+      data = {
+        providers: {
+          meta: {
+            enabled: true,
+            credentials: {
+              pixel_id: "123456789012345",
+              page_id: "987654321012345",
+              daily_limit: 42,
+            },
+            configured: {
+              access_token: true,
+              app_secret: true,
+              verify_token: true,
+            },
+          },
+          google_ads: {
+            enabled: true,
+            credentials: {
+              customer_id: "1234567890",
+              conversion_action: "123456",
+              client_id: "synthetic-client-id",
+            },
+            configured: { client_secret: true, refresh_token: true },
+          },
+          email: null,
+          sms: null,
+        },
+        meta_callback: "https://fixture.invalid/meta",
+        meta_destination: { create_leads: true, stage_id: null },
+      };
+    else if (body.action === "google_feed_settings")
+      data = {
+        enabled: false,
+        url: null,
+        available: 0,
+        without_click: 0,
+        fetched_7d: 0,
+        last_fetched_at: null,
+      };
+    else if (body.action === "save_provider") {
+      providerSave = body;
+      data = { ok: true };
+    } else return route.fallback();
+    return route.fulfill({
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+      body: JSON.stringify(data),
+    });
+  });
   await page
     .getByRole("link", { name: "Rastreamento de anúncios", exact: false })
     .click();
+  await page.getByLabel("Pixel ID", { exact: true }).waitFor();
+  assert.equal(
+    await page.getByLabel("Page ID (opcional)", { exact: true }).inputValue(),
+    "987654321012345",
+  );
+  assert.equal(
+    await page
+      .getByLabel("Segredo do aplicativo (webhook Meta)", { exact: true })
+      .isVisible(),
+    false,
+  );
+  assert.equal(
+    await page
+      .getByLabel("Token de verificação do webhook", { exact: true })
+      .isVisible(),
+    false,
+  );
+  assert.equal(
+    await page
+      .getByLabel("Limite diário de ações", { exact: true })
+      .isVisible(),
+    false,
+  );
+  await page
+    .getByLabel("Código de teste (opcional)", { exact: true })
+    .fill("TEST12345");
+  await page
+    .getByRole("button", { name: "Salvar conexão", exact: true })
+    .click();
+  await page
+    .getByRole("status")
+    .filter({ hasText: "Configuração salva." })
+    .waitFor();
+  assert.equal(providerSave.kind, "meta");
+  assert.equal(providerSave.enabled, true);
+  assert.equal(providerSave.credentials.pixel_id, "123456789012345");
+  assert.equal(providerSave.credentials.daily_limit, 42);
+  assert.equal(providerSave.credentials.test_event_code, "TEST12345");
+  assert.equal(Object.hasOwn(providerSave.credentials, "access_token"), false);
+  assert.equal(Object.hasOwn(providerSave.credentials, "app_secret"), false);
+  await page.screenshot({ path: "/workspace/work/ads-meta-simplified.png" });
+  await page
+    .getByText("Configuração avançada · Receber formulários da Meta", {
+      exact: true,
+    })
+    .click();
+  assert.equal(
+    await page
+      .getByLabel("Segredo do aplicativo (webhook Meta)", { exact: true })
+      .isVisible(),
+    true,
+  );
+  await page.getByRole("button", { name: "Google Ads", exact: true }).click();
+  await page
+    .getByRole("heading", {
+      name: "Envio automático para o Google Ads",
+      exact: true,
+    })
+    .waitFor();
+  assert.equal(
+    await page.getByLabel("OAuth Client ID", { exact: true }).isVisible(),
+    false,
+  );
+  assert.equal(
+    await page
+      .getByLabel("Ativar importação CSV Google", { exact: true })
+      .isDisabled(),
+    true,
+  );
+  await page.getByText("A API direta está ativa.", { exact: false }).waitFor();
+
+  assert.equal(
+    await page.getByLabel("OAuth Client Secret", { exact: true }).isVisible(),
+    false,
+  );
+  await page.screenshot({ path: "/workspace/work/ads-google-simplified.png" });
+  await page
+    .getByText("Configuração avançada · API direta", { exact: false })
+    .click();
+  await page.getByLabel("OAuth Client ID", { exact: true }).waitFor();
+  assert.equal(
+    await page
+      .getByLabel("ID da conta (10 dígitos, sem hífens)", { exact: true })
+      .inputValue(),
+    "1234567890",
+  );
+  await page.getByRole("button", { name: "Meta Ads", exact: true }).click();
+
   await page
     .getByRole("button", { name: "Links rastreáveis", exact: true })
     .click();
