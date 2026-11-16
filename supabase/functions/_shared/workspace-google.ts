@@ -1,3 +1,4 @@
+import { syncAgencyAccountGoogle } from "./agency-account-google.ts";
 const clientId = () => Deno.env.get("GOOGLE_CALENDAR_CLIENT_ID") || "";
 const clientSecret = () => Deno.env.get("GOOGLE_CALENDAR_CLIENT_SECRET") || "";
 export const googleReady = () => !!(clientId() && clientSecret());
@@ -136,16 +137,17 @@ export async function googleBusy(
 export async function syncGoogle(db: any, workspace: string) {
   const token = await access(db, workspace);
   if (!token) return;
-  const { data: rows, error } = await db
-    .from("agency_workspace_appointments")
-    .select("*")
-    .eq("workspace_id", workspace)
-    .order("updated_at")
-    .limit(1000);
+  await syncAgencyAccountGoogle(db, workspace, token);
+  const { data: rows, error } = await db.rpc(
+    "agency_workspace_calendar_pending",
+    { p_workspace: workspace },
+  );
   if (error) throw Error("Não foi possível ler os agendamentos.");
   for (const a of (rows || [])
     .filter(
-      (a: any) => !a.google_synced_at || a.google_synced_at < a.updated_at,
+      (a: any) =>
+        a.workspace_id === workspace &&
+        (!a.google_synced_at || a.google_synced_at < a.updated_at),
     )
     .slice(0, 10)) {
     const id = a.google_event_id || "cg" + a.id.replaceAll("-", "");

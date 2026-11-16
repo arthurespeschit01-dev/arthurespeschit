@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   const signUp = async (email: string, password: string) => {
-    const { data,error } = await supabase.auth.signUp({ email:email.trim(), password,options:{emailRedirectTo:`${window.location.origin}/auth/callback`} });
+    const { data,error } = await supabase.auth.signUp({ email:email.trim(), password,options:{emailRedirectTo:`${window.location.origin}/auth/callback${/^\/convite-equipe\/[a-f0-9]{64}$/.test(window.location.pathname) ? `?next=${encodeURIComponent(window.location.pathname)}` : ""}`} });
     if (error) throw error;
     return {requiresConfirmation:!data.session};
   };

@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { SupabaseClient } from "@supabase/supabase-js";
 export const workspaceDb = supabase as unknown as SupabaseClient;
 export interface ClientWorkspace {
+  account_kind?: "client" | "agency";
   id: string;
   name: string;
   description: string;
@@ -73,6 +74,7 @@ export async function workspaceList() {
   const { data, error } = await workspaceDb
     .from("agency_client_workspaces")
     .select("*")
+    .eq("account_kind", "client")
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as ClientWorkspace[];

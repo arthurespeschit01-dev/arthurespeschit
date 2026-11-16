@@ -25,7 +25,11 @@ Deno.test(
       };
     const db = {
       rpc: (_name: string, args: Record<string, unknown>) => {
+        if (_name === "agency_account_owner")
+          return Promise.resolve({ data: null, error: null });
         assertEquals(args.p_workspace, workspace);
+        if (_name === "agency_workspace_calendar_pending")
+          return Promise.resolve({ data: [appointment], error: null });
         return Promise.resolve({
           data: {
             access_token: "synthetic-access",

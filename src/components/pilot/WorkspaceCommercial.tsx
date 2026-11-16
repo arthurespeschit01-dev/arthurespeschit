@@ -1,3 +1,5 @@
+import AgencyCalendar from "../AgencyCalendar";
+import AgencyPreviousForms from "../AgencyPreviousForms";
 import WorkspaceSalesDashboard from "./WorkspaceSalesDashboard";
 import WorkspaceNotificationInbox from "./WorkspaceNotificationInbox";
 import { Link } from "react-router-dom";
@@ -47,6 +49,7 @@ export default function WorkspaceCommercial({
   stages,
   manage,
   write,
+  primary = false,
 }: {
   workspace: string;
   owner: string;
@@ -54,6 +57,7 @@ export default function WorkspaceCommercial({
   stages: WorkspaceStage[];
   manage: boolean;
   write: boolean;
+  primary?: boolean;
 }) {
   const { user } = useAuth(),
     client = useQueryClient(),
@@ -97,6 +101,8 @@ export default function WorkspaceCommercial({
       .catch((e) => setError(workspaceError(e)))
       .finally(() => setBusy(false));
   };
+  if (primary && section === "agendamentos")
+    return <AgencyCalendar workspace={workspace} />;
   if (["rastreamento", "canais", "creditos"].includes(section))
     return (
       <WorkspaceProviders
@@ -247,16 +253,19 @@ export default function WorkspaceCommercial({
         </p>
       )}
       {section === "formularios" ? (
-        <WorkspaceForms
-          workspace={workspace}
-          forms={forms}
-          folders={data.form_folders || []}
-          responses={responses}
-          stages={stages}
-          manage={manage}
-          write={write}
-          run={run}
-        />
+        <div className="space-y-5">
+          {primary && <AgencyPreviousForms workspace={workspace} />}
+          <WorkspaceForms
+            workspace={workspace}
+            forms={forms}
+            folders={data.form_folders || []}
+            responses={responses}
+            stages={stages}
+            manage={manage}
+            write={write}
+            run={run}
+          />
+        </div>
       ) : section === "agendamentos" ? (
         <WorkspaceScheduling
           workspace={workspace}

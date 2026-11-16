@@ -88,6 +88,7 @@ function WorkspaceGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 export default function PilotWorkspaces() {
+  const location = useLocation();
   return (
     <WorkspaceGate>
       <div className="min-h-dvh bg-background text-foreground">
@@ -101,7 +102,9 @@ export default function PilotWorkspaces() {
             <div className="min-w-0">
               <p className="font-semibold truncate">Central do Gestor</p>
               <p className="text-xs text-muted-foreground">
-                Subcontas de clientes
+                {location.pathname.startsWith("/conta/")
+                  ? "Conta principal"
+                  : "Subcontas de clientes"}
               </p>
             </div>
           </div>
@@ -132,6 +135,19 @@ function WorkspaceList() {
     queryKey: workspaceKey(user?.id),
     queryFn: workspaceList,
     refetchOnMount: "always",
+  });
+  const sharedAccounts = useQuery({
+    queryKey: ["shared-agency-accounts", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const r = await workspaceDb
+        .from("agency_client_workspaces")
+        .select("id,name")
+        .eq("account_kind", "agency")
+        .neq("owner_user_id", user!.id);
+      if (r.error) throw r.error;
+      return r.data as { id: string; name: string }[];
+    },
   });
   const identity = useQuery({
     queryKey: ["workspace-identity", user?.id],
@@ -195,6 +211,16 @@ function WorkspaceList() {
           </Button>
         )}
       </div>
+      {!!sharedAccounts.data?.length && (
+        <section className="border rounded-xl p-4 space-y-2">
+          <h2 className="font-semibold">Contas da equipe</h2>
+          {sharedAccounts.data.map((w) => (
+            <Button key={w.id} asChild variant="outline">
+              <Link to={`/conta/${w.id}`}>{w.name}</Link>
+            </Button>
+          ))}
+        </section>
+      )}
       <div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
         Gerencie as subcontas dos seus clientes e acesse as empresas para as
         quais você foi convidado. Nenhum cliente, tarefa ou conversa da agência
@@ -343,7 +369,7 @@ function WorkspaceView() {
       data?.pipelines[0],
     stages = data?.stages.filter((s) => s.pipeline_id === pipeline?.id) || [],
     leads = data?.leads.filter((l) => l.pipeline_id === pipeline?.id) || [];
-  const base = `/subcontas/${workspaceId}`,
+  const base = `/${w?.account_kind === "agency" ? "conta" : "subcontas"}/${workspaceId}`,
     section =
       location.pathname.split("/").pop() === workspaceId
         ? "inicio"
@@ -423,6 +449,20 @@ function WorkspaceView() {
         </Button>
       </div>
     );
+  if (
+    w.account_kind === "agency" &&
+    location.pathname.startsWith("/subcontas/")
+  )
+    return (
+      <Navigate
+        to={
+          location.pathname.replace("/subcontas/", "/conta/") +
+          location.search +
+          location.hash
+        }
+        replace
+      />
+    );
   const won = leads.filter(
       (l) => stages.find((s) => s.id === l.stage_id)?.kind === "won",
     ),
@@ -443,9 +483,14 @@ function WorkspaceView() {
               setSearch("");
               setLeadDialog(null);
               setPipelineDialog(null);
-              navigate(`/subcontas/${e.target.value}`);
+              navigate(
+                `/${e.target.value === w.id && w.account_kind === "agency" ? "conta" : "subcontas"}/${e.target.value}`,
+              );
             }}
           >
+            {w.account_kind === "agency" && (
+              <option value={w.id}>{w.name} · Conta principal</option>
+            )}
             {all.data?.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -589,6 +634,7 @@ function WorkspaceView() {
               <WorkspaceCommercial
                 key={workspaceId + section}
                 workspace={workspaceId}
+                primary={w.account_kind === "agency"}
                 owner={w.owner_user_id}
                 section={section}
                 stages={data?.stages || []}

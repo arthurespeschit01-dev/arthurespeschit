@@ -55,6 +55,7 @@ for (const name of [
   "20261114034242_workspace_ai_conversion_rules.sql",
   "20261114151246_workspace_crm_and_flow_parity.sql",
   "20261116125048_workspace_standard_release.sql",
+  "20261116135124_workspace_invitation_delivery_roles.sql",
 ])
   await db.exec(
     await readFile(
@@ -63,6 +64,9 @@ for (const name of [
     ),
   );
 // All authenticated accounts use subaccounts without pilot enrollment.
+await db.exec(
+  "alter table public.agency_client_workspaces add column account_kind text not null default 'client'",
+);
 let queue = Promise.resolve(),
   featureReads = 0,
   sends = 0;
@@ -96,6 +100,7 @@ async function contextFor(id) {
   await context.routeWebSocket("**", (ws) => ws.close());
   await context.addInitScript(
     ({ id }) => {
+      if (!id) return;
       const session = {
         access_token:
           "eyJhbGciOiJIUzI1NiJ9.eyJleHAiOjQxMDI0NDQ4MDAsInN1YiI6ImZpeHR1cmUifQ.fixture",
@@ -105,7 +110,7 @@ async function contextFor(id) {
         token_type: "bearer",
         user: {
           id,
-          email: "fixture@example.invalid",
+          email: id + "@example.invalid",
           aud: "authenticated",
           role: "authenticated",
           app_metadata: {},
@@ -132,8 +137,53 @@ async function contextFor(id) {
         body: JSON.stringify(data),
       });
     try {
-      if (u.pathname.includes("/auth/")) return reply({ id, app_metadata: {} });
+      if (u.pathname.includes("/auth/"))
+        return id
+          ? reply({
+              id,
+              email: id + "@example.invalid",
+              email_confirmed_at: "2026-01-01T00:00:00Z",
+              app_metadata: {},
+            })
+          : reply(null, 401);
       if (u.pathname.includes("/functions/")) {
+        if (body?.action === "team_settings")
+          return reply({ email_configured: true });
+        if (body?.action === "invite_member") {
+          const r = await run(id, () =>
+            db.query(
+              "insert into agency_workspace_invitations(workspace_id,email,display_name,role,custom_role_id) values($1,$2,$3,$4,$5) returning *",
+              [
+                body.workspace_id,
+                body.email,
+                body.display_name,
+                body.role,
+                body.custom_role_id,
+              ],
+            ),
+          );
+          await run(null, () =>
+            db.query(
+              "update agency_workspace_invitations set email_sent_at=now() where id=$1",
+              [r.rows[0].id],
+            ),
+          );
+          return reply({ id: r.rows[0].id, email_sent: true });
+        }
+        if (body?.action === "send_invite_email")
+          return reply({ email_sent: true });
+        if (body?.action === "public_invite") {
+          const result = await run(null, () =>
+            db.query(
+              "select w.name,w.account_kind,i.email,i.role,r.name role_name,i.status from agency_workspace_invitations i join agency_client_workspaces w on w.id=i.workspace_id left join agency_workspace_roles r on r.workspace_id=i.workspace_id and r.id=i.custom_role_id where i.token=$1",
+              [body.token],
+            ),
+          );
+          return result.rows[0]
+            ? reply(result.rows[0])
+            : reply({ error: "Convite inválido" }, 400);
+        }
+
         if (body?.action === "public_form" || body?.action === "submit_form") {
           const f = (
             await run(null, () =>
@@ -254,6 +304,25 @@ async function contextFor(id) {
           ]),
         );
         return reply(r.rows[0].result);
+      }
+      if (table === "agency_workspace_accept_invite") {
+        const r = await run(id, () =>
+          db.query("select agency_workspace_accept_invite($1) result", [
+            body.p_token,
+          ]),
+        );
+        return reply(r.rows[0].result);
+      }
+      if (table === "agency_workspace_set_member_role") {
+        const r = await run(id, () =>
+          db.query("select agency_workspace_set_member_role($1,$2,$3,$4)", [
+            body.p_workspace,
+            body.p_user,
+            body.p_role,
+            body.p_custom,
+          ]),
+        );
+        return reply(null);
       }
       if (table === "agency_workspace_save_role") {
         const r = await run(id, () =>
@@ -1325,23 +1394,71 @@ try {
   await navigateModule(page, "Workspace");
   await page.getByRole("button", { name: "Funções", exact: true }).click();
   await page.getByRole("button", { name: "Nova função", exact: true }).click();
+  await page.getByLabel("Nome da função", { exact: true }).fill("Design");
+  await page.getByLabel("Acesso a CRM", { exact: true }).selectOption("read");
   await page
-    .getByLabel("Nome da função", { exact: true })
-    .fill("Comercial de teste");
-  await page.getByLabel("Acesso a CRM", { exact: true }).selectOption("write");
+    .getByLabel("Acesso a Formulários", { exact: true })
+    .selectOption("read");
   await page
     .getByRole("button", { name: "Salvar função", exact: true })
     .click();
-  await page
-    .getByRole("button", { name: "Comercial de teste", exact: false })
-    .waitFor();
+  await page.getByRole("button", { name: "Design", exact: false }).waitFor();
   await page.getByRole("button", { name: "Membros", exact: true }).click();
-  await page.getByLabel("E-mail do convidado").fill("member@example.invalid");
-  await page.getByLabel("Nome do convidado").fill("Atendente");
+  await page.getByLabel("E-mail do convidado").fill(other + "@example.invalid");
+  await page
+    .getByLabel("Permissão do convite")
+    .selectOption({ label: "Design" });
+  await page.getByLabel("Nome do convidado").fill("Designer");
   await page
     .getByRole("button", { name: "Criar convite", exact: true })
     .click();
-  await page.getByText("Atendente · Atendente", { exact: false }).waitFor();
+  await page.getByText("Designer · Design", { exact: false }).waitFor();
+  const invitation = await run(null, () =>
+    db.query(
+      "select * from agency_workspace_invitations where workspace_id=$1 and email=$2 order by created_at desc limit 1",
+      [alpha, other + "@example.invalid"],
+    ),
+  );
+  assert.equal(invitation.rows[0].role, "viewer");
+  assert(invitation.rows[0].custom_role_id);
+  const guest = await contextFor(null),
+    guestPage = await guest.newPage();
+  await guestPage.goto(base + "/convite-equipe/" + invitation.rows[0].token);
+  await guestPage
+    .getByRole("heading", { name: "Convite para a equipe", exact: true })
+    .waitFor();
+  await guestPage.getByLabel("E-mail", { exact: true }).waitFor();
+  assert.equal(
+    await guestPage.getByLabel("E-mail", { exact: true }).inputValue(),
+    other + "@example.invalid",
+  );
+  await guest.close();
+  const recipient = await contextFor(other),
+    recipientPage = await recipient.newPage();
+  await recipientPage.goto(
+    base + "/convite-equipe/" + invitation.rows[0].token,
+  );
+  await recipientPage
+    .getByRole("button", { name: "Aceitar convite", exact: true })
+    .click();
+  await recipientPage
+    .getByRole("heading", { name: "Empresa Alpha", exact: true })
+    .waitFor();
+  await navigateModule(recipientPage, "CRM");
+  assert.equal(
+    await recipientPage
+      .getByRole("button", { name: "Novo lead", exact: true })
+      .isDisabled(),
+    true,
+  );
+  assert.equal(
+    await recipientPage
+      .getByRole("link", { name: "Funis e automações", exact: true })
+      .count(),
+    0,
+  );
+  await recipient.close();
+
   await navigateModule(page, "CRM");
   await page.getByRole("button", { name: "Novo lead", exact: true }).click();
   await page.getByLabel("Nome", { exact: true }).fill("Carla piloto");

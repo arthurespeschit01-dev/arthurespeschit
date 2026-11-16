@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/contexts/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
+import { useWorkspaceRoles, type Role } from "@/hooks/useWorkspaceRoles";
 import { workspaceDb } from "@/lib/clientWorkspaces";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,40 +15,6 @@ const permissionModules = {
   settings: "Configurações e integrações",
   team: "Pessoas (visualização)",
 };
-interface Role {
-  id: string;
-  name: string;
-  color: string;
-  admin_total: boolean;
-  permissions: Record<string, string>;
-  notifications: Record<string, boolean>;
-}
-interface Assignment {
-  user_id: string;
-  role_id: string;
-}
-function useWorkspaceRoles(workspace: string) {
-  const { user } = useAuth();
-  return useQuery({
-    queryKey: ["workspace-roles", user?.id, workspace],
-    queryFn: async () => {
-      const [r, a] = await Promise.all([
-        workspaceDb
-          .from("agency_workspace_roles")
-          .select("*")
-          .eq("workspace_id", workspace)
-          .order("name"),
-        workspaceDb
-          .from("agency_workspace_member_roles")
-          .select("user_id,role_id")
-          .eq("workspace_id", workspace),
-      ]);
-      if (r.error) throw r.error;
-      if (a.error) throw a.error;
-      return { roles: r.data as Role[], assignments: a.data as Assignment[] };
-    },
-  });
-}
 export function RoleAssignments({
   workspace,
   user,
@@ -280,7 +246,8 @@ export default function WorkspaceRoles({
               <div className="border rounded-xl p-4 space-y-3">
                 <h3 className="font-semibold">Acesso aos módulos</h3>
                 <p className="text-xs text-muted-foreground">
-                  A administração de membros e cargos exige Administrador total ou propriedade da empresa.
+                  A administração de membros e cargos exige Administrador total
+                  ou propriedade da empresa.
                 </p>
                 {Object.entries(permissionModules).map(([k, label]) => (
                   <label

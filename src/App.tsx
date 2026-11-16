@@ -108,11 +108,11 @@ function ProtectedRoutes() {
   if (!user) return <AuthPage />;
   return (
     <Routes>
-      <Route path="/convite-equipe/:token" element={<Suspense fallback={<PageFallback />}><WorkspaceInvitation /></Suspense>} />
       <Route
         path="/subcontas/*"
         element={<RouteBoundary><Suspense fallback={<PageFallback />}><PilotWorkspaces /></Suspense></RouteBoundary>}
       />
+      <Route path="/conta/*" element={<RouteBoundary><Suspense fallback={<PageFallback />}><PilotWorkspaces /></Suspense></RouteBoundary>} />
       <Route path="/laboratorio/*" element={<LegacyWorkspaceRedirect />} />
       <Route path="/bloqueado" element={<Navigate to="/" replace />} />
       <Route path="*" element={
@@ -139,7 +139,7 @@ function ProtectedRoutes() {
                 <Route path="/tasks" element={<Tasks />} />
                 <Route path="/estrategias" element={<Navigate to="/comercial" replace />} />
                 <Route path="/utm" element={<UTMGenerator />} />
-                <Route path="/configuracoes" element={<Configuracoes />} />
+                <Route path="/configuracoes/*" element={<Configuracoes />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
@@ -211,6 +211,7 @@ const App = () => (
           <Route path="/captura/:token" element={<WorkspacePublic />} />
           <Route path="/reservar/:token" element={<WorkspacePublic />} />
           <Route path="/*" element={<AuthProvider><PilotVisualTheme/><Routes>
+            <Route path="/convite-equipe/:token" element={<WorkspaceInvitation />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/*" element={<ProtectedRoutes />} />
           </Routes></AuthProvider>} />

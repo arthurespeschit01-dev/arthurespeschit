@@ -1,3 +1,4 @@
+import { sendWorkspaceInvite } from "../_shared/workspace-invites.ts";
 import {
   receiveOptOut,
   assertCampaignAllowed,
@@ -248,7 +249,8 @@ async function publicResource(kind: string, token: unknown) {
     !row ||
     (kind !== "invite" && !row.enabled) ||
     (kind === "invite" &&
-      (row.status !== "pending" || Date.parse(row.expires_at) < Date.now()))
+      (!["pending", "accepted"].includes(row.status) ||
+        Date.parse(row.expires_at) < Date.now()))
   )
     throw Error("Link inválido, expirado ou desativado.");
   await active(row.workspace_id);
@@ -296,7 +298,7 @@ export async function handle(req: Request) {
         callbackUrl.searchParams.get("code") || "",
       );
       return Response.redirect(
-        `${app}/laboratorio/subcontas/${workspace}/integracoes?google=connected`,
+        `${app}/${(await checked(db.rpc("agency_account_owner", { p_workspace: workspace }))) ? `conta/${workspace}/google-agenda` : `subcontas/${workspace}/google-agenda`}?google=connected`,
         303,
       );
     } catch {
@@ -633,11 +635,29 @@ export async function handle(req: Request) {
       const w = await checked(
         db
           .from("agency_client_workspaces")
-          .select("name")
+          .select("name,account_kind")
           .eq("id", i.workspace_id)
           .single(),
       );
-      return reply({ name: w.name, role: i.role, expires_at: i.expires_at });
+      const role = i.custom_role_id
+        ? await checked(
+            db
+              .from("agency_workspace_roles")
+              .select("name")
+              .eq("workspace_id", i.workspace_id)
+              .eq("id", i.custom_role_id)
+              .single(),
+          )
+        : null;
+      return reply({
+        name: w.name,
+        account_kind: w.account_kind,
+        role: i.role,
+        role_name: role?.name,
+        email: i.email,
+        status: i.status,
+        expires_at: i.expires_at,
+      });
     }
     if (body.action === "public_calendar") {
       const c = await publicResource("calendar", body.token);
@@ -732,6 +752,54 @@ export async function handle(req: Request) {
       );
     if (!permissions.can_read)
       return reply({ error: "Sem acesso a esta subconta." }, 403);
+    if (
+      ["invite_member", "send_invite_email", "team_settings"].includes(
+        body.action,
+      )
+    ) {
+      if (!permissions.can_manage)
+        return reply(
+          { error: "Somente administradores podem convidar membros." },
+          403,
+        );
+      await active(workspace);
+      if (body.action === "team_settings")
+        return reply({ email_configured: !!Deno.env.get("RESEND_API_KEY") });
+      let id = body.id;
+      if (body.action === "invite_member") {
+        const roleId = body.custom_role_id || null;
+        if (roleId && !uuid(roleId)) throw Error("Função inválida.");
+        if (!roleId && !["admin", "agent", "viewer"].includes(body.role))
+          throw Error("Escolha uma função válida.");
+        const saved = await checked(
+          client
+            .from("agency_workspace_invitations")
+            .insert({
+              workspace_id: workspace,
+              email: String(body.email || "")
+                .trim()
+                .toLowerCase(),
+              display_name: String(body.display_name || "").trim(),
+              role: roleId ? "viewer" : body.role,
+              custom_role_id: roleId,
+            })
+            .select("id")
+            .single(),
+        );
+        id = saved.id;
+      }
+      if (!uuid(id)) throw Error("Convite inválido.");
+      return reply({
+        id,
+        ...(await sendWorkspaceInvite(
+          db,
+          workspace,
+          id,
+          Deno.env.get("AGENCY_APP_URL") || "https://www.centraldogestor.site",
+          Deno.env.get("RESEND_API_KEY") || "",
+        )),
+      });
+    }
     const managers = [
       "google_connect",
       "google_disconnect",

@@ -60,3 +60,16 @@ See [pilot WhatsApp connections](pilot-whatsapp-connections.md) for separate QR/
 `20261116125048_workspace_standard_release.sql` removes the reviewed runtime allowlist joins, retains every workspace predicate/ACL, adds the standard status RPC and updates existing cron commands in place without duplicate jobs. `tests/workspace-standard-db.mjs` verifies unrestricted own-account enrollment, cross-account denial, viewer restrictions, immutable ownership, archive/anonymous denial, private settings and legacy preservation. The expansion and Cloud suites run with `STANDARD_WORKSPACES=1`; the browser suite now verifies an unenrolled account can create its own workspace while foreign workspaces remain inaccessible.
 
 General availability does not create provider accounts or bypass Meta/Google approval requirements. Each company configures its own integrations.
+
+
+## Main account and invitation delivery
+
+The main account exposes team/roles, Calendar, tracking, channels, webhooks and usage under `/configuracoes/*`, with collaboration under `/conta/:workspace`. `agency_account_workspace()` creates an idempotent owner-bound context. Client subaccounts never receive this binding. Existing main CRM stays at its original route; scoped triggers synchronize common commercial fields in both directions. Existing WhatsApp credentials and conversation history are untouched. New confirmed text messages can feed primary-account conversion rules only when matched to an existing CRM lead. Legacy forms remain at their original route; the shared area also shows their read-only summaries.
+
+Main Calendar keeps original appointment IDs and adds month/week/list views. Its permission-checked RPC supports authorized team access. Google uses a separately connected primary-workspace Google account, deterministic event IDs, revision-aware retries and a deletion queue; a client workspace token is never copied.
+
+Invitations are public capability links with login/signup on the same page. Acceptance requires the confirmed invited email. A custom role is assigned atomically on acceptance with a viewer baseline, and all module access remains enforced by PostgreSQL. Existing members can receive the same roles from the team selector. Shared primary accounts appear under “Contas da equipe”.
+
+Invitation email is sent server-side through Resend using `RESEND_API_KEY` and the verified sender `notificacoes@centraldogestor.site`. Claims serialize sends, enforce resend/rate limits and prevent arbitrary recipient changes. Provider acceptance is recorded separately from an error; the UI never treats invitation creation as email delivery. The invite link remains usable after a provider error. No live emails or Google events are sent by automated tests.
+
+Validation: `ACCOUNT_BROWSER=1 node tests/agency-account-db.mjs`, `node tests/pilot-workspaces-browser.mjs`, and the invite/Google Deno contract tests.
