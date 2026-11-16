@@ -1052,7 +1052,10 @@ try {
   await navigateModule(page, "Geral");
 
   // Keep customer setup concise without removing existing advanced credentials.
-  let providerSave;
+  let providerSave,
+    googleApiEnabled = true,
+    googleFeedEnabled = false;
+  const switchCalls = [];
   await page.route("**/functions/v1/workspace-operations", async (route) => {
     const request = route.request();
     if (request.method() !== "POST") return route.fallback();
@@ -1075,7 +1078,7 @@ try {
             },
           },
           google_ads: {
-            enabled: true,
+            enabled: googleApiEnabled,
             credentials: {
               customer_id: "1234567890",
               conversion_action: "123456",
@@ -1091,8 +1094,8 @@ try {
       };
     else if (body.action === "google_feed_settings")
       data = {
-        enabled: false,
-        url: null,
+        enabled: googleFeedEnabled,
+        url: googleFeedEnabled ? "https://fixture.invalid/feed" : null,
         available: 0,
         without_click: 0,
         fetched_7d: 0,
@@ -1100,6 +1103,19 @@ try {
       };
     else if (body.action === "save_provider") {
       providerSave = body;
+      if (body.kind === "google_ads") {
+        assert.equal(body.enabled, false);
+        assert.deepEqual(body.credentials, {});
+        assert.equal(body.workspace_id, alpha);
+        googleApiEnabled = false;
+        switchCalls.push("disable-api");
+      }
+      data = { ok: true };
+    } else if (body.action === "save_google_feed") {
+      assert.equal(googleApiEnabled, false);
+      assert.equal(body.workspace_id, alpha);
+      googleFeedEnabled = body.values.enabled;
+      switchCalls.push("enable-feed");
       data = { ok: true };
     } else return route.fallback();
     return route.fulfill({
@@ -1154,18 +1170,23 @@ try {
   assert.equal(providerSave.credentials.test_event_code, "TEST12345");
   assert.equal(Object.hasOwn(providerSave.credentials, "access_token"), false);
   assert.equal(Object.hasOwn(providerSave.credentials, "app_secret"), false);
-  await page.screenshot({ path: "/workspace/work/ads-meta-simplified.png" });
-  await page
-    .getByText("Configuração avançada · Receber formulários da Meta", {
-      exact: true,
-    })
-    .click();
   assert.equal(
     await page
       .getByLabel("Segredo do aplicativo (webhook Meta)", { exact: true })
-      .isVisible(),
-    true,
+      .count(),
+    0,
   );
+  assert.equal(
+    await page
+      .getByLabel("Token de verificação do webhook", { exact: true })
+      .count(),
+    0,
+  );
+  assert.equal(
+    await page.getByLabel("URL do webhook Meta", { exact: true }).count(),
+    0,
+  );
+  await page.screenshot({ path: "/workspace/work/ads-meta-simplified.png" });
   await page.getByRole("button", { name: "Google Ads", exact: true }).click();
   await page
     .getByRole("heading", {
@@ -1183,22 +1204,47 @@ try {
       .isDisabled(),
     true,
   );
-  await page.getByText("A API direta está ativa.", { exact: false }).waitFor();
+  await page
+    .getByText("Há uma modalidade de envio anterior ativa.", { exact: false })
+    .waitFor();
 
   assert.equal(
     await page.getByLabel("OAuth Client Secret", { exact: true }).isVisible(),
     false,
   );
   await page.screenshot({ path: "/workspace/work/ads-google-simplified.png" });
-  await page
-    .getByText("Configuração avançada · API direta", { exact: false })
-    .click();
-  await page.getByLabel("OAuth Client ID", { exact: true }).waitFor();
+  assert.equal(
+    await page.getByLabel("OAuth Client ID", { exact: true }).count(),
+    0,
+  );
+  assert.equal(
+    await page.getByLabel("OAuth Client Secret", { exact: true }).count(),
+    0,
+  );
   assert.equal(
     await page
-      .getByLabel("ID da conta (10 dígitos, sem hífens)", { exact: true })
-      .inputValue(),
-    "1234567890",
+      .getByLabel("OAuth Refresh Token com escopo Data Manager", {
+        exact: true,
+      })
+      .count(),
+    0,
+  );
+  assert.equal(
+    await page
+      .getByText("Configuração avançada · API direta", { exact: false })
+      .count(),
+    0,
+  );
+  await page
+    .getByRole("button", { name: "Usar importação por URL", exact: true })
+    .click();
+  await page.getByRole("link", { name: "Baixar CSV", exact: true }).waitFor();
+  assert.deepEqual(switchCalls, ["disable-api", "enable-feed"]);
+  assert.equal(
+    await page
+      .getByLabel("Ativar importação CSV Google", { exact: true })
+      .isChecked(),
+    true,
   );
   await page.getByRole("button", { name: "Meta Ads", exact: true }).click();
 

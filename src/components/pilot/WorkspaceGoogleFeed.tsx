@@ -36,6 +36,14 @@ export default function WorkspaceGoogleFeed({
     setBusy(true);
     setError("");
     try {
+      if (enabled && apiEnabled) {
+        await workspaceOperation("save_provider", {
+          workspace_id: workspace,
+          kind: "google_ads",
+          enabled: false,
+          credentials: {},
+        });
+      }
       await workspaceOperation("save_google_feed", {
         workspace_id: workspace,
         values: { enabled, rotate },
@@ -44,6 +52,9 @@ export default function WorkspaceGoogleFeed({
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      await client.invalidateQueries({
+        queryKey: ["workspace-providers", user?.id, workspace],
+      });
       setBusy(false);
     }
   };
@@ -65,14 +76,22 @@ export default function WorkspaceGoogleFeed({
       <p className="text-sm text-muted-foreground">
         O Google busca as conversões desta empresa pela URL abaixo, no horário
         configurado na importação. Copie o endereço uma vez para o Google Ads e
-        configure uma busca diária. Não é necessário preencher credenciais de
-        API nesta modalidade.
+        configure uma busca diária.
       </p>
       {apiEnabled && (
-        <p className="text-sm text-muted-foreground">
-          A API direta está ativa. Para usar a importação por URL, desative o
-          envio pela API na configuração avançada abaixo.
-        </p>
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">
+            Há uma modalidade de envio anterior ativa. Ao usar a importação por
+            URL, o envio anterior será desativado para evitar conversões
+            duplicadas. Os dados salvos serão preservados.
+          </p>
+          <Button
+            disabled={busy || q.isPending}
+            onClick={() => void save(true)}
+          >
+            Usar importação por URL
+          </Button>
+        </div>
       )}
       {!q.data?.url && (
         <p className="text-sm text-muted-foreground">
