@@ -12,7 +12,7 @@ A manager can issue a 15-minute delegated connection link after verifying the in
 
 ### Official Meta Cloud API
 
-The implementation uses Facebook Login for Business with a **v4** configuration. Its server-issued nonce is scoped to workspace and authenticated administrator, expires after 10 minutes and is consumed once. The authorization code is exchanged server-side, and the selected phone ID is verified against the WABA granted by that token. Business-app mode requires Meta to confirm `is_on_biz_app`; normal mode registers the phone with a server-generated PIN retained privately. The app is subscribed to WABA events. Only after these calls succeed is the workspace connection enabled and its actual phone checked.
+The implementation uses Facebook Login for Business with a **v4** configuration and `sessionInfoVersion: "3"` for session logging. The session payload version is independent from the Embedded Signup version. Its server-issued nonce is scoped to workspace and authenticated administrator, expires after 10 minutes and is consumed once. The authorization code is exchanged server-side, and the selected phone ID is verified against the WABA granted by that token. The documented Business-app completion event may contain only a WABA ID. In that case, Business-app mode can resolve a phone only when the token-authorized WABA contains exactly one non-paginated Cloud API phone with `is_on_biz_app=true`; ambiguous accounts are refused. A normal login or account-sharing-only finish is not treated as completed WhatsApp onboarding. Business-app mode requires Meta to confirm `is_on_biz_app`; normal mode registers the phone with a server-generated PIN retained privately. The app is subscribed to WABA events. Only after these calls succeed is the workspace connection enabled and its actual phone checked.
 
 Incoming callbacks require `X-Hub-Signature-256` over the raw body using the application's secret. WABA ID and phone ID must match an enabled workspace connection. Replayed message IDs remain idempotent. New text messages and supported message descriptions/captions enter the existing scoped CRM/conversation pipeline; Business app message echoes are outgoing messages. Sender contact identity and tracking references are preserved.
 
@@ -54,6 +54,8 @@ Loading has a bounded timeout and a manual retry. An authorization can be cancel
 - Provider contracts: HMAC validation/tampering, WABA/phone routing, coexistence echo normalization, media/text dispatch, service window refusal and phrase matching.
 - Frontend: trusted origin and session event parsing, code/session join and cancellation; browser regression verifies the two tabs, honest pending state, QR display/status transition and preserved workspace/RLS behavior.
 - Public pairing is verified with fixture responses/expired capabilities; no real provider session is generated in tests.
+
+A Facebook reauthorization screen alone does not prove the login configuration launches Embedded Signup. In the Meta app, inspect Facebook Login for Business → Configurations → Edit: login variation must be Embedded Signup and the selected products must include WhatsApp Cloud API. If OAuth returns a code without any WhatsApp session event, the client reports this distinction instead of claiming a selected phone was missing.
 
 Official docs consulted:
 

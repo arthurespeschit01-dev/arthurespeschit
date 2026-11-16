@@ -885,6 +885,7 @@ try {
     setTimeout(function(){window.FB={init:function(){},login:function(callback,options){
       window.__metaEventType=window.event&&window.event.type;
       if(!navigator.userActivation.isActive)throw Error('Login lost user activation');
+      if(options.extras.sessionInfoVersion !== '3')throw Error('Session logging disabled');
       window.__metaMode=options.extras.featureType||'new_number';
       window.open('/meta-popup-fixture','meta-fixture','width=500,height=600');
       window.__completeMeta=function(){callback({authResponse:{code:'fixture-code'}});window.dispatchEvent(new MessageEvent('message',{origin:'https://www.facebook.com',data:JSON.stringify({type:'WA_EMBEDDED_SIGNUP',event:'FINISH',data:{waba_id:'123456',phone_number_id:'654321'}})}));};

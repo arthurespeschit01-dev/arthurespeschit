@@ -91,6 +91,8 @@ export function metaSignupEvent(origin: string, input: unknown) {
     if (message?.type !== "WA_EMBEDDED_SIGNUP") return null;
     if (["CANCEL", "ERROR"].includes(message.event))
       return { cancelled: true } as const;
+    if (message.event === "FINISH_ONLY_WABA")
+      return { incomplete: true } as const;
     if (
       !["FINISH", "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING"].includes(
         message.event,
@@ -98,14 +100,19 @@ export function metaSignupEvent(origin: string, input: unknown) {
     )
       return null;
     const { waba_id, phone_number_id } = message.data || {};
-    if (
-      !/^[0-9]{5,30}$/.test(waba_id) ||
-      !/^[0-9]{5,30}$/.test(phone_number_id)
-    )
+    if (!/^[0-9]{5,30}$/.test(waba_id)) return null;
+    if (phone_number_id !== undefined && !/^[0-9]{5,30}$/.test(phone_number_id))
       return null;
+    if (
+      phone_number_id === undefined &&
+      message.event !== "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING"
+    )
+      return { incomplete: true } as const;
     return {
       waba_id: String(waba_id),
-      phone_number_id: String(phone_number_id),
+      ...(phone_number_id === undefined
+        ? {}
+        : { phone_number_id: String(phone_number_id) }),
     };
   } catch {
     return null;
@@ -120,10 +127,10 @@ export function launchMetaSignup(
   return new Promise<{
     code: string;
     waba_id: string;
-    phone_number_id: string;
+    phone_number_id?: string;
   }>((resolve, reject) => {
     let code = "",
-      ids: { waba_id: string; phone_number_id: string } | null = null,
+      ids: { waba_id: string; phone_number_id?: string } | null = null,
       done = false,
       assetTimer: ReturnType<typeof setTimeout> | undefined;
     const cleanup = () => {
@@ -153,6 +160,12 @@ export function launchMetaSignup(
         fail("Conexão cancelada na Meta.");
         return;
       }
+      if ("incomplete" in result) {
+        fail(
+          "A Meta compartilhou a conta sem concluir o cadastro do número. Edite as configurações na janela da Meta e conclua a seleção do WhatsApp.",
+        );
+        return;
+      }
       ids = result;
       finish();
     };
@@ -180,7 +193,7 @@ export function launchMetaSignup(
             assetTimer = setTimeout(
               () =>
                 fail(
-                  "A Meta não informou o número selecionado. Tente novamente.",
+                  "O Facebook autorizou o login, mas não retornou o cadastro do WhatsApp. Confira se a configuração de login usa Cadastro incorporado e o produto WhatsApp Cloud API.",
                 ),
               5000,
             );
@@ -191,6 +204,8 @@ export function launchMetaSignup(
           override_default_response_type: true,
           extras: {
             version: "v4",
+            setup: {},
+            sessionInfoVersion: "3",
             ...(mode === "business_app"
               ? { featureType: "whatsapp_business_app_onboarding" }
               : {}),

@@ -81,16 +81,33 @@ export async function verifyCloudNumber(
   phone: string,
   token: string,
   request: typeof fetch = fetch,
+  allowCoexistenceDiscovery = false,
 ) {
-  if (!/^[0-9]{5,30}$/.test(waba) || !/^[0-9]{5,30}$/.test(phone))
+  if (
+    !/^[0-9]{5,30}$/.test(waba) ||
+    (phone ? !/^[0-9]{5,30}$/.test(phone) : !allowCoexistenceDiscovery)
+  )
     throw Error("Identificação do número Meta inválida.");
   const numbers = await cloudGraph(
-    `${waba}/phone_numbers?fields=id,display_phone_number&limit=100`,
+    `${waba}/phone_numbers?fields=id,display_phone_number,is_on_biz_app,platform_type&limit=100`,
     token,
     "GET",
     undefined,
     request,
   );
+  if (!phone) {
+    const eligible = (numbers.data || []).filter(
+      (n: any) =>
+        n.is_on_biz_app === true &&
+        n.platform_type === "CLOUD_API" &&
+        /^[0-9]{5,30}$/.test(n.id),
+    );
+    if (eligible.length !== 1 || numbers.paging?.next)
+      throw Error(
+        "A Meta retornou a conta sem identificar um único número em coexistência. Conclua a seleção do número no cadastro incorporado.",
+      );
+    phone = eligible[0].id;
+  }
   if (!numbers.data?.some((n: any) => n.id === phone))
     throw Error("O número não pertence à conta WhatsApp autorizada.");
   const info = await cloudGraph(
@@ -100,6 +117,8 @@ export async function verifyCloudNumber(
     undefined,
     request,
   );
+  if (info.id !== phone)
+    throw Error("A Meta não confirmou a identificação do número.");
   const digits = String(info.display_phone_number || "").replace(/\D/g, "");
   if (!/^[0-9]{10,15}$/.test(digits))
     throw Error("A Meta não confirmou o telefone.");
