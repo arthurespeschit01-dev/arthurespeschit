@@ -27,7 +27,7 @@ it("joins the SDK code with trusted session assets and removes the listener", as
         options: { extras: { version: string; sessionInfoVersion?: string } },
       ) => {
         expect(options.extras.version).toBe("v4");
-        expect(options.extras.sessionInfoVersion).toBeUndefined();
+        expect(options.extras.sessionInfoVersion).toBe("3");
         cb({ authResponse: { code: "authorized-code" } });
       },
     );
@@ -141,5 +141,70 @@ it("reports SDK initialization timeout and allows a clean retry", async () => {
       .querySelectorAll('script[src*="connect.facebook.net"]')
       .forEach((s) => s.remove());
     delete host.FB;
+  }
+});
+
+it("accepts documented coexistence completion with WABA only, without guessing a phone", async () => {
+  const promise = launchMetaSignup(
+    {
+      init: vi.fn(),
+      login: (cb) => cb({ authResponse: { code: "coex-code" } }),
+    },
+    "config",
+    "business_app",
+  );
+  window.dispatchEvent(
+    new MessageEvent("message", {
+      origin: "https://www.facebook.com",
+      data: {
+        type: "WA_EMBEDDED_SIGNUP",
+        event: "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING",
+        data: { waba_id: "123456" },
+      },
+    }),
+  );
+  await expect(promise).resolves.toEqual({
+    code: "coex-code",
+    waba_id: "123456",
+  });
+});
+it("refuses account-sharing completion without a selected phone in the normal flow", async () => {
+  const promise = launchMetaSignup(
+    {
+      init: vi.fn(),
+      login: (cb) => cb({ authResponse: { code: "shared-code" } }),
+    },
+    "config",
+    "new_number",
+  );
+  window.dispatchEvent(
+    new MessageEvent("message", {
+      origin: "https://www.facebook.com",
+      data: {
+        type: "WA_EMBEDDED_SIGNUP",
+        event: "FINISH_ONLY_WABA",
+        data: { waba_id: "123456" },
+      },
+    }),
+  );
+  await expect(promise).rejects.toThrow("sem concluir o cadastro do número");
+});
+it("distinguishes Facebook-only login from actual WhatsApp onboarding", async () => {
+  vi.useFakeTimers();
+  try {
+    const result = expect(
+      launchMetaSignup(
+        {
+          init: vi.fn(),
+          login: (cb) => cb({ authResponse: { code: "login-only-code" } }),
+        },
+        "config",
+        "new_number",
+      ),
+    ).rejects.toThrow("Cadastro incorporado");
+    await vi.advanceTimersByTimeAsync(5000);
+    await result;
+  } finally {
+    vi.useRealTimers();
   }
 });

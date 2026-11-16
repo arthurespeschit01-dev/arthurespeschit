@@ -162,3 +162,98 @@ Deno.test(
     assertEquals(matchesOptOut("Pode preparar a visita?", ["parar"]), false);
   },
 );
+
+Deno.test(
+  "WABA-only coexistence resolves only a unique authorized Business app number",
+  async () => {
+    let calls = 0;
+    const request: typeof fetch = async () => {
+      calls++;
+      return Response.json(
+        calls === 1
+          ? {
+              data: [
+                {
+                  id: "654321",
+                  display_phone_number: "5511999990000",
+                  is_on_biz_app: true,
+                  platform_type: "CLOUD_API",
+                },
+                {
+                  id: "777777",
+                  is_on_biz_app: false,
+                  platform_type: "CLOUD_API",
+                },
+              ],
+            }
+          : {
+              id: "654321",
+              display_phone_number: "5511999990000",
+              is_on_biz_app: true,
+              platform_type: "CLOUD_API",
+            },
+      );
+    };
+    const result = await verifyCloudNumber(
+      "123456",
+      "",
+      "fixture-token",
+      request,
+      true,
+    );
+    assertEquals(result.id, "654321");
+    assertEquals(result.phone, "5511999990000");
+    await assertRejects(() =>
+      verifyCloudNumber("123456", "", "fixture-token", request, false),
+    );
+  },
+);
+Deno.test(
+  "WABA-only completion cannot guess among multiple or paginated phone assets",
+  async () => {
+    const candidates = [
+      { id: "654321", is_on_biz_app: true, platform_type: "CLOUD_API" },
+      { id: "777777", is_on_biz_app: true, platform_type: "CLOUD_API" },
+    ];
+    await assertRejects(() =>
+      verifyCloudNumber(
+        "123456",
+        "",
+        "fixture-token",
+        async () => Response.json({ data: candidates }),
+        true,
+      ),
+    );
+    await assertRejects(() =>
+      verifyCloudNumber(
+        "123456",
+        "",
+        "fixture-token",
+        async () =>
+          Response.json({
+            data: [candidates[0]],
+            paging: { next: "https://graph.facebook.com/next" },
+          }),
+        true,
+      ),
+    );
+    await assertRejects(() =>
+      verifyCloudNumber(
+        "123456",
+        "",
+        "fixture-token",
+        async () =>
+          Response.json({
+            data: [
+              {
+                id: "777777",
+                is_on_biz_app: false,
+                platform_type: "CLOUD_API",
+              },
+            ],
+          }),
+        true,
+      ),
+    );
+  },
+);

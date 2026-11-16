@@ -1065,6 +1065,8 @@ export async function handle(req: Request) {
         String(body.waba_id || ""),
         String(body.phone_number_id || ""),
         token,
+        undefined,
+        session.mode === "business_app",
       );
       if (session.mode === "business_app" && !info.is_on_biz_app)
         throw Error(
@@ -1080,7 +1082,7 @@ export async function handle(req: Request) {
           p_workspace: workspace,
           p_values: {
             waba_id: body.waba_id,
-            phone_number_id: body.phone_number_id,
+            phone_number_id: info.id,
             token,
             pin,
             pipeline_id: body.pipeline_id,
