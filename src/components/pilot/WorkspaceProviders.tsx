@@ -17,11 +17,9 @@ import { RecordMenu, ShareLink, Empty } from "./CommercialShared";
 const fields: Record<string, [string, string, boolean][]> = {
   meta: [
     ["pixel_id", "Pixel ID", false],
-    ["access_token", "Token de acesso", true],
+    ["page_id", "Page ID (opcional)", false],
     ["test_event_code", "Código de teste (opcional)", false],
-    ["page_id", "Page ID (para captar formulários Meta)", false],
-    ["app_secret", "Segredo do aplicativo (webhook Meta)", true],
-    ["verify_token", "Token de verificação do webhook", true],
+    ["access_token", "Token de acesso", true],
   ],
   google_ads: [
     ["customer_id", "ID da conta (10 dígitos, sem hífens)", false],
@@ -155,6 +153,26 @@ export default function WorkspaceProviders({
   if (q.isPending) return <p role="status">Carregando configurações…</p>;
   if (q.error) return <p role="alert">{q.error.message}</p>;
   const d = q.data!;
+  const providerForm = (
+    <ProviderForm
+      key={tab}
+      kind={tab}
+      provider={d.config.providers[tab]}
+      workspace={workspace}
+      stages={stages}
+      callback={d.config.meta_callback}
+      disabled={busy}
+      save={(v) =>
+        void act(() =>
+          workspaceOperation("save_provider", {
+            workspace_id: workspace,
+            kind: tab,
+            ...v,
+          }),
+        )
+      }
+    />
+  );
   return (
     <div className="space-y-5">
       <header>
@@ -258,26 +276,27 @@ export default function WorkspaceProviders({
       ) : (
         <>
           {mode === "tracking" && tab === "google_ads" && (
-            <WorkspaceGoogleFeed workspace={workspace} />
+            <WorkspaceGoogleFeed
+              workspace={workspace}
+              apiEnabled={!!d.config.providers.google_ads?.enabled}
+            />
           )}
-          <ProviderForm
-            key={tab}
-            kind={tab}
-            provider={d.config.providers[tab]}
-            workspace={workspace}
-            stages={stages}
-            callback={d.config.meta_callback}
-            disabled={busy}
-            save={(v) =>
-              void act(() =>
-                workspaceOperation("save_provider", {
-                  workspace_id: workspace,
-                  kind: tab,
-                  ...v,
-                }),
-              )
-            }
-          />
+          {mode === "tracking" && tab === "google_ads" ? (
+            <details className="border rounded-xl bg-card p-4 space-y-3">
+              <summary className="cursor-pointer font-medium">
+                Configuração avançada · API direta
+                {d.config.providers.google_ads?.enabled ? " · Ativa" : ""}
+              </summary>
+              <p className="text-sm text-muted-foreground">
+                Use esta opção somente se preferir enviar pela API em vez da
+                importação automática por URL. As duas modalidades não podem
+                ficar ativas ao mesmo tempo.
+              </p>
+              {providerForm}
+            </details>
+          ) : (
+            providerForm
+          )}
           {mode === "tracking" && tab === "meta" && (
             <WorkspaceAdDestination
               key={JSON.stringify(d.config.meta_destination)}
@@ -411,6 +430,28 @@ function ProviderForm({
       ...provider?.credentials,
     })),
     [enabled, setEnabled] = useState(provider?.enabled || false);
+  const renderField = ([key, label, secret]: [string, string, boolean]) => (
+    <label
+      key={key}
+      className={`text-sm block ${kind === "meta" && key === "access_token" ? "md:col-span-2" : ""}`}
+    >
+      {label}
+      <Input
+        type={secret ? "password" : "text"}
+        autoComplete="off"
+        value={String(values[key] || "")}
+        maxLength={4096}
+        placeholder={
+          provider?.configured[key]
+            ? "Já configurado; deixe vazio para manter"
+            : key === "test_event_code"
+              ? "Ex.: TEST12345"
+              : ""
+        }
+        onChange={(e) => setValues({ ...values, [key]: e.target.value })}
+      />
+    </label>
+  );
   return (
     <form
       className="border rounded-xl p-5 bg-card space-y-4"
@@ -437,36 +478,29 @@ function ProviderForm({
           {provider?.enabled ? "Ativa" : "Não ativa"}
         </span>
       </div>
+      {kind === "meta" && (
+        <p className="text-sm text-muted-foreground">
+          Copie o Pixel ID e o token no Gerenciador de Eventos da Meta. O Page
+          ID é opcional para enviar conversões; não é o ID da conta do WhatsApp.
+          Use o código de teste para conferir os eventos no painel da Meta.
+        </p>
+      )}
       <div className="grid md:grid-cols-2 gap-3">
-        {fields[kind]?.map(([key, label, secret]) => (
-          <label key={key} className="text-sm block">
-            {label}
+        {fields[kind]?.map(renderField)}
+        {["email", "sms"].includes(kind) && (
+          <label className="text-sm block">
+            Limite diário de ações
             <Input
-              type={secret ? "password" : "text"}
-              autoComplete="off"
-              value={String(values[key] || "")}
-              maxLength={4096}
-              placeholder={
-                provider?.configured[key]
-                  ? "Já configurado; deixe vazio para manter"
-                  : ""
+              type="number"
+              min="1"
+              max="10000"
+              value={Number(values.daily_limit || 100)}
+              onChange={(e) =>
+                setValues({ ...values, daily_limit: Number(e.target.value) })
               }
-              onChange={(e) => setValues({ ...values, [key]: e.target.value })}
             />
           </label>
-        ))}
-        <label className="text-sm block">
-          Limite diário de ações
-          <Input
-            type="number"
-            min="1"
-            max="10000"
-            value={Number(values.daily_limit || 100)}
-            onChange={(e) =>
-              setValues({ ...values, daily_limit: Number(e.target.value) })
-            }
-          />
-        </label>
+        )}
         {kind === "google_ads" && (
           <p className="text-xs text-muted-foreground">
             Usa a API Google Data Manager para novas integrações. Ative essa API
@@ -475,41 +509,74 @@ function ProviderForm({
             deve aceitar importação de cliques.
           </p>
         )}
-        {kind === "meta" && (
-          <label className="text-sm block">
-            Destino dos formulários Meta Ads
-            <select
-              className={selectClass + " w-full"}
-              value={String(values.entry_stage_id || "")}
-              onChange={(e) =>
-                setValues({ ...values, entry_stage_id: e.target.value })
-              }
-            >
-              <option value="">Não configurado</option>
-              {stages.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
       </div>
       {kind === "meta" && (
         <details className="text-sm">
           <summary className="cursor-pointer">
-            Conectar formulários Meta Ads por webhook
+            Configuração avançada · Receber formulários da Meta
           </summary>
           <p className="text-xs text-muted-foreground mt-2">
             Configure Page ID, segredo do aplicativo, token de verificação e
             etapa de entrada. Autorize o aplicativo para receber leadgen da
             página e cadastre este retorno no painel da Meta:
           </p>
+          <div className="grid md:grid-cols-2 gap-3 mt-3">
+            {renderField([
+              "app_secret",
+              "Segredo do aplicativo (webhook Meta)",
+              true,
+            ])}
+            {renderField([
+              "verify_token",
+              "Token de verificação do webhook",
+              true,
+            ])}
+            {kind === "meta" && (
+              <label className="text-sm block">
+                Destino dos formulários Meta Ads
+                <select
+                  className={selectClass + " w-full"}
+                  value={String(values.entry_stage_id || "")}
+                  onChange={(e) =>
+                    setValues({ ...values, entry_stage_id: e.target.value })
+                  }
+                >
+                  <option value="">Não configurado</option>
+                  {stages.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
           <Input readOnly aria-label="URL do webhook Meta" value={callback} />
           <p className="text-xs text-muted-foreground mt-2">
             A aprovação e as permissões do aplicativo são concedidas pela Meta.
             O recebimento verifica a assinatura do webhook.
           </p>
+        </details>
+      )}
+      {["meta", "google_ads"].includes(kind) && (
+        <details className="text-sm">
+          <summary className="cursor-pointer">
+            Limite diário de conversões
+          </summary>
+          <div className="mt-3 max-w-sm">
+            <label className="text-sm block">
+              Limite diário de ações
+              <Input
+                type="number"
+                min="1"
+                max="10000"
+                value={Number(values.daily_limit || 100)}
+                onChange={(e) =>
+                  setValues({ ...values, daily_limit: Number(e.target.value) })
+                }
+              />
+            </label>
+          </div>
         </details>
       )}
       <label className="flex gap-2 text-sm">
@@ -520,7 +587,9 @@ function ProviderForm({
         />
         Ativar{" "}
         {kind === "meta" || kind === "google_ads"
-          ? "envio de conversões"
+          ? kind === "meta"
+            ? "envio de conversões para a Meta"
+            : "envio de conversões pela API do Google"
           : "envios por este provedor"}
       </label>
       {["email", "sms"].includes(kind) && (

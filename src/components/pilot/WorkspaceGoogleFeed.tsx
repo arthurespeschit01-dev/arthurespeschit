@@ -14,8 +14,10 @@ interface Feed {
 }
 export default function WorkspaceGoogleFeed({
   workspace,
+  apiEnabled = false,
 }: {
   workspace: string;
+  apiEnabled?: boolean;
 }) {
   const { user } = useAuth(),
     client = useQueryClient(),
@@ -48,14 +50,12 @@ export default function WorkspaceGoogleFeed({
   return (
     <section className="border rounded-xl p-4 space-y-3 bg-card">
       <div className="flex justify-between gap-3">
-        <h3 className="font-semibold">
-          Envio automático para o Google Ads · CSV
-        </h3>
+        <h3 className="font-semibold">Envio automático para o Google Ads</h3>
         <label className="text-sm flex gap-2">
           <input
             type="checkbox"
             aria-label="Ativar importação CSV Google"
-            disabled={busy || q.isPending}
+            disabled={busy || q.isPending || (apiEnabled && !q.data?.enabled)}
             checked={!!q.data?.enabled}
             onChange={(e) => void save(e.target.checked)}
           />
@@ -63,13 +63,29 @@ export default function WorkspaceGoogleFeed({
         </label>
       </div>
       <p className="text-sm text-muted-foreground">
-        O Google pode buscar esta URL por HTTPS em uma importação programada. A
-        chave permite consultar conversões desta empresa; guarde o endereço. Use
-        CSV ou API, evitando envio duplicado.
+        O Google busca as conversões desta empresa pela URL abaixo, no horário
+        configurado na importação. Copie o endereço uma vez para o Google Ads e
+        configure uma busca diária. Não é necessário preencher credenciais de
+        API nesta modalidade.
       </p>
+      {apiEnabled && (
+        <p className="text-sm text-muted-foreground">
+          A API direta está ativa. Para usar a importação por URL, desative o
+          envio pela API na configuração avançada abaixo.
+        </p>
+      )}
+      {!q.data?.url && (
+        <p className="text-sm text-muted-foreground">
+          Ative o envio automático para gerar a URL de importação.
+        </p>
+      )}
       {q.data?.url && (
         <>
           <ShareLink url={q.data.url} />
+          <p className="text-xs text-muted-foreground">
+            Trate esta URL como uma senha: ela dá acesso às conversões desta
+            empresa. Cole-a somente na importação do Google Ads.
+          </p>
           <div className="flex gap-2">
             <Button asChild variant="outline">
               <a href={q.data.url} download>
@@ -95,7 +111,7 @@ export default function WorkspaceGoogleFeed({
       )}
       <div className="grid sm:grid-cols-3 gap-3">
         {[
-          ["Conversões elegíveis", q.data?.available || 0],
+          ["Disponíveis para importação", q.data?.available || 0],
           ["Incluídas em consultas (7 dias)", q.data?.fetched_7d || 0],
           [
             "Última consulta da URL",
@@ -116,7 +132,9 @@ export default function WorkspaceGoogleFeed({
         diagnóstico da importação no Google Ads.
       </p>
       <details className="text-sm">
-        <summary>Como configurar no Google Ads</summary>
+        <summary className="cursor-pointer">
+          Como configurar no Google Ads (uma vez)
+        </summary>
         <ol className="list-decimal pl-5 space-y-2 mt-3">
           <li>
             Crie uma ação de conversão de importação de cliques e use o mesmo
