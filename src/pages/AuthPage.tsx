@@ -5,7 +5,7 @@ import { Mail, Lock, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import logoCentralGestor from '@/assets/logo-central-gestor.png';
 
-export default function AuthPage({initialEmail = "", workspaceName}: {initialEmail?: string; workspaceName?:string} = {}) {
+export default function AuthPage({initialEmail = "", workspaceName, allowSignUp = true}: {initialEmail?: string; workspaceName?:string;allowSignUp?:boolean} = {}) {
   const { signIn,signUp } = useAuth();
   const [mode,setMode]=useState<'login'|'signup'>('login');
   const [confirmPassword,setConfirmPassword]=useState('');
@@ -174,7 +174,7 @@ export default function AuthPage({initialEmail = "", workspaceName}: {initialEma
               </motion.button>
             </form>}
 
-            {!confirmationSent&&<div className="mt-5 text-center text-sm text-muted-foreground"><span>{mode==='login'?'Ainda não tem uma conta?':'Já tem uma conta?'}</span><button type="button" disabled={loading} onClick={changeMode} className="ml-1 min-h-11 text-primary font-medium hover:underline">{mode==='login'?'Criar conta':'Entrar'}</button></div>}
+            {allowSignUp&&!confirmationSent&&<div className="mt-5 text-center text-sm text-muted-foreground"><span>{mode==='login'?'Ainda não tem uma conta?':'Já tem uma conta?'}</span><button type="button" disabled={loading} onClick={changeMode} className="ml-1 min-h-11 text-primary font-medium hover:underline">{mode==='login'?'Criar conta':'Entrar'}</button></div>}
 
           </div>
         </div>

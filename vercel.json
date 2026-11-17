@@ -1,6 +1,30 @@
 {
   "rewrites": [
     {
+      "source": "/mcp",
+      "destination": "https://dycyskikaljvokaxsxnh.supabase.co/functions/v1/central-mcp?route=mcp"
+    },
+    {
+      "source": "/.well-known/oauth-protected-resource/mcp",
+      "destination": "https://dycyskikaljvokaxsxnh.supabase.co/functions/v1/central-mcp?route=resource"
+    },
+    {
+      "source": "/.well-known/oauth-protected-resource",
+      "destination": "https://dycyskikaljvokaxsxnh.supabase.co/functions/v1/central-mcp?route=resource"
+    },
+    {
+      "source": "/.well-known/oauth-authorization-server",
+      "destination": "https://dycyskikaljvokaxsxnh.supabase.co/functions/v1/central-mcp?route=authorization-server"
+    },
+    {
+      "source": "/mcp/oauth/register",
+      "destination": "https://dycyskikaljvokaxsxnh.supabase.co/functions/v1/central-mcp?route=register"
+    },
+    {
+      "source": "/mcp/oauth/token",
+      "destination": "https://dycyskikaljvokaxsxnh.supabase.co/functions/v1/central-mcp?route=token"
+    },
+    {
       "source": "/rastreio.js",
       "has": [
         {
@@ -30,6 +54,29 @@
     {
       "source": "/((?!assets/|.*\\..*).*)",
       "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/mcp/authorize",
+      "headers": [
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors 'none'"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "no-referrer"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
     }
   ]
 }
