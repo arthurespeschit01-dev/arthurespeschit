@@ -1,3 +1,4 @@
+import ClientMeetingMinutes from "@/components/ClientMeetingMinutes";
 import ClientBillingFields from '@/components/ClientBillingFields';
 import {billingError,firstBillingDate,localDate} from '@/lib/billingSchedule';
 import ClientOperationFields from '@/components/ClientOperationFields';
@@ -81,7 +82,7 @@ export default function ClientDetail() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [client, setClient] = useState<Client | null>(null);
-  const [tab, setTab] = useState<'dados' | 'anexos' | 'meta' | 'google'>('dados');
+  const [tab, setTab] = useState<'dados' | 'anexos' | 'meta' | 'google' | 'atas'>('dados');
   const [metaActiveAccount, setMetaActiveAccount] = useState<string | null>(null);
   const [importingMeta, setImportingMeta] = useState(false);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -558,6 +559,7 @@ export default function ClientDetail() {
       {/* Tabs */}
       <div className="flex gap-1 p-1 bg-secondary/50 rounded-lg w-fit flex-wrap">
         <button onClick={() => setTab('dados')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'dados' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>Dados do Cliente</button>
+        <button onClick={() => setTab('atas')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'atas' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>Atas de reuniões</button>
         <button onClick={() => setTab('meta')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'meta' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>Meta Ads</button>
         <button onClick={() => setTab('google')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'google' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>Google Ads</button>
         <button onClick={() => setTab('anexos')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'anexos' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
@@ -565,6 +567,7 @@ export default function ClientDetail() {
         </button>
       </div>
 
+      {tab === 'atas' && id && <ClientMeetingMinutes key={id} clientId={id} />}
       {/* Meta Ads Tab */}
       {tab === 'meta' && id && (
         <div className="space-y-4">

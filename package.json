@@ -20,7 +20,8 @@
     "test:workspaces-standard": "node tests/workspace-standard-db.mjs && STANDARD_WORKSPACES=1 node tests/workspace-expansion-db.mjs && STANDARD_WORKSPACES=1 node tests/workspace-cloud-db.mjs && node tests/pilot-workspaces-browser.mjs && node tests/pilot-visual-browser.mjs",
     "test:account-access": "ACCOUNT_BROWSER=1 node tests/agency-account-db.mjs && node tests/pilot-workspaces-browser.mjs",
     "test:invited-access": "INVITED_ACCESS=1 ACCOUNT_BROWSER=1 node tests/agency-account-db.mjs && node tests/pilot-workspaces-browser.mjs",
-    "test:main-whatsapp": "ACCOUNT_BROWSER=1 ACCOUNT_WHATSAPP=1 node tests/agency-account-db.mjs"
+    "test:main-whatsapp": "ACCOUNT_BROWSER=1 ACCOUNT_WHATSAPP=1 node tests/agency-account-db.mjs",
+    "test:mcp": "MCP_TEST=1 MCP_BROWSER=1 node tests/agency-account-db.mjs"
   },
   "dependencies": {
     "@lovable.dev/cloud-auth-js": "^1.1.2",
@@ -69,6 +70,7 @@
   "devDependencies": {
     "@electric-sql/pglite": "0.3.14",
     "@eslint/js": "^9.32.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "@tailwindcss/typography": "^0.5.19",
     "@testing-library/jest-dom": "^6.6.0",
     "@testing-library/react": "^16.0.0",

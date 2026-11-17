@@ -374,6 +374,7 @@ try {
     await verifyAgencyBrowser(db, owner, w);
   }
   if(process.env.INVITED_ACCESS) { const {verifyInvitedAccess}=await import("./invited-access-checks.mjs");await verifyInvitedAccess(db,owner); }
+  if(process.env.MCP_TEST){const {verifyMcp}=await import("./minutes-mcp-checks.mjs");await verifyMcp(db,owner,other);}
   console.log(
     "PASS primary account: isolated owner context, existing CRM preserved and synchronized both ways, custom invitation role, read-only enforcement, foreign denial and scoped calendar CRUD",
   );

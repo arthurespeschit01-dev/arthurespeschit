@@ -17,6 +17,7 @@ import ScrollToTop from "./components/ScrollToTop";
 
 // Lazy load pages so a single failing chunk doesn't blank the app
 const PilotWorkspaces = lazy(() => import("./pages/PilotWorkspaces"));
+const McpAuthorize = lazy(() => import("./pages/McpAuthorize"));
 const Chamados = lazy(() => import("./pages/Chamados"));
 const ClientPortal = lazy(() => import("./pages/ClientPortal"));
 const WorkspaceWhatsAppPair = lazy(() => import("./pages/WorkspaceWhatsAppPair"));
@@ -213,6 +214,7 @@ const App = () => (
           <Route path="/captura/:token" element={<WorkspacePublic />} />
           <Route path="/reservar/:token" element={<WorkspacePublic />} />
           <Route path="/*" element={<AuthProvider><PilotVisualTheme/><Routes>
+            <Route path="/mcp/authorize" element={<McpAuthorize />} />
             <Route path="/convite-equipe/:token" element={<WorkspaceInvitation />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/*" element={<ProtectedRoutes />} />
