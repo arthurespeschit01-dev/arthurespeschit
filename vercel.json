@@ -52,6 +52,18 @@
       "destination": "https://vertice-gmn.vercel.app/:path*"
     },
     {
+      "source": "/privacidade",
+      "destination": "/legal/privacidade.html"
+    },
+    {
+      "source": "/termos",
+      "destination": "/legal/termos.html"
+    },
+    {
+      "source": "/exclusao-de-dados",
+      "destination": "/legal/exclusao-de-dados.html"
+    },
+    {
       "source": "/((?!assets/|.*\\..*).*)",
       "destination": "/index.html"
     }
