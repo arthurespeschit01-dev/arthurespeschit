@@ -1,17 +1,29 @@
 import WorkspaceCalendarView from "@/components/pilot/WorkspaceCalendarView";
+import { RecordMenu, Empty } from "@/components/pilot/CommercialShared";
 import { useAgencyWorkspace } from "@/hooks/useAgencyWorkspace";
 import { workspaceDb } from "@/lib/clientWorkspaces";
+import { dateLabel, selectClass } from "@/lib/workspaceCommercial";
 import { Link } from "react-router-dom";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { agencySelectClass } from "@/lib/agency";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { type Appointment, localDateTime } from "@/lib/appointments";
 import { toast } from "sonner";
 
+const statuses: Record<Appointment["status"], string> = {
+  agendado: "Agendado",
+  concluido: "Concluído",
+  cancelado: "Cancelado",
+};
 const empty = {
   title: "",
   start: "",
@@ -20,6 +32,15 @@ const empty = {
   notes: "",
   status: "agendado" as Appointment["status"],
 };
+const toDraft = (e: Appointment) => ({
+  title: e.title,
+  start: localDateTime(e.starts_at),
+  end: localDateTime(e.ends_at),
+  client_id: e.client_id || "",
+  notes: e.notes,
+  status: e.status,
+});
+
 export default function AgencyCalendar({
   workspace,
 }: { workspace?: string } = {}) {
@@ -36,9 +57,12 @@ export default function AgencyCalendar({
   >([]);
   const [draft, setDraft] = useState({ ...empty });
   const [editing, setEditing] = useState<string | null>(null);
+  const [dialog, setDialog] = useState(false);
+  const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [showPast, setShowPast] = useState(false);
+  const [formError, setFormError] = useState("");
+
   const load = useCallback(async () => {
     if (!user) return;
     if (!account) return;
@@ -66,6 +90,43 @@ export default function AgencyCalendar({
   useEffect(() => {
     void load();
   }, [load]);
+
+  const persist = async (
+    id: string | null,
+    values: typeof empty,
+  ): Promise<boolean> => {
+    if (!account) return false;
+    const start = new Date(values.start),
+      end = new Date(values.end);
+    const result = await workspaceDb.rpc("agency_account_calendar", {
+      p_workspace: account,
+      p_action: "save",
+      p_id: id,
+      p_values: {
+        title: values.title.trim(),
+        starts_at: start.toISOString(),
+        ends_at: end.toISOString(),
+        notes: values.notes,
+        client_id: values.client_id || null,
+        status: values.status,
+      },
+    });
+    return !result.error;
+  };
+
+  const openNew = () => {
+    setEditing(null);
+    setDraft({ ...empty });
+    setFormError("");
+    setDialog(true);
+  };
+  const openEdit = (e: Appointment) => {
+    setEditing(e.id);
+    setDraft(toDraft(e));
+    setFormError("");
+    setDialog(true);
+  };
+
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!user || !account || !canWrite || busy) return;
@@ -77,160 +138,81 @@ export default function AgencyCalendar({
       !Number.isFinite(end.getTime()) ||
       end <= start
     ) {
-      setError("Informe um título e um término posterior ao início.");
+      setFormError("Informe um título e um término posterior ao início.");
       return;
     }
     setBusy(true);
-    setError("");
-    const payload = {
-      title: draft.title.trim(),
-      starts_at: start.toISOString(),
-      ends_at: end.toISOString(),
-      notes: draft.notes,
-      client_id: draft.client_id || null,
-      status: draft.status,
-    };
-    const result = await workspaceDb.rpc("agency_account_calendar", {
-      p_workspace: account,
-      p_action: "save",
-      p_id: editing,
-      p_values: payload,
-    });
+    setFormError("");
+    const ok = await persist(editing, draft);
     setBusy(false);
-    if (result.error) {
-      setError(
+    if (!ok) {
+      setFormError(
         "Não foi possível salvar o agendamento. Os dados do formulário foram mantidos.",
       );
       return;
     }
+    setDialog(false);
     setDraft({ ...empty });
     setEditing(null);
     toast.success("Agendamento salvo!");
     await load();
   };
-  const visible = events.filter(
-    (e) =>
-      showPast ||
-      (new Date(e.ends_at) >= new Date() && e.status === "agendado"),
-  );
+
+  const changeStatus = async (e: Appointment, status: Appointment["status"]) => {
+    if (!canWrite || busy) return;
+    setBusy(true);
+    const ok = await persist(e.id, { ...toDraft(e), status });
+    setBusy(false);
+    if (!ok) {
+      setError("Não foi possível alterar o status do agendamento.");
+      return;
+    }
+    await load();
+  };
+
+  const remove = async (e: Appointment) => {
+    if (!account || busy) return;
+    if (!canManage) {
+      setError("Você não tem permissão para excluir agendamentos.");
+      return;
+    }
+    if (!window.confirm("Excluir ou cancelar este agendamento?")) return;
+    setBusy(true);
+    const r = await workspaceDb.rpc("agency_account_calendar", {
+      p_workspace: account,
+      p_action: "delete",
+      p_id: e.id,
+    });
+    setBusy(false);
+    if (r.error) {
+      setError(r.error.message);
+      return;
+    }
+    if (selected === e.id) setSelected(null);
+    await load();
+  };
+
   return (
     <div className="space-y-5">
-      <div className="flex justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold">Agendamentos</h1>
-          <p className="text-sm text-muted-foreground">
-            Cadastre e acompanhe seus compromissos na Central do Gestor.
-          </p>
+      <div className="flex justify-between gap-3">
+        <h2 className="text-xl font-semibold">Agendamentos</h2>
+        <div className="flex gap-2 flex-wrap">
+          {canWrite && (
+            <Button variant="outline" onClick={openNew}>
+              Novo agendamento
+            </Button>
+          )}
         </div>
-        <Button variant="outline" onClick={() => void load()} disabled={busy}>
-          Atualizar agendamentos
-        </Button>
       </div>
       {context.error && !workspace && (
         <p role="alert">{context.error.message}</p>
       )}
       {error && (
-        <p role="alert" className="border border-destructive/40 rounded-lg p-4">
+        <p role="alert" className="border border-destructive/40 rounded-xl p-4">
           {error}
         </p>
       )}
-      {canWrite && (
-        <form onSubmit={save} className="rounded-xl border p-5 space-y-3">
-          <h3 className="font-semibold">
-            {editing ? "Editar agendamento" : "Novo agendamento"}
-          </h3>
-          <Label htmlFor="event-title">Título do agendamento</Label>
-          <Input
-            id="event-title"
-            required
-            maxLength={160}
-            value={draft.title}
-            onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-          />
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="event-start">Início</Label>
-              <Input
-                id="event-start"
-                required
-                type="datetime-local"
-                value={draft.start}
-                onChange={(e) => setDraft({ ...draft, start: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="event-end">Término</Label>
-              <Input
-                id="event-end"
-                required
-                type="datetime-local"
-                min={draft.start}
-                value={draft.end}
-                onChange={(e) => setDraft({ ...draft, end: e.target.value })}
-              />
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Fuso horário: {Intl.DateTimeFormat().resolvedOptions().timeZone}.
-          </p>
-          <Label htmlFor="event-client">Cliente (opcional)</Label>
-          <select
-            id="event-client"
-            className={agencySelectClass}
-            value={draft.client_id}
-            onChange={(e) => setDraft({ ...draft, client_id: e.target.value })}
-          >
-            <option value="">Sem cliente vinculado</option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-                {c.status === "Ativo" ? "" : ` (${c.status})`}
-              </option>
-            ))}
-          </select>
-          <Label htmlFor="event-notes">Observações do agendamento</Label>
-          <Textarea
-            id="event-notes"
-            maxLength={10000}
-            value={draft.notes}
-            onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
-          />
-          <Label htmlFor="event-status">Status do agendamento</Label>
-          <select
-            id="event-status"
-            className={agencySelectClass}
-            value={draft.status}
-            onChange={(e) =>
-              setDraft({
-                ...draft,
-                status: e.target.value as Appointment["status"],
-              })
-            }
-          >
-            <option value="agendado">Agendado</option>
-            <option value="concluido">Concluído</option>
-            <option value="cancelado">Cancelado</option>
-          </select>
-          <div className="flex gap-2">
-            <Button disabled={busy} type="submit">
-              {busy ? "Salvando…" : "Salvar agendamento"}
-            </Button>
-            {editing && (
-              <Button
-                variant="ghost"
-                type="button"
-                onClick={() => {
-                  setEditing(null);
-                  setDraft({ ...empty });
-                }}
-              >
-                Cancelar edição
-              </Button>
-            )}
-          </div>
-        </form>
-      )}
-      <p className="text-sm text-muted-foreground">
+      <p className="text-xs text-muted-foreground">
         {google
           ? "Google Agenda conectada · sincronização automática em até um minuto."
           : "Google Agenda ainda não conectada."}{" "}
@@ -243,15 +225,17 @@ export default function AgencyCalendar({
           </Link>
         )}
       </p>
-      <div className="flex gap-2">
+      <div className="flex gap-2" aria-label="Visualização de agendamentos">
         <Button
           variant={view === "calendar" ? "default" : "outline"}
+          aria-pressed={view === "calendar"}
           onClick={() => setView("calendar")}
         >
           Calendário
         </Button>
         <Button
           variant={view === "list" ? "default" : "outline"}
+          aria-pressed={view === "list"}
           onClick={() => setView("list")}
         >
           Lista
@@ -259,138 +243,183 @@ export default function AgencyCalendar({
       </div>
       {view === "calendar" && (
         <WorkspaceCalendarView
-          appointments={events
-            .filter((e) => showPast || e.status !== "cancelado")
-            .map((e) => ({
-              id: e.id,
-              calendar_id: "",
-              name: e.title,
-              phone: "",
-              email: "",
-              notes: e.notes,
-              starts_at: e.starts_at,
-              ends_at: e.ends_at,
-              status:
-                e.status === "cancelado"
-                  ? "cancelled"
-                  : e.status === "concluido"
-                    ? "completed"
-                    : "confirmed",
-              lead_id: null,
-            }))}
+          appointments={events.map((e) => ({
+            id: e.id,
+            calendar_id: "",
+            name: e.title,
+            phone: "",
+            email: "",
+            notes: e.notes,
+            starts_at: e.starts_at,
+            ends_at: e.ends_at,
+            status:
+              e.status === "cancelado"
+                ? "cancelled"
+                : e.status === "concluido"
+                  ? "completed"
+                  : "confirmed",
+            lead_id: null,
+          }))}
           onSelect={(id) => {
-            const e = events.find((e) => e.id === id);
-            if (!e) return;
-            setEditing(e.id);
-            setDraft({
-              title: e.title,
-              start: localDateTime(e.starts_at),
-              end: localDateTime(e.ends_at),
-              client_id: e.client_id || "",
-              notes: e.notes,
-              status: e.status,
-            });
-            document.getElementById("event-title")?.focus();
+            setSelected(id);
+            setTimeout(
+              () =>
+                document
+                  .getElementById(`appointment-${id}`)
+                  ?.scrollIntoView({ behavior: "smooth", block: "center" }),
+              0,
+            );
           }}
         />
       )}
-      <label className="text-sm flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={showPast}
-          onChange={(e) => setShowPast(e.target.checked)}
-        />
-        Mostrar histórico e cancelados
-      </label>
-      {(view === "list" ? visible : events.filter((e) => e.id === editing)).map(
-        (e) => (
-          <article
-            key={e.id}
-            className="rounded-xl border p-5 flex justify-between gap-4"
-          >
-            <div>
-              <h3 className="font-semibold">{e.title}</h3>
-              <p className="text-sm text-muted-foreground">
-                {new Date(e.starts_at).toLocaleString("pt-BR")} até{" "}
-                {new Date(e.ends_at).toLocaleString("pt-BR")}
-              </p>
-              {e.client_id && (
+      <section className="space-y-2">
+        <h3 className="font-semibold">Compromissos</h3>
+        {[...events]
+          .filter((e) => view === "list" || e.id === selected)
+          .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
+          .map((e) => (
+            <article
+              key={e.id}
+              id={`appointment-${e.id}`}
+              className="border rounded-xl p-4 bg-card flex flex-wrap gap-3 justify-between items-center"
+            >
+              <div>
+                <p className="font-medium">{e.title}</p>
                 <p className="text-sm">
-                  {clients.find((c) => c.id === e.client_id)?.name}
+                  {dateLabel(e.starts_at)}
+                  {e.client_id &&
+                    ` · ${clients.find((c) => c.id === e.client_id)?.name || ""}`}
                 </p>
-              )}
-              <p className="text-sm mt-2 whitespace-pre-wrap">{e.notes}</p>
-              <span className="text-xs">
-                {
-                  {
-                    agendado: "Agendado",
-                    concluido: "Concluído",
-                    cancelado: "Cancelado",
-                  }[e.status]
-                }
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {canManage && (
-                <Button
-                  variant="outline"
-                  disabled={busy}
-                  onClick={async () => {
-                    if (
-                      !account ||
-                      !window.confirm("Excluir ou cancelar este agendamento?")
+                {e.notes && (
+                  <p className="text-sm mt-1 whitespace-pre-wrap">{e.notes}</p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <select
+                  aria-label={`Status do agendamento ${e.title}`}
+                  disabled={!canWrite || busy}
+                  className={selectClass}
+                  value={e.status}
+                  onChange={(ev) =>
+                    void changeStatus(
+                      e,
+                      ev.target.value as Appointment["status"],
                     )
-                      return;
-                    setBusy(true);
-                    const r = await workspaceDb.rpc("agency_account_calendar", {
-                      p_workspace: account,
-                      p_action: "delete",
-                      p_id: e.id,
-                    });
-                    setBusy(false);
-                    if (r.error) {
-                      setError(r.error.message);
-                      return;
-                    }
-                    if (editing === e.id) {
-                      setEditing(null);
-                      setDraft({ ...empty });
-                    }
-                    await load();
-                  }}
+                  }
                 >
-                  Excluir ou cancelar agendamento
-                </Button>
-              )}
-              {canWrite && (
-                <Button
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() => {
-                    setEditing(e.id);
-                    setDraft({
-                      title: e.title,
-                      start: localDateTime(e.starts_at),
-                      end: localDateTime(e.ends_at),
-                      client_id: e.client_id || "",
-                      notes: e.notes,
-                      status: e.status,
-                    });
-                    document.getElementById("event-title")?.focus();
-                  }}
-                >
-                  Editar agendamento
-                </Button>
-              )}
+                  {Object.entries(statuses).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+                <RecordMenu
+                  enabled={canWrite && !busy}
+                  edit={() => openEdit(e)}
+                  remove={() => void remove(e)}
+                />
+              </div>
+            </article>
+          ))}
+        {!events.length && (
+          <Empty>
+            Nenhum agendamento cadastrado. Clique em “Novo agendamento” para
+            adicionar um compromisso.
+          </Empty>
+        )}
+      </section>
+      <Dialog open={dialog} onOpenChange={setDialog}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editing ? "Editar agendamento" : "Novo agendamento"}
+            </DialogTitle>
+            <DialogDescription>
+              O horário usa o fuso do seu dispositivo (
+              {Intl.DateTimeFormat().resolvedOptions().timeZone}).
+            </DialogDescription>
+          </DialogHeader>
+          <form className="space-y-3" onSubmit={save}>
+            <Input
+              aria-label="Título do agendamento"
+              required
+              maxLength={160}
+              placeholder="Título"
+              value={draft.title}
+              onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <label className="text-sm">
+                Início
+                <Input
+                  type="datetime-local"
+                  required
+                  value={draft.start}
+                  onChange={(e) =>
+                    setDraft({ ...draft, start: e.target.value })
+                  }
+                />
+              </label>
+              <label className="text-sm">
+                Término
+                <Input
+                  type="datetime-local"
+                  required
+                  min={draft.start}
+                  value={draft.end}
+                  onChange={(e) => setDraft({ ...draft, end: e.target.value })}
+                />
+              </label>
             </div>
-          </article>
-        ),
-      )}
-      {!visible.length && (
-        <p className="text-muted-foreground">
-          Nenhum agendamento {showPast ? "cadastrado" : "pendente"}.
-        </p>
-      )}
+            <select
+              aria-label="Cliente do agendamento"
+              className={selectClass + " w-full"}
+              value={draft.client_id}
+              onChange={(e) => setDraft({ ...draft, client_id: e.target.value })}
+            >
+              <option value="">Sem cliente vinculado</option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                  {c.status === "Ativo" ? "" : ` (${c.status})`}
+                </option>
+              ))}
+            </select>
+            <select
+              aria-label="Status do agendamento"
+              className={selectClass + " w-full"}
+              value={draft.status}
+              onChange={(e) =>
+                setDraft({
+                  ...draft,
+                  status: e.target.value as Appointment["status"],
+                })
+              }
+            >
+              {Object.entries(statuses).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
+            </select>
+            <Textarea
+              aria-label="Observações do agendamento"
+              placeholder="Observações"
+              maxLength={10000}
+              value={draft.notes}
+              onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
+            />
+            {formError && (
+              <p role="alert" className="text-sm text-destructive">
+                {formError}
+              </p>
+            )}
+            <Button type="submit" disabled={busy}>
+              {busy ? "Salvando…" : editing ? "Salvar alterações" : "Agendar"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
