@@ -7,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const GOOGLE_ADS_DEVELOPER_TOKEN = Deno.env.get('GOOGLE_ADS_DEVELOPER_TOKEN')!;
+const GOOGLE_ADS_DEVELOPER_TOKEN = Deno.env.get('GOOGLE_ADS_DEVELOPER_TOKEN') || '';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
       // Buscar nome do customer
       const headers: Record<string, string> = {
         Authorization: `Bearer ${accessToken}`,
-        'developer-token': GOOGLE_ADS_DEVELOPER_TOKEN,
+        ...(GOOGLE_ADS_DEVELOPER_TOKEN ? { 'developer-token': GOOGLE_ADS_DEVELOPER_TOKEN } : {}),
         'Content-Type': 'application/json',
       };
       if (login_customer_id) headers['login-customer-id'] = login_customer_id.replace(/-/g, '');
@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
     const listRes = await fetch('https://googleads.googleapis.com/v25/customers:listAccessibleCustomers', {
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        'developer-token': GOOGLE_ADS_DEVELOPER_TOKEN,
+        ...(GOOGLE_ADS_DEVELOPER_TOKEN ? { 'developer-token': GOOGLE_ADS_DEVELOPER_TOKEN } : {}),
       },
     });
     const listData = await listRes.json();
@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
     await Promise.all(accessibleIds.map(async (cid) => {
       const headers: Record<string, string> = {
         Authorization: `Bearer ${accessToken}`,
-        'developer-token': GOOGLE_ADS_DEVELOPER_TOKEN,
+        ...(GOOGLE_ADS_DEVELOPER_TOKEN ? { 'developer-token': GOOGLE_ADS_DEVELOPER_TOKEN } : {}),
         'Content-Type': 'application/json',
         'login-customer-id': cid,
       };

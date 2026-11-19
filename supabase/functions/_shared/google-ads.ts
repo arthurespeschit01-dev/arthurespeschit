@@ -1,8 +1,8 @@
 // Helpers compartilhados para Google Ads (refresh de token).
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-const GOOGLE_ADS_CLIENT_ID = Deno.env.get('GOOGLE_ADS_CLIENT_ID')!;
-const GOOGLE_ADS_CLIENT_SECRET = Deno.env.get('GOOGLE_ADS_CLIENT_SECRET')!;
+const GOOGLE_ADS_CLIENT_ID = (Deno.env.get('GOOGLE_ADS_CLIENT_ID') || Deno.env.get('GOOGLE_CALENDAR_CLIENT_ID'))!;
+const GOOGLE_ADS_CLIENT_SECRET = (Deno.env.get('GOOGLE_ADS_CLIENT_SECRET') || Deno.env.get('GOOGLE_CALENDAR_CLIENT_SECRET'))!;
 
 export interface GoogleAdsConnection {
   id: string;

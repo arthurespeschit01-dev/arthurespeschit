@@ -8,7 +8,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const GOOGLE_ADS_DEVELOPER_TOKEN = Deno.env.get('GOOGLE_ADS_DEVELOPER_TOKEN')!;
+const GOOGLE_ADS_DEVELOPER_TOKEN = Deno.env.get('GOOGLE_ADS_DEVELOPER_TOKEN') || '';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
@@ -127,7 +127,7 @@ Deno.serve(async (req) => {
 
     const headers: Record<string, string> = {
       Authorization: `Bearer ${accessToken}`,
-      'developer-token': GOOGLE_ADS_DEVELOPER_TOKEN,
+      ...(GOOGLE_ADS_DEVELOPER_TOKEN ? { 'developer-token': GOOGLE_ADS_DEVELOPER_TOKEN } : {}),
       'Content-Type': 'application/json',
     };
     if (loginCid) headers['login-customer-id'] = loginCid;
