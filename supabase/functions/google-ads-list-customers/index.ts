@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
 
       let customerName = select_customer_id;
       try {
-        const nameRes = await fetch(`https://googleads.googleapis.com/v17/customers/${select_customer_id.replace(/-/g, '')}/googleAds:search`, {
+        const nameRes = await fetch(`https://googleads.googleapis.com/v25/customers/${select_customer_id.replace(/-/g, '')}/googleAds:search`, {
           method: 'POST',
           headers,
           body: JSON.stringify({ query: 'SELECT customer.descriptive_name FROM customer LIMIT 1' }),
@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
     }
 
     // Listar contas acessíveis
-    const listRes = await fetch('https://googleads.googleapis.com/v17/customers:listAccessibleCustomers', {
+    const listRes = await fetch('https://googleads.googleapis.com/v25/customers:listAccessibleCustomers', {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'developer-token': GOOGLE_ADS_DEVELOPER_TOKEN,
@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
         'login-customer-id': cid,
       };
       try {
-        const meRes = await fetch(`https://googleads.googleapis.com/v17/customers/${cid}/googleAds:search`, {
+        const meRes = await fetch(`https://googleads.googleapis.com/v25/customers/${cid}/googleAds:search`, {
           method: 'POST', headers,
           body: JSON.stringify({ query: 'SELECT customer.id, customer.descriptive_name, customer.manager FROM customer LIMIT 1' }),
         });
@@ -108,7 +108,7 @@ Deno.serve(async (req) => {
         }
 
         // MCC — buscar filhas
-        const childRes = await fetch(`https://googleads.googleapis.com/v17/customers/${cid}/googleAds:search`, {
+        const childRes = await fetch(`https://googleads.googleapis.com/v25/customers/${cid}/googleAds:search`, {
           method: 'POST', headers,
           body: JSON.stringify({
             query: `SELECT customer_client.id, customer_client.descriptive_name, customer_client.manager, customer_client.level FROM customer_client WHERE customer_client.level <= 1`,
