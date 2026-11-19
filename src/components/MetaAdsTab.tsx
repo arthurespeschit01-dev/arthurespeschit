@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { syncMetaClient, META_SYNC_EVENT } from '@/lib/metaAutoSync';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Loader2, Link2, CheckCircle2, RefreshCw, AlertCircle, Megaphone, Image as ImageIcon, BarChart3 } from 'lucide-react';
@@ -64,6 +65,21 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
   };
 
   useEffect(() => { loadConnection(); }, [loadConnection]);
+
+  // Atualização automática: ao abrir o cliente, se os dados tiverem mais de 30 min
+  const [autoSync, setAutoSync] = useState(false);
+  useEffect(() => {
+    if (!connection?.selected_ad_account_id) return;
+    let vivo = true;
+    setAutoSync(true);
+    syncMetaClient(clientId, { maxMinutos: 30 }).finally(() => { if (vivo) setAutoSync(false); });
+    return () => { vivo = false; };
+  }, [clientId, connection?.selected_ad_account_id]);
+  useEffect(() => {
+    const h = (e: Event) => { if ((e as CustomEvent).detail?.clientId === clientId) onCampaignsImported?.(); };
+    window.addEventListener(META_SYNC_EVENT, h);
+    return () => window.removeEventListener(META_SYNC_EVENT, h);
+  }, [clientId, onCampaignsImported]);
 
   // Detecta retorno do callback OAuth (?meta=ok|err)
   useEffect(() => {
@@ -185,6 +201,7 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
       || (adsetsRes.status === 'fulfilled' && adsetsRes.value.error)
       || (creativesRes.status === 'fulfilled' && creativesRes.value.error);
 
+    try { localStorage.setItem(`meta-sync-${clientId}`, String(Date.now())); } catch { /* ignore */ }
     setImporting(false);
     setImportStep('idle');
     setImportStartedAt(null);
@@ -298,7 +315,7 @@ export default function MetaAdsTab({ clientId, onCampaignsImported }: { clientId
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={refresh} disabled={importing} className="gap-1">
-            <RefreshCw className={`w-3 h-3 ${importing ? 'animate-spin' : ''}`} /> Atualizar dados
+            <RefreshCw className={`w-3 h-3 ${importing || autoSync ? 'animate-spin' : ''}`} /> {autoSync && !importing ? 'Atualizando…' : 'Atualizar dados'}
           </Button>
           {(expired || expiringSoon) && <Button size="sm" onClick={connect} disabled={connecting}>Reconectar Meta Ads</Button>}
           {connection.selected_ad_account_id && (

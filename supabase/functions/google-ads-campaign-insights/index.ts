@@ -45,10 +45,13 @@ Deno.serve(async (req) => {
     const { start, end } = dateRange(days);
 
     const query = `
-      SELECT campaign.id, campaign.name, campaign.status,
+      SELECT campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type,
+             campaign_budget.amount_micros,
              metrics.impressions, metrics.clicks, metrics.ctr,
-             metrics.average_cpc, metrics.cost_micros,
-             metrics.conversions, metrics.conversions_value
+             metrics.average_cpc, metrics.average_cpm, metrics.cost_micros,
+             metrics.conversions, metrics.conversions_value, metrics.all_conversions,
+             metrics.cost_per_conversion, metrics.interactions, metrics.interaction_rate,
+             metrics.search_impression_share, metrics.video_trueview_views
       FROM campaign
       WHERE segments.date BETWEEN '${start}' AND '${end}'
       ORDER BY metrics.cost_micros DESC
@@ -92,6 +95,14 @@ Deno.serve(async (req) => {
         conversions_value: conversionsValue,
         cpa: conversions > 0 ? cost / conversions : 0,
         roas: cost > 0 ? conversionsValue / cost : 0,
+        channel: r.campaign?.advertisingChannelType || null,
+        daily_budget: r.campaignBudget?.amountMicros ? Number(r.campaignBudget.amountMicros) / 1_000_000 : null,
+        average_cpm: Number(r.metrics?.averageCpm || 0) / 1_000_000,
+        all_conversions: Number(r.metrics?.allConversions || 0),
+        interactions: Number(r.metrics?.interactions || 0),
+        interaction_rate: Number(r.metrics?.interactionRate || 0) * 100,
+        search_impression_share: r.metrics?.searchImpressionShare != null ? Number(r.metrics.searchImpressionShare) * 100 : null,
+        video_views: Number(r.metrics?.videoTrueviewViews || 0),
       };
     });
 

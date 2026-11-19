@@ -1,3 +1,4 @@
+import { syncMetaClient, META_SYNC_EVENT } from '@/lib/metaAutoSync';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -910,6 +911,26 @@ function ReportGenerator({
       if (!templateId && tpls[0]) setTemplateId(tpls[0].id);
     })();
   }, []); // eslint-disable-line
+
+  // Dados da Meta sempre frescos: ao escolher o cliente, atualiza em segundo plano se tiver mais de 30 min
+  useEffect(() => {
+    if (!clientId) return;
+    void syncMetaClient(clientId, { maxMinutos: 30 });
+    const h = async (e: Event) => {
+      if ((e as CustomEvent).detail?.clientId !== clientId) return;
+      const { data } = await supabase.from('campaigns').select('*').eq('client_id', clientId).order('name');
+      const list = (data || []) as CampaignRow[];
+      setCampaigns(list);
+      setSelectedCampaignIds(prev => new Set([...prev].filter(id => list.some(c => c.id === id))));
+      if (list.length > 0) {
+        const { data: ads } = await supabase.from('ad_sets').select('*')
+          .in('campaign_id', list.map(c => c.id)).in('status', ['Ativa', 'Ativo', 'ACTIVE', 'active']);
+        setAdsets((ads || []) as AdSetRow[]);
+      }
+    };
+    window.addEventListener(META_SYNC_EVENT, h);
+    return () => window.removeEventListener(META_SYNC_EVENT, h);
+  }, [clientId]);
 
   // Load campaigns when client changes
   useEffect(() => {
