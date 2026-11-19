@@ -118,11 +118,7 @@ export default function ClientTicketLink({ clientId }: { clientId: string }) {
           </Button>
         </div>
       )}
-      {!loading && !portal && (
-        <Button disabled={busy} onClick={() => void create()}>
-          {busy ? "Criando…" : "Criar link de chamados"}
-        </Button>
-      )}
+
       {portal && (
         <>
           <Label htmlFor="client-ticket-url">
@@ -172,11 +168,18 @@ export default function ClientTicketLink({ clientId }: { clientId: string }) {
           </div>
         </>
       )}
-      <Button variant="link" asChild className="px-0">
-        <Link to={`/chamados?cliente=${encodeURIComponent(clientId)}`}>
-          Ver chamados deste cliente
-        </Link>
-      </Button>
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+        {!loading && !portal && (
+          <Button disabled={busy} onClick={() => void create()}>
+            {busy ? "Criando…" : "Criar link de chamados"}
+          </Button>
+        )}
+        <Button variant="link" asChild className="px-0">
+          <Link to={`/chamados?cliente=${encodeURIComponent(clientId)}`}>
+            Ver chamados deste cliente
+          </Link>
+        </Button>
+      </div>
       <Dialog
         open={confirmRotate}
         onOpenChange={(open) => !busy && setConfirmRotate(open)}
