@@ -23,8 +23,8 @@ const METRIC_FIELDS: Record<string, string> = {
   conversions: 'metrics.conversions',
   conversions_value: 'metrics.conversions_value',
   all_conversions: 'metrics.all_conversions',
-  video_views: 'metrics.video_views',
-  average_cpv: 'metrics.average_cpv',
+  video_views: 'metrics.video_trueview_views',
+  average_cpv: 'metrics.trueview_average_cpv',
   engagements: 'metrics.engagements',
   interactions: 'metrics.interactions',
   search_impression_share: 'metrics.search_impression_share',
@@ -51,8 +51,8 @@ function normalizeRow(r: any) {
     conversions: conv,
     conversions_value: convValue,
     all_conversions: Number(m.allConversions || 0),
-    video_views: Number(m.videoViews || 0),
-    average_cpv: Number(m.averageCpv || 0) / 1_000_000,
+    video_views: Number(m.videoTrueviewViews ?? m.videoViews ?? 0),
+    average_cpv: Number(m.trueviewAverageCpv ?? m.averageCpv ?? 0) / 1_000_000,
     engagements: Number(m.engagements || 0),
     interactions: Number(m.interactions || 0),
     search_impression_share: Number(m.searchImpressionShare || 0) * 100,
@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
     if (loginCid) headers['login-customer-id'] = loginCid;
 
     async function runGAQL(query: string) {
-      const r = await fetch(`https://googleads.googleapis.com/v17/customers/${customerId}/googleAds:search`, {
+      const r = await fetch(`https://googleads.googleapis.com/v25/customers/${customerId}/googleAds:search`, {
         method: 'POST', headers, body: JSON.stringify({ query, pageSize: 10000 }),
       });
       const j = await r.json();
