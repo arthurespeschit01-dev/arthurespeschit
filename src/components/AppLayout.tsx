@@ -3,6 +3,7 @@ import {supabase} from '@/integrations/supabase/client';
 import {settingsResources} from '@/lib/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { syncAllMetaClients } from '@/lib/metaAutoSync';
 import NotificationBar from '@/components/NotificationBar';
 import SupportFAB from '@/components/SupportFAB';
 import ThemeToggle from '@/components/ThemeToggle';
@@ -76,6 +77,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const workspaceAccess = useWorkspaceAccess();
   const { pathname } = useLocation();
   const [canAccessProspecting,setCanAccessProspecting]=useState(false);
+  // Ao entrar no sistema, atualiza os dados da Meta de todos os clientes em segundo plano
+  useEffect(() => { if (!user?.id) return; const t = setTimeout(() => { void syncAllMetaClients(60); }, 5000); return () => clearTimeout(t); }, [user?.id]);
   useEffect(()=>{let alive=true;setCanAccessProspecting(false);if(user?.id)void supabase.auth.getUser().then(({data,error})=>{if(alive&&!error&&data.user?.id===user.id)setCanAccessProspecting(data.user.app_metadata?.central_prospecting===true)}).catch(()=>{});return()=>{alive=false}},[user?.id]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [navSearch,setNavSearch]=useState('');

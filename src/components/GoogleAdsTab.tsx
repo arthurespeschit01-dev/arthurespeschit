@@ -17,7 +17,38 @@ interface Campaign {
   average_cpc: number; cost: number;
   conversions: number; conversions_value: number;
   cpa: number; roas: number;
+  channel?: string | null; daily_budget?: number | null; average_cpm?: number;
+  all_conversions?: number; interactions?: number; interaction_rate?: number;
+  search_impression_share?: number | null; video_views?: number;
 }
+
+const STATUS_PT: Record<string, string> = { ENABLED: 'Ativa', PAUSED: 'Pausada', REMOVED: 'Removida' };
+const CANAL_PT: Record<string, string> = {
+  SEARCH: 'Pesquisa', DISPLAY: 'Display', VIDEO: 'Vídeo', SHOPPING: 'Shopping', PERFORMANCE_MAX: 'Performance Max',
+  DEMAND_GEN: 'Demand Gen', DISCOVERY: 'Discovery', LOCAL: 'Local', SMART: 'Inteligente', MULTI_CHANNEL: 'App',
+};
+type Coluna = { k: string; label: string; v: (c: Campaign) => string; destaque?: boolean };
+const pct = (v?: number | null) => (v == null ? '—' : `${v.toFixed(2)}%`);
+const COLUNAS: Coluna[] = [
+  { k: 'channel', label: 'Tipo', v: c => CANAL_PT[c.channel || ''] || c.channel || '—' },
+  { k: 'daily_budget', label: 'Orçamento/dia', v: c => (c.daily_budget ? fmtBRL(c.daily_budget) : '—') },
+  { k: 'cost', label: 'Investido', v: c => fmtBRL(c.cost), destaque: true },
+  { k: 'impressions', label: 'Impr.', v: c => fmtInt(c.impressions) },
+  { k: 'clicks', label: 'Cliques', v: c => fmtInt(c.clicks) },
+  { k: 'ctr', label: 'CTR', v: c => pct(c.ctr) },
+  { k: 'average_cpc', label: 'CPC médio', v: c => fmtBRL(c.average_cpc) },
+  { k: 'average_cpm', label: 'CPM médio', v: c => fmtBRL(c.average_cpm || 0) },
+  { k: 'interactions', label: 'Interações', v: c => fmtInt(c.interactions || 0) },
+  { k: 'interaction_rate', label: 'Taxa de interação', v: c => pct(c.interaction_rate) },
+  { k: 'search_impression_share', label: 'Parcela de impr.', v: c => pct(c.search_impression_share) },
+  { k: 'video_views', label: 'Visualizações', v: c => fmtInt(c.video_views || 0) },
+  { k: 'conversions', label: 'Conv.', v: c => fmtInt(c.conversions), destaque: true },
+  { k: 'all_conversions', label: 'Todas as conv.', v: c => fmtInt(c.all_conversions || 0) },
+  { k: 'conversions_value', label: 'Valor conv.', v: c => fmtBRL(c.conversions_value) },
+  { k: 'cpa', label: 'Custo/conv.', v: c => (c.cpa > 0 ? fmtBRL(c.cpa) : '—') },
+  { k: 'roas', label: 'ROAS', v: c => (c.roas > 0 ? `${c.roas.toFixed(2)}x` : '—'), destaque: true },
+];
+const COLUNAS_PADRAO = ['cost', 'impressions', 'clicks', 'ctr', 'average_cpc', 'conversions', 'cpa', 'roas'];
 
 const fmtBRL = (v: number) => `R$ ${(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtInt = (v: number) => (v || 0).toLocaleString('pt-BR');
@@ -32,6 +63,17 @@ export default function GoogleAdsTab({ clientId }: { clientId: string }) {
   const [days, setDays] = useState(30);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
+  const [filtroStatus, setFiltroStatus] = useState<'todas' | 'ENABLED' | 'PAUSED' | 'REMOVED'>('todas');
+  const [colunas, setColunas] = useState<string[]>(() => {
+    try { const v = JSON.parse(localStorage.getItem('gads-colunas') || 'null'); if (Array.isArray(v) && v.length) return v; } catch { /* ignore */ }
+    return COLUNAS_PADRAO;
+  });
+  const [escolhendo, setEscolhendo] = useState(false);
+  const alternarColuna = (k: string) => setColunas(prev => {
+    const n = prev.includes(k) ? prev.filter(x => x !== k) : COLUNAS.map(c => c.k).filter(x => prev.includes(x) || x === k);
+    try { localStorage.setItem('gads-colunas', JSON.stringify(n)); } catch { /* ignore */ }
+    return n;
+  });
 
   const loadConnection = useCallback(async () => {
     setLoading(true);
@@ -166,7 +208,9 @@ export default function GoogleAdsTab({ clientId }: { clientId: string }) {
   }
 
   const expired = connection.token_expires_at && new Date(connection.token_expires_at) < new Date();
-  const totals = campaigns.reduce((acc, c) => ({
+  const visiveis = campaigns.filter(c => (filtroStatus === 'todas' ? c.status !== 'REMOVED' : c.status === filtroStatus));
+  const contaStatus = (st: string) => campaigns.filter(c => (st === 'todas' ? c.status !== 'REMOVED' : c.status === st)).length;
+  const totals = visiveis.reduce((acc, c) => ({
     cost: acc.cost + c.cost,
     clicks: acc.clicks + c.clicks,
     impressions: acc.impressions + c.impressions,
@@ -276,41 +320,58 @@ export default function GoogleAdsTab({ clientId }: { clientId: string }) {
           </div>
 
           <div className="glass-surface rounded-xl p-4">
-            <h4 className="text-sm font-semibold text-foreground mb-3">Campanhas ({campaigns.length})</h4>
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+              <div className="flex items-center gap-3 flex-wrap">
+                <h4 className="text-sm font-semibold text-foreground">Campanhas ({visiveis.length})</h4>
+                <div className="flex gap-1 p-1 bg-secondary/50 rounded-lg">
+                  {([['todas', 'Todas'], ['ENABLED', 'Ativas'], ['PAUSED', 'Pausadas'], ['REMOVED', 'Removidas']] as const).map(([k, l]) => (
+                    <button key={k} onClick={() => setFiltroStatus(k)}
+                      className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${filtroStatus === k ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+                      {l} <span className="opacity-70">{contaStatus(k)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="relative">
+                <Button variant="outline" size="sm" onClick={() => setEscolhendo(v => !v)}>Colunas ({colunas.length})</Button>
+                {escolhendo && (
+                  <div className="absolute right-0 z-20 mt-1 w-60 rounded-lg border border-border bg-popover p-2 shadow-lg max-h-80 overflow-auto">
+                    {COLUNAS.map(c => (
+                      <label key={c.k} className="flex items-center gap-2 px-2 py-1 text-xs text-foreground cursor-pointer hover:bg-secondary/50 rounded">
+                        <input type="checkbox" checked={colunas.includes(c.k)} onChange={() => alternarColuna(c.k)} /> {c.label}
+                      </label>
+                    ))}
+                    <button className="w-full text-left px-2 py-1 text-xs text-primary" onClick={() => { setColunas(COLUNAS_PADRAO); try { localStorage.removeItem('gads-colunas'); } catch { /* ignore */ } }}>Voltar ao padrão</button>
+                  </div>
+                )}
+              </div>
+            </div>
             {loadingMetrics ? (
               <div className="flex items-center justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
-            ) : campaigns.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-6">Nenhuma campanha no período.</p>
+            ) : visiveis.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">{campaigns.length ? 'Nenhuma campanha com esse status no período.' : 'Nenhuma campanha no período.'}</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-xs text-muted-foreground border-b border-border/50">
                       <th className="text-left font-medium py-2 px-2">Campanha</th>
-                      <th className="text-right font-medium py-2 px-2">Status</th>
-                      <th className="text-right font-medium py-2 px-2">Investido</th>
-                      <th className="text-right font-medium py-2 px-2">Impr.</th>
-                      <th className="text-right font-medium py-2 px-2">Cliques</th>
-                      <th className="text-right font-medium py-2 px-2">CTR</th>
-                      <th className="text-right font-medium py-2 px-2">CPC</th>
-                      <th className="text-right font-medium py-2 px-2">Conv.</th>
-                      <th className="text-right font-medium py-2 px-2">CPA</th>
-                      <th className="text-right font-medium py-2 px-2">ROAS</th>
+                      <th className="text-left font-medium py-2 px-2">Status</th>
+                      {COLUNAS.filter(c => colunas.includes(c.k)).map(c => <th key={c.k} className="text-right font-medium py-2 px-2 whitespace-nowrap">{c.label}</th>)}
                     </tr>
                   </thead>
                   <tbody>
-                    {campaigns.map(c => (
+                    {visiveis.map(c => (
                       <tr key={c.id} className="border-b border-border/30 hover:bg-secondary/30">
                         <td className="py-2 px-2 text-foreground font-medium">{c.name}</td>
-                        <td className="py-2 px-2 text-right text-muted-foreground text-xs">{c.status}</td>
-                        <td className="py-2 px-2 text-right text-foreground">{fmtBRL(c.cost)}</td>
-                        <td className="py-2 px-2 text-right text-muted-foreground">{fmtInt(c.impressions)}</td>
-                        <td className="py-2 px-2 text-right text-muted-foreground">{fmtInt(c.clicks)}</td>
-                        <td className="py-2 px-2 text-right text-muted-foreground">{c.ctr.toFixed(2)}%</td>
-                        <td className="py-2 px-2 text-right text-muted-foreground">{fmtBRL(c.average_cpc)}</td>
-                        <td className="py-2 px-2 text-right text-foreground">{fmtInt(c.conversions)}</td>
-                        <td className="py-2 px-2 text-right text-muted-foreground">{c.cpa > 0 ? fmtBRL(c.cpa) : '—'}</td>
-                        <td className="py-2 px-2 text-right text-primary font-semibold">{c.roas > 0 ? `${c.roas.toFixed(2)}x` : '—'}</td>
+                        <td className="py-2 px-2 text-xs">
+                          <span className={`inline-flex items-center gap-1 ${c.status === 'ENABLED' ? 'text-emerald-400' : c.status === 'PAUSED' ? 'text-amber-400' : 'text-muted-foreground'}`}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-current" />{STATUS_PT[c.status] || c.status}
+                          </span>
+                        </td>
+                        {COLUNAS.filter(k => colunas.includes(k.k)).map(k => (
+                          <td key={k.k} className={`py-2 px-2 text-right whitespace-nowrap ${k.k === 'roas' ? 'text-primary font-semibold' : k.destaque ? 'text-foreground' : 'text-muted-foreground'}`}>{k.v(c)}</td>
+                        ))}
                       </tr>
                     ))}
                   </tbody>
