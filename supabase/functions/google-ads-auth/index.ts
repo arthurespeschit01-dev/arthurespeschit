@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const GOOGLE_ADS_CLIENT_ID = Deno.env.get('GOOGLE_ADS_CLIENT_ID')!;
+const GOOGLE_ADS_CLIENT_ID = (Deno.env.get('GOOGLE_ADS_CLIENT_ID') || Deno.env.get('GOOGLE_CALENDAR_CLIENT_ID'))!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const REDIRECT_URI = `${SUPABASE_URL}/functions/v1/google-ads-auth-callback`;

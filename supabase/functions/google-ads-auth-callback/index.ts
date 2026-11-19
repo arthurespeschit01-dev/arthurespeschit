@@ -1,8 +1,8 @@
 // Callback OAuth do Google Ads. Troca code por tokens e salva.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-const GOOGLE_ADS_CLIENT_ID = Deno.env.get('GOOGLE_ADS_CLIENT_ID')!;
-const GOOGLE_ADS_CLIENT_SECRET = Deno.env.get('GOOGLE_ADS_CLIENT_SECRET')!;
+const GOOGLE_ADS_CLIENT_ID = (Deno.env.get('GOOGLE_ADS_CLIENT_ID') || Deno.env.get('GOOGLE_CALENDAR_CLIENT_ID'))!;
+const GOOGLE_ADS_CLIENT_SECRET = (Deno.env.get('GOOGLE_ADS_CLIENT_SECRET') || Deno.env.get('GOOGLE_CALENDAR_CLIENT_SECRET'))!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const REDIRECT_URI = `${SUPABASE_URL}/functions/v1/google-ads-auth-callback`;
