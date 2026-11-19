@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
 
     const customerId = (conn as any).selected_customer_id;
     const apiRes = await fetch(`https://googleads.googleapis.com/v25/customers/${customerId}/googleAds:search`, {
-      method: 'POST', headers, body: JSON.stringify({ query, pageSize: 1000 }),
+      method: 'POST', headers, body: JSON.stringify({ query }),
     });
     const apiData = await apiRes.json();
 

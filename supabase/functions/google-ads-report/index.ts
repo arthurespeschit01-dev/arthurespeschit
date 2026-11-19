@@ -134,7 +134,7 @@ Deno.serve(async (req) => {
 
     async function runGAQL(query: string) {
       const r = await fetch(`https://googleads.googleapis.com/v25/customers/${customerId}/googleAds:search`, {
-        method: 'POST', headers, body: JSON.stringify({ query, pageSize: 10000 }),
+        method: 'POST', headers, body: JSON.stringify({ query }),
       });
       const j = await r.json();
       if (!r.ok) throw { status: r.status, body: j };
