@@ -134,6 +134,43 @@ export async function googleBusy(
     }),
   );
 }
+// Eventos criados direto no Google Agenda (os que a Central criou ficam de fora, já aparecem como compromissos)
+export async function googleEvents(
+  db: any,
+  workspace: string,
+  start: string,
+  end: string,
+) {
+  const token = await access(db, workspace);
+  if (!token) return [];
+  const params = new URLSearchParams({
+    timeMin: start,
+    timeMax: end,
+    singleEvents: "true",
+    orderBy: "startTime",
+    maxResults: "250",
+  });
+  const r = await api(token, "calendars/primary/events?" + params.toString());
+  const data = await r.json();
+  if (!r.ok)
+    throw Error("Não foi possível ler o Google Agenda. Reconecte a conta Google.");
+  return (data.items || [])
+    .filter(
+      (e: any) =>
+        e.status !== "cancelled" && !/^c[ag][0-9a-f]{32}$/.test(e.id || ""),
+    )
+    .map((e: any) => {
+      const allDay = !e.start?.dateTime;
+      return {
+        id: String(e.id),
+        title: String(e.summary || "Sem título").slice(0, 200),
+        starts_at: e.start?.dateTime || `${e.start?.date}T00:00:00-03:00`,
+        ends_at: e.end?.dateTime || `${e.end?.date}T00:00:00-03:00`,
+        all_day: allDay,
+        url: typeof e.htmlLink === "string" ? e.htmlLink : null,
+      };
+    });
+}
 export async function syncGoogle(db: any, workspace: string) {
   const token = await access(db, workspace);
   if (!token) return;
