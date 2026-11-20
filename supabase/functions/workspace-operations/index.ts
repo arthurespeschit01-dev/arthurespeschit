@@ -50,6 +50,7 @@ import {
   startGoogle,
   googleCallback,
   googleBusy,
+  googleEvents,
   syncGoogle,
 } from "../_shared/workspace-google.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.103.2";
@@ -798,6 +799,26 @@ export async function handle(req: Request) {
           Deno.env.get("AGENCY_APP_URL") || "https://www.centraldogestor.site",
           Deno.env.get("RESEND_API_KEY") || "",
         )),
+      });
+    }
+    if (body.action === "google_events") {
+      const start = new Date(String(body.start || "")),
+        end = new Date(String(body.end || ""));
+      if (
+        Number.isNaN(start.getTime()) ||
+        Number.isNaN(end.getTime()) ||
+        end <= start ||
+        end.getTime() - start.getTime() > 200 * 86400000
+      )
+        throw Error("Período inválido.");
+      await syncGoogle(db, workspace).catch(() => {});
+      return reply({
+        events: await googleEvents(
+          db,
+          workspace,
+          start.toISOString(),
+          end.toISOString(),
+        ),
       });
     }
     const managers = [

@@ -18,6 +18,9 @@ import {
 } from "@/components/ui/dialog";
 import { type Appointment, localDateTime } from "@/lib/appointments";
 import { toast } from "sonner";
+import { workspaceOperation } from "@/lib/workspaceCommercial";
+
+type GoogleEvent = { id: string; title: string; starts_at: string; ends_at: string; all_day: boolean; url: string | null };
 
 const statuses: Record<Appointment["status"], string> = {
   agendado: "Agendado",
@@ -52,6 +55,7 @@ export default function AgencyCalendar({
     [google, setGoogle] = useState(false),
     [view, setView] = useState<"calendar" | "list">("calendar");
   const [events, setEvents] = useState<Appointment[]>([]);
+  const [googleEvents, setGoogleEvents] = useState<GoogleEvent[]>([]);
   const [clients, setClients] = useState<
     { id: string; name: string; status: string }[]
   >([]);
@@ -90,6 +94,29 @@ export default function AgencyCalendar({
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Eventos criados direto no Google Agenda aparecem aqui também (atualiza a cada minuto e ao voltar para a aba)
+  const loadGoogle = useCallback(async () => {
+    if (!account || !google) { setGoogleEvents([]); return; }
+    try {
+      const r = await workspaceOperation<{ events: GoogleEvent[] }>("google_events", {
+        workspace_id: account,
+        start: new Date(Date.now() - 60 * 86400000).toISOString(),
+        end: new Date(Date.now() + 120 * 86400000).toISOString(),
+      });
+      setGoogleEvents(r.events || []);
+      void load();
+    } catch {
+      /* mantém o último resultado */
+    }
+  }, [account, google, load]);
+  useEffect(() => {
+    void loadGoogle();
+    const timer = setInterval(() => void loadGoogle(), 60000);
+    const onFocus = () => void loadGoogle();
+    window.addEventListener("focus", onFocus);
+    return () => { clearInterval(timer); window.removeEventListener("focus", onFocus); };
+  }, [loadGoogle]);
 
   const persist = async (
     id: string | null,
@@ -259,7 +286,18 @@ export default function AgencyCalendar({
                   ? "completed"
                   : "confirmed",
             lead_id: null,
-          }))}
+          })).concat(googleEvents.map((g) => ({
+            id: "g:" + g.id,
+            calendar_id: "",
+            name: "Google · " + g.title,
+            phone: "",
+            email: "",
+            notes: "",
+            starts_at: g.starts_at,
+            ends_at: g.ends_at,
+            status: "confirmed" as const,
+            lead_id: null,
+          })))}
           onSelect={(id) => {
             setSelected(id);
             setTimeout(
@@ -321,7 +359,30 @@ export default function AgencyCalendar({
               </div>
             </article>
           ))}
-        {!events.length && (
+        {[...googleEvents]
+          .filter((g) => view === "list" || "g:" + g.id === selected)
+          .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
+          .map((g) => (
+            <article
+              key={"g:" + g.id}
+              id={`appointment-g:${g.id}`}
+              className="border rounded-xl p-4 bg-card flex flex-wrap gap-3 justify-between items-center"
+            >
+              <div>
+                <p className="font-medium">
+                  {g.title}{" "}
+                  <span className="ml-1 text-[11px] rounded-full border px-2 py-0.5 text-muted-foreground align-middle">Google Agenda</span>
+                </p>
+                <p className="text-sm">{g.all_day ? "Dia inteiro · " + new Date(g.starts_at).toLocaleDateString("pt-BR") : dateLabel(g.starts_at)}</p>
+              </div>
+              {g.url && (
+                <a href={g.url} target="_blank" rel="noreferrer" className="text-sm text-primary underline">
+                  Abrir no Google
+                </a>
+              )}
+            </article>
+          ))}
+        {!events.length && !googleEvents.length && (
           <Empty>
             Nenhum agendamento cadastrado. Clique em “Novo agendamento” para
             adicionar um compromisso.
