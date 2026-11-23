@@ -24,6 +24,7 @@ interface Client { id: string; name: string; monthly_fee: number | null; payment
 interface Transacao {
   id: string; tipo: 'entrada' | 'saida'; descricao: string; valor: number;
   data: string; cliente_id: string | null; categoria: string | null;
+  natureza?: 'fixo' | 'variavel' | null;
 }
 interface Mensalidade {
   id: string; cliente_id: string; valor: number; vencimento: string; original_amount?:number|null; fee_adjusted_at?:string|null;
@@ -32,6 +33,9 @@ interface Mensalidade {
 
 const CATEGORIAS_SAIDA = ['Ferramentas/SaaS', 'Freelancer', 'Impulsionamento', 'Infraestrutura', 'Outros'];
 const CUSTOS_DIRETOS = new Set(['Freelancer', 'Impulsionamento']);
+// Variável: vinculado a cliente, marcado como variável, ou categoria de custo direto (se não marcado como fixo)
+const ehVariavel = (t: Transacao) =>
+  !!t.cliente_id || t.natureza === 'variavel' || (t.natureza !== 'fixo' && !!t.categoria && CUSTOS_DIRETOS.has(t.categoria));
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n || 0);
@@ -97,8 +101,14 @@ export default function Financeiro() {
   const receitaBruta = receitaMensalidadesPagas + receitaAvulsa;
 
   const saidas = transacoes.filter(t => t.tipo === 'saida');
-  const custosDiretos = saidas.filter(t => t.cliente_id || (t.categoria && CUSTOS_DIRETOS.has(t.categoria))).reduce((s, t) => s + Number(t.valor), 0);
-  const custosFixos = saidas.filter(t => !t.cliente_id && (!t.categoria || !CUSTOS_DIRETOS.has(t.categoria))).reduce((s, t) => s + Number(t.valor), 0);
+  const custosDiretos = saidas.filter(ehVariavel).reduce((s, t) => s + Number(t.valor), 0);
+  const custosFixos = saidas.filter(t => !ehVariavel(t)).reduce((s, t) => s + Number(t.valor), 0);
+  const somaVar = (f: (t: Transacao) => boolean) => saidas.filter(t => ehVariavel(t) && f(t)).reduce((s, t) => s + Number(t.valor), 0);
+  const varFreelancer = somaVar(t => t.categoria === 'Freelancer');
+  const varImpuls = somaVar(t => t.categoria === 'Impulsionamento');
+  const varCliente = somaVar(t => !!t.cliente_id && t.categoria !== 'Freelancer' && t.categoria !== 'Impulsionamento');
+  const varSemCliente = somaVar(t => !t.cliente_id && t.categoria !== 'Freelancer' && t.categoria !== 'Impulsionamento');
+  const fixoPorCategoria = (cat: string) => saidas.filter(t => !ehVariavel(t) && t.categoria === cat).reduce((s, t) => s + Number(t.valor), 0);
   const custosVariaveis = custosDiretos;
   const lucroLiquido = receitaBruta - custosDiretos - custosFixos;
   const margem = receitaBruta > 0 ? (lucroLiquido / receitaBruta) * 100 : 0;
@@ -126,7 +136,7 @@ export default function Financeiro() {
 
   // ===== Forms =====
   const [entrada, setEntrada] = useState({ descricao: '', cliente_id: '', valor: '', data: new Date().toISOString().slice(0,10) });
-  const [saida, setSaida] = useState({ descricao: '', categoria: 'Outros', cliente_id: '', valor: '', data: new Date().toISOString().slice(0,10) });
+  const [saida, setSaida] = useState({ descricao: '', categoria: 'Outros', cliente_id: '', natureza: 'fixo' as 'fixo' | 'variavel', valor: '', data: new Date().toISOString().slice(0,10) });
   const [filtroTipo, setFiltroTipo] = useState<'todos'|'entrada'|'saida'>('todos');
   const [filtroCliente, setFiltroCliente] = useState<string>('todos');
 
@@ -147,10 +157,11 @@ export default function Financeiro() {
     const { data, error } = await supabase.from('transacoes').insert({
       user_id: user.id, tipo: 'saida', descricao: saida.descricao, valor: parseFloat(saida.valor),
       data: saida.data, cliente_id: saida.cliente_id || null, categoria: saida.categoria,
+      natureza: saida.cliente_id ? 'variavel' : saida.natureza,
     }).select().single();
     if (error) { toast.error('Erro ao registrar'); return; }
     setTransacoes(prev => [data as Transacao, ...prev]);
-    setSaida({ descricao: '', categoria: 'Outros', cliente_id: '', valor: '', data: new Date().toISOString().slice(0,10) });
+    setSaida({ descricao: '', categoria: 'Outros', cliente_id: '', natureza: 'fixo', valor: '', data: new Date().toISOString().slice(0,10) });
     toast.success('Saída registrada');
   };
 
@@ -167,7 +178,7 @@ export default function Financeiro() {
     (filtroCliente === 'todos' || t.cliente_id === filtroCliente || (filtroCliente === 'sem' && !t.cliente_id))
   );
 
-  const clientName = (id: string | null) => id ? (clients.find(c => c.id === id)?.name || '-') : 'Custo fixo';
+  const clientName = (t: Transacao) => t.cliente_id ? (clients.find(c => c.id === t.cliente_id)?.name || '-') : t.tipo === 'saida' && ehVariavel(t) ? 'Custo variável' : 'Custo fixo';
 
   const exportPDF = async () => {
     const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
@@ -188,17 +199,15 @@ export default function Financeiro() {
     rows.push([{ content: 'Total de Receitas', styles: { fontStyle: 'bold' } }, { content: fmt(receitaBruta), styles: { fontStyle: 'bold' } }]);
 
     rows.push([{ content: 'CUSTOS DIRETOS', colSpan: 2, styles: { fontStyle: 'bold', fillColor: [40, 40, 50], textColor: 255 } }]);
-    const freel = saidas.filter(t => t.categoria === 'Freelancer').reduce((s,t)=>s+Number(t.valor),0);
-    const imp = saidas.filter(t => t.categoria === 'Impulsionamento').reduce((s,t)=>s+Number(t.valor),0);
-    const outrosDir = saidas.filter(t => t.cliente_id && t.categoria !== 'Freelancer' && t.categoria !== 'Impulsionamento').reduce((s,t)=>s+Number(t.valor),0);
-    rows.push(['Freelancers', fmt(freel)]);
-    rows.push(['Impulsionamento', fmt(imp)]);
-    if (outrosDir > 0) rows.push(['Outros custos por cliente', fmt(outrosDir)]);
+    rows.push(['Freelancers', fmt(varFreelancer)]);
+    rows.push(['Impulsionamento', fmt(varImpuls)]);
+    if (varCliente > 0) rows.push(['Outros custos por cliente', fmt(varCliente)]);
+    if (varSemCliente > 0) rows.push(['Outros custos variáveis (sem cliente)', fmt(varSemCliente)]);
     rows.push([{ content: 'Total Custos Diretos', styles: { fontStyle: 'bold' } }, { content: fmt(custosDiretos), styles: { fontStyle: 'bold' } }]);
 
     rows.push([{ content: 'CUSTOS FIXOS', colSpan: 2, styles: { fontStyle: 'bold', fillColor: [40, 40, 50], textColor: 255 } }]);
     for (const cat of CATEGORIAS_SAIDA) {
-      const val = saidas.filter(t => !t.cliente_id && t.categoria === cat).reduce((s,t)=>s+Number(t.valor),0);
+      const val = fixoPorCategoria(cat);
       if (val > 0) rows.push([cat, fmt(val)]);
     }
     rows.push([{ content: 'Total Custos Fixos', styles: { fontStyle: 'bold' } }, { content: fmt(custosFixos), styles: { fontStyle: 'bold' } }]);
@@ -490,10 +499,11 @@ export default function Financeiro() {
                     </Select>
                   </div>
                   <div><Label className="text-xs">Vínculo</Label>
-                    <Select value={saida.cliente_id || 'none'} onValueChange={v => setSaida({...saida, cliente_id: v === 'none' ? '' : v})}>
+                    <Select value={saida.cliente_id || (saida.natureza === 'variavel' ? 'variavel' : 'none')} onValueChange={v => setSaida({...saida, cliente_id: v === 'none' || v === 'variavel' ? '' : v, natureza: v === 'none' ? 'fixo' : 'variavel'})}>
                       <SelectTrigger><SelectValue placeholder="Custo fixo" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">Custo fixo (sem cliente)</SelectItem>
+                        <SelectItem value="variavel">Custo variável (sem cliente)</SelectItem>
                         {visibleClients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
@@ -545,7 +555,7 @@ export default function Financeiro() {
                         : <Badge className="bg-red-500/15 text-red-400 border-red-500/30">Saída</Badge>}</td>
                       <td className="p-3 font-medium">{t.descricao}<DeleteItemButton kind="transaction" id={t.id} title={t.descricao} description="Este lançamento manual será removido dos totais financeiros." onDeleted={loadAll}/></td>
                       <td className="p-3 text-muted-foreground">{t.categoria || '-'}</td>
-                      <td className="p-3 text-muted-foreground">{clientName(t.cliente_id)}</td>
+                      <td className="p-3 text-muted-foreground">{clientName(t)}</td>
                       <td className={`p-3 text-right font-semibold ${t.tipo === 'entrada' ? 'text-emerald-400' : 'text-red-400'}`}>{t.tipo === 'saida' ? '−' : '+'}{fmt(Number(t.valor))}</td>
                     </tr>
                   ))}
@@ -569,14 +579,15 @@ export default function Financeiro() {
             ]} total={receitaBruta} totalLabel="Total de Receitas" positive />
 
             <DreSection title="Custos Diretos" rows={[
-              ['Freelancers', saidas.filter(t => t.categoria === 'Freelancer').reduce((s,t)=>s+Number(t.valor),0)],
-              ['Impulsionamento', saidas.filter(t => t.categoria === 'Impulsionamento').reduce((s,t)=>s+Number(t.valor),0)],
-              ['Outros custos vinculados a cliente', saidas.filter(t => t.cliente_id && t.categoria !== 'Freelancer' && t.categoria !== 'Impulsionamento').reduce((s,t)=>s+Number(t.valor),0)],
+              ['Freelancers', varFreelancer],
+              ['Impulsionamento', varImpuls],
+              ['Outros custos vinculados a cliente', varCliente],
+              ['Outros custos variáveis (sem cliente)', varSemCliente],
             ]} total={custosDiretos} totalLabel="Total Custos Diretos" />
 
             <DreSection title="Custos Fixos" rows={CATEGORIAS_SAIDA.map(cat => [
               cat,
-              saidas.filter(t => !t.cliente_id && t.categoria === cat).reduce((s,t)=>s+Number(t.valor),0)
+              fixoPorCategoria(cat)
             ] as [string, number])} total={custosFixos} totalLabel="Total Custos Fixos" />
 
             <div className={`mt-6 p-4 rounded-lg flex items-center justify-between ${lucroLiquido >= 0 ? 'bg-emerald-500/15 border border-emerald-500/30' : 'bg-red-500/15 border border-red-500/30'}`}>

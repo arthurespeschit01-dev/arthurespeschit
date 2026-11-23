@@ -129,8 +129,9 @@ export default function Dashboard() {
     const recAvulsa = transacoes.filter(t => t.tipo === 'entrada').reduce((s, t) => s + Number(t.valor), 0);
     const receita = recMens + recAvulsa;
     const saidas = transacoes.filter(t => t.tipo === 'saida');
-    const custosDiretos = saidas.filter(t => t.cliente_id || (t.categoria && CUSTOS_DIRETOS.has(t.categoria))).reduce((s, t) => s + Number(t.valor), 0);
-    const custosFixos = saidas.filter(t => !t.cliente_id && (!t.categoria || !CUSTOS_DIRETOS.has(t.categoria))).reduce((s, t) => s + Number(t.valor), 0);
+    const ehVar = (t: any) => !!t.cliente_id || t.natureza === 'variavel' || (t.natureza !== 'fixo' && !!t.categoria && (CUSTOS_DIRETOS.has(t.categoria) || t.categoria === 'Freelancer' || t.categoria === 'Impulsionamento'));
+    const custosDiretos = saidas.filter(ehVar).reduce((s, t) => s + Number(t.valor), 0);
+    const custosFixos = saidas.filter(t => !ehVar(t)).reduce((s, t) => s + Number(t.valor), 0);
     const lucro = receita - custosDiretos - custosFixos;
     const margem = receita > 0 ? (lucro / receita) * 100 : 0;
     const aReceber = mensalidades.filter(m => m.status !== 'pago').reduce((s, m) => s + Number(m.valor), 0);

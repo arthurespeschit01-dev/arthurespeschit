@@ -1441,6 +1441,7 @@ export type Database = {
       }
       transacoes: {
         Row: {
+          natureza: string | null
           categoria: string | null
           cliente_id: string | null
           created_at: string
@@ -1453,6 +1454,7 @@ export type Database = {
           valor: number
         }
         Insert: {
+          natureza?: string | null
           categoria?: string | null
           cliente_id?: string | null
           created_at?: string
@@ -1465,6 +1467,7 @@ export type Database = {
           valor?: number
         }
         Update: {
+          natureza?: string | null
           categoria?: string | null
           cliente_id?: string | null
           created_at?: string
