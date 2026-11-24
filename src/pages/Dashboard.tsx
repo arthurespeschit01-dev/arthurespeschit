@@ -134,11 +134,13 @@ export default function Dashboard() {
     const custosFixos = saidas.filter(t => !ehVar(t)).reduce((s, t) => s + Number(t.valor), 0);
     const lucro = receita - custosDiretos - custosFixos;
     const margem = receita > 0 ? (lucro / receita) * 100 : 0;
-    const aReceber = mensalidades.filter(m => m.status !== 'pago').reduce((s, m) => s + Number(m.valor), 0);
-    const atrasadas = mensalidades.filter(m => m.status === 'atrasado');
+    const ativos = new Set(clients.filter(isActiveClient).map(c => c.id));
+    const abertas = mensalidades.filter(m => m.status !== 'pago' && ativos.has(m.cliente_id));
+    const aReceber = abertas.reduce((s, m) => s + Number(m.valor), 0);
+    const atrasadas = abertas.filter(m => m.status === 'atrasado');
     const totalAtrasado = atrasadas.reduce((s, m) => s + Number(m.valor), 0);
     return { receita, lucro, margem, aReceber, totalAtrasado, atrasadasCount: atrasadas.length };
-  }, [mensalidades, transacoes]);
+  }, [mensalidades, transacoes, clients]);
 
   // ===== Visão de clientes =====
   const totalClientes = clients.length;
@@ -166,6 +168,7 @@ export default function Dashboard() {
     return mensalidades
       .filter(m => m.status !== 'pago')
       .map(m => ({ ...m, cliente: clients.find(c => c.id === m.cliente_id) }))
+      .filter(m => m.cliente && isActiveClient(m.cliente))
       .sort((a, b) => a.vencimento.localeCompare(b.vencimento))
       .slice(0, 5);
   }, [mensalidades, clients]);
