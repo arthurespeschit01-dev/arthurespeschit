@@ -113,7 +113,11 @@ export default function Financeiro() {
   const lucroLiquido = receitaBruta - custosDiretos - custosFixos;
   const margem = receitaBruta > 0 ? (lucroLiquido / receitaBruta) * 100 : 0;
 
-  const scopedInvoices=mensalidades.filter(m=>statusFilter==='Todos'||clients.some(c=>c.id===m.cliente_id&&matchesClientStatus(c,statusFilter)));
+  // Cobrança em aberto só existe para cliente ativo; o que já foi pago continua no histórico
+  const ativoIds = new Set(clients.filter(isActiveClient).map(c => c.id));
+  const cobravel = (m: Mensalidade) => m.status === 'pago' || ativoIds.has(m.cliente_id);
+  const mensVisiveis = mensalidades.filter(m => cobravel(m) && (statusFilter === 'Todos' || visibleClientIds.has(m.cliente_id)));
+  const scopedInvoices=mensVisiveis;
   const feesMensais=clients.filter(c=>matchesClientStatus(c,statusFilter)).reduce((sum,c)=>sum+Number(c.monthly_fee||0),0);
   const aReceber = scopedInvoices.filter(m => m.status !== 'pago').reduce((s, m) => s + Number(m.valor), 0);
   const atrasados = scopedInvoices.filter(m => m.status === 'atrasado');
@@ -378,8 +382,8 @@ export default function Financeiro() {
                   <tr><th className="text-left p-3">Cliente</th><th className="text-left p-3">Mensalidade</th><th className="text-left p-3">Vencimento</th><th className="text-left p-3">Status</th><th className="text-right p-3">Ação</th></tr>
                 </thead>
                 <tbody>
-                  {!mensalidades.some(m => statusFilter === 'Todos' || visibleClientIds.has(m.cliente_id)) && <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Nenhuma mensalidade no período</td></tr>}
-                  {mensalidades.filter(m => statusFilter === 'Todos' || visibleClientIds.has(m.cliente_id)).sort((a,b) => a.vencimento.localeCompare(b.vencimento)).map(m => {
+                  {!mensVisiveis.length && <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Nenhuma mensalidade no período</td></tr>}
+                  {[...mensVisiveis].sort((a,b) => a.vencimento.localeCompare(b.vencimento)).map(m => {
                     const c = clients.find(x => x.id === m.cliente_id);
                     return (
                       <tr key={m.id} className="border-t border-border/50">
