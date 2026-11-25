@@ -122,6 +122,9 @@ export default function GoogleAdsReport() {
   const [groupBy, setGroupBy] = useState<'campaign' | 'ad_group'>('campaign');
   const [campaignFilter, setCampaignFilter] = useState<Set<string>>(new Set());
   const [campaignSearch, setCampaignSearch] = useState('');
+  const [statusFiltro, setStatusFiltro] = useState<'todas' | 'ENABLED' | 'PAUSED'>('todas');
+  const [todasCampanhas, setTodasCampanhas] = useState<{ id: string; name: string; status: string }[]>([]);
+  useEffect(() => { setTodasCampanhas([]); setCampaignFilter(new Set()); setStatusFiltro('todas'); }, [clientId]);
 
   const [columns, setColumns] = useState<string[]>(() => {
     try {
@@ -174,7 +177,7 @@ export default function GoogleAdsReport() {
         end_date: end,
         metrics: columns,
         group_by: groupBy,
-        campaign_ids: groupBy === 'ad_group' && campaignFilter.size > 0 ? Array.from(campaignFilter) : [],
+        campaign_ids: campaignFilter.size > 0 ? Array.from(campaignFilter) : [],
         include_timeseries: true,
       },
     });
@@ -185,15 +188,28 @@ export default function GoogleAdsReport() {
       setRows([]); setTimeseries([]);
       return;
     }
-    setRows((data as any).rows || []);
+    const recebidas = (data as any).rows || [];
+    setRows(recebidas);
     setTimeseries((data as any).timeseries || []);
+    // guarda a lista completa de campanhas da conta para o filtro
+    if (groupBy === 'campaign' && campaignFilter.size === 0) {
+      setTodasCampanhas(recebidas.map((r: any) => ({ id: String(r.id), name: r.name, status: String(r.status || '') })));
+    }
   }, [clientId, connection?.selected_customer_id, period, customStart, customEnd, columns, groupBy, campaignFilter]);
 
   // Recarrega automaticamente quando filtros relevantes mudam
   useEffect(() => {
     if (clientId && connection?.selected_customer_id) fetchReport();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId, connection?.selected_customer_id, period, customStart, customEnd, groupBy]);
+  }, [clientId, connection?.selected_customer_id, period, customStart, customEnd, groupBy, campaignFilter]);
+
+  // Ativas/Pausadas: seleciona as campanhas com esse status
+  function escolherStatus(st: 'todas' | 'ENABLED' | 'PAUSED') {
+    setStatusFiltro(st);
+    if (st === 'todas') { setCampaignFilter(new Set()); return; }
+    const ids = todasCampanhas.filter(c => c.status === st).map(c => c.id);
+    setCampaignFilter(new Set(ids.length ? ids : ['0']));
+  }
 
   function saveColumns(next: string[]) {
     setColumns(next);
@@ -206,8 +222,8 @@ export default function GoogleAdsReport() {
     let list = rows;
     if (q) list = list.filter((r: any) => (r.name || '').toLowerCase().includes(q));
     // Quando agrupado por ad_group e há filtro de campanhas, aplica também
-    if (groupBy === 'ad_group' && campaignFilter.size > 0) {
-      list = list.filter((r: any) => campaignFilter.has(String(r.campaign_id)));
+    if (campaignFilter.size > 0) {
+      list = list.filter((r: any) => campaignFilter.has(String(groupBy === 'ad_group' ? r.campaign_id : r.id)));
     }
     return list;
   }, [rows, campaignSearch, groupBy, campaignFilter]);
@@ -295,6 +311,7 @@ export default function GoogleAdsReport() {
 
   // Lista única de campanhas (a partir das rows quando agrupado por ad_group, ou rows quando campanha)
   const campaignOptions = useMemo(() => {
+    if (todasCampanhas.length) return todasCampanhas.map(c => ({ id: c.id, name: `${c.name} · ${statusPt(c.status)}` }));
     if (groupBy === 'campaign') {
       return rows.map((r: any) => ({ id: String(r.id), name: r.name }));
     }
@@ -426,13 +443,24 @@ export default function GoogleAdsReport() {
               </div>
             </div>
 
-            {groupBy === 'ad_group' && campaignOptions.length > 0 && (
+            <div>
+              <Label className="text-xs">Status da campanha</Label>
+              <div className="flex gap-1">
+                {([['todas', 'Todas'], ['ENABLED', 'Ativas'], ['PAUSED', 'Pausadas']] as const).map(([k, l]) => (
+                  <Button key={k} size="sm" variant={statusFiltro === k ? 'default' : 'outline'} onClick={() => escolherStatus(k)}>
+                    {l}{todasCampanhas.length > 0 && <span className="ml-1 opacity-70">{k === 'todas' ? todasCampanhas.length : todasCampanhas.filter(c => c.status === k).length}</span>}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {campaignOptions.length > 0 && (
               <div className="min-w-[260px]">
-                <Label className="text-xs">Filtrar por campanha</Label>
+                <Label className="text-xs">Escolher campanhas</Label>
                 <CampaignFilter
                   options={campaignOptions}
                   selected={campaignFilter}
-                  onChange={setCampaignFilter}
+                  onChange={(next) => { setStatusFiltro('todas'); setCampaignFilter(next); }}
                 />
               </div>
             )}
@@ -595,7 +623,7 @@ function CampaignFilter({
         <div className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto bg-popover border border-border rounded-md p-2 shadow-md space-y-1">
           <div className="flex justify-between mb-1">
             <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={() => onChange(new Set(options.map(o => o.id)))}>Todas</Button>
-            <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={() => onChange(new Set())}>Nenhuma</Button>
+            <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={() => onChange(new Set())}>Limpar</Button>
           </div>
           {options.map(o => {
             const checked = selected.has(o.id);
