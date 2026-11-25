@@ -30,8 +30,9 @@ const sum = (arr: number[]) => arr.reduce((a, b) => a + (Number(b) || 0), 0);
 const safeDiv = (a: number, b: number): number | null => !b || !isFinite(b) ? null : a / b;
 const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtInt = (v: number) => Math.round(v).toLocaleString("pt-BR");
-const fmtPct = (v: number | null) => v === null || !isFinite(v) ? "—" : `${v.toFixed(2)}%`;
-const fmtRoas = (v: number | null) => v === null || !isFinite(v) ? "—" : v.toFixed(2);
+const dec2 = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtPct = (v: number | null) => v === null || !isFinite(v) ? "—" : `${dec2(v)}%`;
+const fmtRoas = (v: number | null) => v === null || !isFinite(v) ? "—" : `${dec2(v)}x`;
 
 type Row = {
   label: string;

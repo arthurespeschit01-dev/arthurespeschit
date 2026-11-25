@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Switch } from "@/components/ui/switch";
@@ -53,8 +53,33 @@ const emptyPlatform = (): PlatformData => ({ funnel: defaultFunnel(), monthly: e
 
 const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtInt = (v: number) => Math.round(v).toLocaleString("pt-BR");
-const fmtPct = (v: number | null) => v === null || !isFinite(v) ? "—" : `${v.toFixed(2)}%`;
-const fmtRoas = (v: number | null) => v === null || !isFinite(v) ? "—" : v.toFixed(2);
+const fmtDec2 = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtPct = (v: number | null) => v === null || !isFinite(v) ? "—" : `${fmtDec2(v)}%`;
+const fmtRoas = (v: number | null) => v === null || !isFinite(v) ? "—" : `${fmtDec2(v)}x`;
+const INT_KEYS = new Set<InputKey>(["clicks", "impressions", "pageViews", "addToCart", "leads", "checkout", "sales"]);
+
+// Lê número no formato brasileiro ou de calculadora: "R$ 2.471,30", "2471,3", "2471.30", "13.339"
+function parseNumeroBR(texto: string, inteiro: boolean): number {
+  let t = String(texto ?? "").replace(/[R$\s%\u00a0]/g, "").replace(/[^0-9.,-]/g, "");
+  if (!t || t === "-") return 0;
+  const virg = t.lastIndexOf(","), ponto = t.lastIndexOf(".");
+  if (inteiro) {
+    // contagens não têm casas decimais: ponto e vírgula são separador de milhar
+    const n = Number(t.replace(/[.,]/g, ""));
+    return isFinite(n) ? n : 0;
+  }
+  if (virg >= 0 && ponto >= 0) {
+    t = virg > ponto ? t.replace(/\./g, "").replace(",", ".") : t.replace(/,/g, "");
+  } else if (virg >= 0) {
+    t = t.replace(/\./g, "").replace(/,(?=.*,)/g, "").replace(",", ".");
+  } else if (ponto >= 0 && (/\..*\./.test(t) || /^-?\d{1,3}(\.\d{3})+$/.test(t))) {
+    t = t.replace(/\./g, "");
+  }
+  const n = Number(t);
+  return isFinite(n) ? Math.round(n * 100) / 100 : 0;
+}
+const paraEdicao = (v: number, inteiro: boolean) =>
+  !v ? "" : v.toLocaleString("pt-BR", { useGrouping: false, minimumFractionDigits: inteiro ? 0 : 2, maximumFractionDigits: inteiro ? 0 : 2 });
 const safeDiv = (a: number, b: number): number | null => !b || !isFinite(b) ? null : a / b;
 const sum = (arr: number[]) => arr.reduce((a, b) => a + (Number(b) || 0), 0);
 const addArr = (a: number[], b: number[]) => a.map((v, i) => (v || 0) + (b[i] || 0));
@@ -102,7 +127,11 @@ export default function PlanilhaTeste() {
     const md = raw?.monthly || {};
     const filled = emptyMonthly();
     INPUT_KEYS.forEach((k) => {
-      if (Array.isArray(md[k]) && md[k].length === 12) filled[k] = md[k].map((n: any) => Number(n) || 0);
+      if (Array.isArray(md[k]) && md[k].length === 12) filled[k] = md[k].map((n: any) => {
+        const v = Number(n) || 0;
+        // contagem salva com casas decimais (ex.: 13.339 digitado como milhar) vira 13339
+        return INT_KEYS.has(k) && !Number.isInteger(v) ? Math.round(v * 1000) : v;
+      });
     });
     const obj = raw?.objectives || {};
     const filledObj = emptyObjectives();
@@ -272,6 +301,7 @@ export default function PlanilhaTeste() {
               monthHeaders={monthHeaders}
               readOnly={false}
               title="Facebook Ads"
+              year={year}
             />
           </TabsContent>
           <TabsContent value="google" className="space-y-4">
@@ -281,6 +311,7 @@ export default function PlanilhaTeste() {
               monthHeaders={monthHeaders}
               readOnly={false}
               title="Google Ads"
+              year={year}
             />
           </TabsContent>
           <TabsContent value="geral" className="space-y-4">
@@ -290,6 +321,7 @@ export default function PlanilhaTeste() {
               monthHeaders={monthHeaders}
               readOnly
               title="Geral (Facebook + Google)"
+              year={year}
             />
           </TabsContent>
         </Tabs>
@@ -305,7 +337,9 @@ function PlatformSheet({
   monthHeaders,
   readOnly,
   title,
+  year,
 }: {
+  year: number;
   data: PlatformData;
   setData: (updater: (prev: PlatformData) => PlatformData) => void;
   monthHeaders: string[];
@@ -329,6 +363,7 @@ function PlatformSheet({
   };
 
   const valAt = (arr: number[], i: number) => (i === -1 ? sum(arr) : arr[i] || 0);
+  const mesAtual = year === new Date().getFullYear() ? new Date().getMonth() : -1;
 
   const rows: RowDef[] = useMemo(() => {
     const inv = monthly.investment, cl = monthly.clicks, im = monthly.impressions;
@@ -358,7 +393,7 @@ function PlatformSheet({
     r.push({ key: "sales", label: "Vendas", type: "input-int", inputKey: "sales" });
     r.push({ key: "cps", label: "Custo por Venda", type: "calc-money", calc: (i) => safeDiv(valAt(inv, i), valAt(sl, i)), higherIsBetter: false });
     r.push({ key: "salesValue", label: "Valor em Vendas", type: "input-money", inputKey: "salesValue" });
-    r.push({ key: "roas", label: "ROAS", type: "calc-roas", calc: (i) => safeDiv(valAt(sv, i), valAt(inv, i)) });
+    r.push({ key: "roas", label: "ROAS", type: "calc-roas", calc: (i) => safeDiv(valAt(sv, i), valAt(inv, i)), higherIsBetter: true });
     return r;
   }, [funnel, monthly]);
 
@@ -374,14 +409,29 @@ function PlatformSheet({
     if (funnel.checkout && funnel.addToCart) out.push({ key: "tco", label: "Carrinho → Checkout", type: "calc-pct", calc: (i) => pct(valAt(ck, i), valAt(ac, i)) });
     if (funnel.checkout) out.push({ key: "tvd", label: "Taxa de Venda", type: "calc-pct", calc: (i) => pct(valAt(sl, i), valAt(ck, i)) });
     out.push({ key: "tcv", label: "Taxa de Conversão (Venda/Clique)", type: "calc-pct", calc: (i) => pct(valAt(sl, i), valAt(cl, i)) });
-    return out;
+    return out.map((o) => ({ ...o, higherIsBetter: true }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [funnel, monthly]);
 
-  const parseNum = (s: string): number => {
-    if (!s) return 0;
-    const n = Number(String(s).replace(",", "."));
-    return isFinite(n) ? n : 0;
+  // Colar várias células do Excel/Planilhas: preenche meses (colunas) e métricas (linhas) a partir da célula
+  const inputRows = rows.filter((r) => r.inputKey).map((r) => r.inputKey!) as InputKey[];
+  const colarGrade = (inicio: InputKey, mes: number, texto: string) => {
+    const linhas = texto.replace(/\r/g, "").split("\n").filter((l, i, a) => l !== "" || i < a.length - 1);
+    const r0 = inputRows.indexOf(inicio);
+    setData((prev) => {
+      const monthly = { ...prev.monthly };
+      linhas.forEach((linha, dr) => {
+        const key = inputRows[r0 + dr];
+        if (!key) return;
+        const arr = [...monthly[key]];
+        linha.split("\t").forEach((cel, dc) => {
+          const m = mes + dc;
+          if (m < 12 && cel.trim() !== "") arr[m] = parseNumeroBR(cel, INT_KEYS.has(key));
+        });
+        monthly[key] = arr;
+      });
+      return { ...prev, monthly };
+    });
   };
 
   const renderInputCell = (row: RowDef, monthIdx: number) => {
@@ -389,29 +439,30 @@ function PlatformSheet({
     const v = monthly[k][monthIdx] || 0;
     const isMoney = row.type === "input-money";
     if (readOnly) {
-      return <span className="text-xs">{isMoney ? fmtBRL(v) : fmtInt(v)}</span>;
+      return <div className={`px-2 py-1.5 text-xs ${v ? "" : "text-muted-foreground/60"}`}>{isMoney ? fmtBRL(v) : fmtInt(v)}</div>;
     }
     return (
-      <input
-        type="text"
-        inputMode="decimal"
-        value={v === 0 ? "" : String(v)}
-        onChange={(e) => setCell(k, monthIdx, parseNum(e.target.value))}
-        className="w-full bg-transparent text-right text-xs px-2 py-1.5 outline-none focus:bg-background focus:ring-2 focus:ring-primary rounded"
-        placeholder={isMoney ? "R$ 0,00" : "0"}
+      <CelulaNumero
+        valor={v}
+        dinheiro={isMoney}
+        onCommit={(n) => setCell(k, monthIdx, n)}
+        onColarGrade={(t) => colarGrade(k, monthIdx, t)}
       />
     );
   };
 
   const renderCalcCell = (row: RowDef, monthIdx: number) => {
     const v = row.calc!(monthIdx);
-    let txt = "—";
-    if (v !== null && isFinite(v)) {
-      if (row.type === "calc-money") txt = fmtBRL(v);
-      else if (row.type === "calc-pct") txt = fmtPct(v);
-      else if (row.type === "calc-roas") txt = fmtRoas(v);
+    if (v === null || !isFinite(v)) return <span className="text-xs text-muted-foreground/60">—</span>;
+    const txt = row.type === "calc-money" ? fmtBRL(v) : row.type === "calc-pct" ? fmtPct(v) : fmtRoas(v);
+    // comparação com o mês anterior: verde melhorou, vermelho piorou
+    const ant = monthIdx > 0 ? row.calc!(monthIdx - 1) : null;
+    let seta: JSX.Element | null = null;
+    if (ant !== null && isFinite(ant) && ant !== 0 && v !== ant && row.higherIsBetter !== undefined) {
+      const melhorou = row.higherIsBetter ? v > ant : v < ant;
+      seta = <span className={`ml-1 text-[10px] ${melhorou ? "text-emerald-400" : "text-red-400"}`} title={`Mês anterior: ${row.type === "calc-money" ? fmtBRL(ant) : row.type === "calc-pct" ? fmtPct(ant) : fmtRoas(ant)}`}>{v > ant ? "▲" : "▼"}</span>;
     }
-    return <span className="text-xs">{txt}</span>;
+    return <span className="text-xs whitespace-nowrap">{txt}{seta}</span>;
   };
 
   const renderTotalCell = (row: RowDef) => {
@@ -429,22 +480,13 @@ function PlatformSheet({
   const renderObjectiveCell = (row: RowDef) => {
     // Objetivo só existe na linha de "Investimento em mídia"
     if (row.key !== "investment") {
-      return <span className="text-xs text-muted-foreground">—</span>;
+      return <div className="px-2 py-1.5 text-right text-xs text-muted-foreground">—</div>;
     }
     const v = objectives.investment || 0;
     if (readOnly) {
       return <span className="text-xs font-semibold">{v === 0 ? "—" : fmtBRL(v)}</span>;
     }
-    return (
-      <input
-        type="text"
-        inputMode="decimal"
-        value={v === 0 ? "" : String(v)}
-        onChange={(e) => setObjective("investment", parseNum(e.target.value))}
-        className="w-full bg-transparent text-right text-xs px-2 py-1.5 outline-none focus:bg-background focus:ring-2 focus:ring-primary rounded font-semibold"
-        placeholder="R$ 0,00"
-      />
-    );
+    return <CelulaNumero valor={v} dinheiro forte onCommit={(n) => setObjective("investment", n)} />;
   };
 
   return (
@@ -479,8 +521,8 @@ function PlatformSheet({
             <tr className="bg-primary text-primary-foreground">
               <th className="text-left px-3 py-2 font-semibold sticky left-0 bg-primary z-20 min-w-[220px]">Métrica</th>
               <th className="px-3 py-2 font-semibold sticky left-[220px] bg-primary z-20 min-w-[120px] border-l border-primary-foreground/20">OBJETIVO</th>
-              {monthHeaders.map((m) => (
-                <th key={m} className="px-2 py-2 font-semibold min-w-[90px]">{m}</th>
+              {monthHeaders.map((m, i) => (
+                <th key={m} className={`px-2 py-2 font-semibold min-w-[100px] text-right ${i === mesAtual ? "bg-primary-foreground/15 underline underline-offset-4" : ""}`}>{m}</th>
               ))}
               <th className="px-3 py-2 font-semibold min-w-[100px] bg-primary/90">TOTAL</th>
             </tr>
@@ -496,7 +538,7 @@ function PlatformSheet({
                   <td className={`px-3 py-1 sticky left-0 ${stickyBg} z-10 font-medium text-foreground border-r border-border min-w-[220px]`}>{row.label}</td>
                   <td className={`sticky left-[220px] ${stickyBg} z-10 border-r border-border min-w-[120px]`}>{renderObjectiveCell(row)}</td>
                   {Array.from({ length: 12 }).map((_, i) => (
-                    <td key={i} className="text-right px-1 border-r border-border/40 text-foreground">
+                    <td key={i} className={`text-right px-1 border-r border-border/40 text-foreground ${i === mesAtual ? "bg-primary/5" : ""}`}>
                       {isInput ? renderInputCell(row, i) : <div className="px-2 py-1.5">{renderCalcCell(row, i)}</div>}
                     </td>
                   ))}
@@ -519,9 +561,9 @@ function PlatformSheet({
               return (
                 <tr key={row.key} className={`${rowBg} border-b border-border/50 hover:bg-accent/5 transition-colors`}>
                   <td className={`px-3 py-1.5 sticky left-0 ${stickyBg} z-10 font-medium text-foreground border-r border-border min-w-[220px]`}>{row.label}</td>
-                  <td className={`sticky left-[220px] ${stickyBg} z-10 border-r border-border text-center text-muted-foreground min-w-[120px]`}>—</td>
+                  <td className={`sticky left-[220px] ${stickyBg} z-10 border-r border-border min-w-[120px]`}><div className="px-2 py-1.5 text-right text-xs text-muted-foreground">—</div></td>
                   {Array.from({ length: 12 }).map((_, i) => (
-                    <td key={i} className="text-right px-3 py-1.5 border-r border-border/40 text-foreground">{renderCalcCell(row, i)}</td>
+                    <td key={i} className={`text-right px-1 border-r border-border/40 text-foreground ${i === mesAtual ? "bg-primary/5" : ""}`}><div className="px-2 py-1.5">{renderCalcCell(row, i)}</div></td>
                   ))}
                   <td className={`text-right px-3 py-1.5 border-l border-border ${stickyBg} font-semibold text-foreground`}>{renderTotalCell(row)}</td>
                 </tr>
@@ -530,7 +572,49 @@ function PlatformSheet({
           </tbody>
         </table>
       </div>
+      <p className="text-[11px] text-muted-foreground">
+        Digite como preferir: <strong>2.471,30</strong>, <strong>2471,3</strong> ou <strong>2471.30</strong> (da calculadora). Dá para colar vários valores do Excel/Planilhas de uma vez. ▲▼ comparam com o mês anterior: verde melhorou, vermelho piorou.
+      </p>
     </>
+  );
+}
+
+// Célula editável: mostra formatado (R$ 2.471,30) e, ao clicar, deixa digitar livre; salva ao sair da célula ou com Enter
+function CelulaNumero({ valor, dinheiro, forte, onCommit, onColarGrade }: {
+  valor: number; dinheiro: boolean; forte?: boolean;
+  onCommit: (n: number) => void; onColarGrade?: (texto: string) => void;
+}) {
+  const [editando, setEditando] = useState(false);
+  const [rascunho, setRascunho] = useState("");
+  const ref = useRef<HTMLInputElement>(null);
+  const cancelar = useRef(false);
+  const inteiro = !dinheiro;
+  const salvar = () => {
+    if (cancelar.current) { cancelar.current = false; setEditando(false); return; }
+    const n = parseNumeroBR(rascunho, inteiro);
+    if (n !== valor) onCommit(n);
+    setEditando(false);
+  };
+  return (
+    <input
+      ref={ref}
+      type="text"
+      inputMode="decimal"
+      value={editando ? rascunho : valor ? (dinheiro ? fmtBRL(valor) : fmtInt(valor)) : ""}
+      onFocus={(e) => { setRascunho(paraEdicao(valor, inteiro)); setEditando(true); requestAnimationFrame(() => e.target.select()); }}
+      onChange={(e) => setRascunho(e.target.value)}
+      onBlur={salvar}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") { e.preventDefault(); ref.current?.blur(); }
+        if (e.key === "Escape") { cancelar.current = true; ref.current?.blur(); }
+      }}
+      onPaste={(e) => {
+        const t = e.clipboardData.getData("text");
+        if (onColarGrade && /[\t\n]/.test(t.trim())) { e.preventDefault(); cancelar.current = true; onColarGrade(t); ref.current?.blur(); }
+      }}
+      className={`w-full bg-transparent text-right text-xs px-2 py-1.5 outline-none focus:bg-background focus:ring-2 focus:ring-primary rounded ${forte ? "font-semibold" : ""}`}
+      placeholder={dinheiro ? "R$ 0,00" : "0"}
+    />
   );
 }
 
