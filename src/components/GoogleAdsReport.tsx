@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import {
-  Loader2, RefreshCw, Settings2, Search, AlertCircle, Link2,
+  Loader2, RefreshCw, Settings2, Search, AlertCircle, Link2, ClipboardCopy, Download, FileText,
 } from 'lucide-react';
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip as RTooltip, CartesianGrid, Legend,
@@ -49,6 +49,10 @@ const COLUMNS: ColumnDef[] = [
   { key: 'engagements',                    label: 'Engajamentos',              fmt: 'int', group: 'Engajamento' },
   { key: 'interactions',                   label: 'Interações',                fmt: 'int', group: 'Engajamento' },
 ];
+
+const STATUS_PT: Record<string, string> = { ENABLED: 'Ativa', PAUSED: 'Pausada', REMOVED: 'Removida' };
+const statusPt = (s: any) => STATUS_PT[String(s || '')] || String(s || '');
+const dataBR = (iso: string) => iso.split('-').reverse().join('/');
 
 const COL_BY_KEY: Record<string, ColumnDef> = Object.fromEntries(COLUMNS.map(c => [c.key, c]));
 
@@ -232,6 +236,62 @@ export default function GoogleAdsReport() {
     t.average_cpv = t.video_views > 0 ? t.cost / t.video_views : 0;
     return t;
   }, [filteredRows]);
+
+  // ----- Exportar (copiar / baixar), igual ao relatório da Meta -----
+  const nomeCliente = clients.find(c => c.id === clientId)?.name || 'Cliente';
+  const periodo = rangeForPeriod(period, customStart, customEnd);
+  const periodoTxt = `${dataBR(periodo.start)} a ${dataBR(periodo.end)}`;
+  const colsVisiveis = columns.filter(k => COL_BY_KEY[k]);
+  const cabecalho = [groupBy === 'ad_group' ? 'Grupo de anúncios' : 'Campanha', ...(groupBy === 'ad_group' ? ['Campanha'] : []), 'Status', ...colsVisiveis.map(k => COL_BY_KEY[k].label)];
+  const linhaDe = (r: any) => [r.name, ...(groupBy === 'ad_group' ? [r.campaign_name || ''] : []), statusPt(r.status), ...colsVisiveis.map(k => format(r[k], COL_BY_KEY[k].fmt))];
+  const linhaTotal = ['Total', ...(groupBy === 'ad_group' ? [''] : []), '', ...colsVisiveis.map(k => format(totals[k], COL_BY_KEY[k].fmt))];
+
+  async function copiarMensagem() {
+    const out: string[] = [];
+    out.push(`📊 *Relatório Google Ads — ${nomeCliente}*`);
+    out.push(`🗓 Período: ${periodoTxt}`);
+    for (const r of filteredRows) {
+      out.push('');
+      out.push(`*${r.name}* (${statusPt(r.status)})`);
+      for (const k of colsVisiveis) out.push(`• ${COL_BY_KEY[k].label}: ${format(r[k], COL_BY_KEY[k].fmt)}`);
+    }
+    if (filteredRows.length > 1) {
+      out.push('\n———————————');
+      out.push('📊 *Totais do período*');
+      for (const k of colsVisiveis) out.push(`• ${COL_BY_KEY[k].label}: ${format(totals[k], COL_BY_KEY[k].fmt)}`);
+    }
+    try { await navigator.clipboard.writeText(out.join('\n')); toast.success('Mensagem copiada! Cole direto no WhatsApp.'); }
+    catch { toast.error('Não foi possível copiar'); }
+  }
+
+  async function copiarTabela() {
+    const tsv = [cabecalho, ...filteredRows.map(linhaDe), linhaTotal].map(l => l.join('\t')).join('\n');
+    try { await navigator.clipboard.writeText(tsv); toast.success('Tabela copiada! Cole no Excel ou Google Planilhas.'); }
+    catch { toast.error('Não foi possível copiar'); }
+  }
+
+  function baixarCSV() {
+    const esc = (v: string) => `"${String(v).replace(/"/g, '""')}"`;
+    const csv = [cabecalho, ...filteredRows.map(linhaDe), linhaTotal].map(l => l.map(esc).join(';')).join('\r\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `google-ads-${nomeCliente.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${periodo.start}-a-${periodo.end}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  async function baixarPDF() {
+    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
+    const doc = new jsPDF({ orientation: 'landscape' });
+    doc.setFontSize(14); doc.text(`Relatório Google Ads — ${nomeCliente}`, 14, 16);
+    doc.setFontSize(10); doc.text(`Período: ${periodoTxt}`, 14, 23);
+    autoTable(doc, {
+      startY: 29, head: [cabecalho], body: filteredRows.map(linhaDe), foot: [linhaTotal],
+      theme: 'striped', styles: { fontSize: 8 }, headStyles: { fillColor: [88, 28, 135] }, footStyles: { fillColor: [60, 60, 70] },
+    });
+    doc.save(`google-ads-${nomeCliente.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${periodo.start}-a-${periodo.end}.pdf`);
+  }
 
   // Lista única de campanhas (a partir das rows quando agrupado por ad_group, ou rows quando campanha)
   const campaignOptions = useMemo(() => {
@@ -433,10 +493,18 @@ export default function GoogleAdsReport() {
 
       {/* Tabela */}
       <Card>
-        <CardHeader className="pb-2">
+        <CardHeader className="pb-2 flex flex-row flex-wrap items-center justify-between gap-2">
           <CardTitle className="text-sm">
             {groupBy === 'ad_group' ? 'Grupos de anúncios' : 'Campanhas'} ({filteredRows.length})
           </CardTitle>
+          {filteredRows.length > 0 && !loading && (
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={copiarMensagem} className="gap-1"><ClipboardCopy className="w-3.5 h-3.5" /> Copiar mensagem</Button>
+              <Button size="sm" variant="outline" onClick={copiarTabela} className="gap-1"><ClipboardCopy className="w-3.5 h-3.5" /> Copiar tabela</Button>
+              <Button size="sm" variant="outline" onClick={baixarCSV} className="gap-1"><Download className="w-3.5 h-3.5" /> Baixar planilha</Button>
+              <Button size="sm" variant="outline" onClick={() => void baixarPDF()} className="gap-1"><FileText className="w-3.5 h-3.5" /> Baixar PDF</Button>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -467,7 +535,7 @@ export default function GoogleAdsReport() {
                       {groupBy === 'ad_group' && (
                         <td className="py-2 px-2 text-muted-foreground text-xs">{r.campaign_name}</td>
                       )}
-                      <td className="py-2 px-2 text-right text-muted-foreground text-xs">{r.status}</td>
+                      <td className="py-2 px-2 text-right text-muted-foreground text-xs">{statusPt(r.status)}</td>
                       {columns.map(k => COL_BY_KEY[k] && (
                         <td key={k} className="py-2 px-2 text-right text-foreground whitespace-nowrap">
                           {format(r[k], COL_BY_KEY[k].fmt)}
