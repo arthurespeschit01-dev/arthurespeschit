@@ -43,3 +43,11 @@ export async function getValidAccessToken(admin: SupabaseClient, conn: GoogleAds
     .eq('id', conn.id);
   return data.access_token;
 }
+
+// Confere, com o token do próprio usuário (RLS), se o cliente pertence a quem está chamando.
+// Sem isso, a chave de serviço deixaria qualquer conta ler o Google Ads de outra agência.
+export async function exigirClienteDoUsuario(userClient: SupabaseClient, clientId: unknown): Promise<boolean> {
+  if (typeof clientId !== 'string' || !/^[0-9a-f-]{36}$/i.test(clientId)) return false;
+  const { data, error } = await userClient.from('clients').select('id').eq('id', clientId).maybeSingle();
+  return !error && !!data;
+}

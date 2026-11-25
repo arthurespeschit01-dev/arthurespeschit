@@ -1,7 +1,7 @@
 project_id = "ffvmmnzvmjiddqtywkko"
 
 [functions.strategy-chat]
-verify_jwt = false
+verify_jwt = true
 
 [functions.meta-auth-callback]
 verify_jwt = false

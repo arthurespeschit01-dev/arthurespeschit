@@ -1,4 +1,5 @@
 import ClientMeetingMinutes from "@/components/ClientMeetingMinutes";
+import { abrirAnexo, urlAssinada, validarAnexo } from '@/lib/anexos';
 import ClientBillingFields from '@/components/ClientBillingFields';
 import {billingError,firstBillingDate,localDate} from '@/lib/billingSchedule';
 import ClientOperationFields from '@/components/ClientOperationFields';
@@ -123,6 +124,14 @@ export default function ClientDetail() {
   const [previewHtml, setPreviewHtml] = useState<string>('');
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewAttachment, setPreviewAttachment] = useState<ClientAttachment | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  useEffect(() => {
+    setPreviewUrl(null);
+    if (!previewAttachment) return;
+    let vivo = true;
+    void urlAssinada('client-attachments', previewAttachment.file_url).then((u) => { if (vivo) setPreviewUrl(u); });
+    return () => { vivo = false; };
+  }, [previewAttachment]);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportStatusFilter, setExportStatusFilter] = useState<'todas' | 'ACTIVE' | 'PAUSED' | 'ARCHIVED'>('todas');
   const [exportObjectives, setExportObjectives] = useState<string[]>([]);
@@ -494,6 +503,8 @@ export default function ClientDetail() {
     if (!user || !id) return;
     setUploading(true);
     try {
+      const invalido = validarAnexo(file);
+      if (invalido) { toast.error(invalido); return; }
       const filePath = `${user.id}/${id}/${Date.now()}_${file.name}`;
       const { error: uploadError } = await supabase.storage.from('client-attachments').upload(filePath, file);
       if (uploadError) throw uploadError;
@@ -785,11 +796,8 @@ export default function ClientDetail() {
                       </button>
                       <div className="flex items-center gap-1 shrink-0 ml-2">
                         <a
-                          href={att.file_url}
-                          download={att.file_name}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
+                          href="#"
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); void abrirAnexo('client-attachments', att.file_url, att.file_name).catch(() => toast.error('Não foi possível abrir o anexo')); }}
                           className="p-2 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
                           title="Baixar"
                         >
@@ -973,7 +981,8 @@ export default function ClientDetail() {
             </DialogTitle>
           </DialogHeader>
           {previewAttachment && (() => {
-            const url = previewAttachment.file_url;
+            const url = previewUrl;
+            if (!url) return <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>;
             const name = previewAttachment.file_name.toLowerCase();
             const ext = name.split('.').pop() || '';
             const isImage = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'avif'].includes(ext);

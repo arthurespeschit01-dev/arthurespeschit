@@ -1,5 +1,6 @@
 // Recebe o callback OAuth da Meta, troca code por token de longa duração e salva.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { escapeHtml, origemPermitida } from '../_shared/security.ts';
 
 const META_APP_ID = Deno.env.get('META_APP_ID')!;
 const META_APP_SECRET = Deno.env.get('META_APP_SECRET')!;
@@ -12,7 +13,7 @@ function htmlClose(message: string, ok: boolean) {
 <style>body{font-family:system-ui;background:#0a0a0a;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:20px}
 .box{max-width:420px}.ok{color:#a78bfa}.err{color:#f87171}button{margin-top:16px;padding:10px 20px;background:#7c3aed;color:#fff;border:0;border-radius:8px;cursor:pointer;font-size:14px}</style></head>
 <body><div class="box"><h2 class="${ok ? 'ok' : 'err'}">${ok ? '✓ Meta Ads conectado!' : '✗ Erro na conexão'}</h2>
-<p>${message}</p>
+<p>${escapeHtml(message)}</p>
 <p style="opacity:.6;font-size:14px;margin-top:20px">Esta janela será fechada automaticamente...</p>
 <button onclick="doClose()">Fechar</button></div>
 <script>
@@ -24,7 +25,7 @@ setTimeout(doClose,800);
 
 function decodeOrigin(state: string | null): string | null {
   if (!state || !state.includes('~')) return null;
-  try { return atob(state.split('~')[1]); } catch { return null; }
+  try { return origemPermitida(atob(state.split('~')[1])); } catch { return null; }
 }
 
 function stateKey(state: string | null): string | null {

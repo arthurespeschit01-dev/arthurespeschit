@@ -1,4 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { sanitizarMensagens } from "../_shared/security.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -44,7 +46,21 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages } = await req.json();
+    // Só usuário logado usa o chat (evita uso da IA por terceiros às custas da conta)
+    const authHeader = req.headers.get("Authorization") || "";
+    const userClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false },
+    });
+    const { data: who } = await userClient.auth.getUser();
+    if (!who?.user) {
+      return new Response(JSON.stringify({ error: "Não autorizado" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const body = await req.json().catch(() => ({}));
+    // Só mensagens de usuário/assistente: o prompt de sistema não pode ser trocado pelo navegador
+    const messages = sanitizarMensagens(body?.messages);
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 

@@ -1,7 +1,7 @@
 // Relatório customizável do Google Ads — métricas selecionáveis, range de datas,
 // filtros e timeseries diária. Espelha o que o gerenciador do Google oferece.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { getValidAccessToken } from "../_shared/google-ads.ts";
+import { getValidAccessToken, exigirClienteDoUsuario } from "../_shared/google-ads.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -99,6 +99,9 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'invalid dates' }), { status: 400, headers: corsHeaders });
     }
 
+    if (!(await exigirClienteDoUsuario(supabase, client_id))) {
+      return new Response(JSON.stringify({ error: 'Cliente não encontrado' }), { status: 404, headers: corsHeaders });
+    }
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const { data: conn } = await admin.from('google_ads_connections').select('*').eq('client_id', client_id).maybeSingle();
     if (!conn || !(conn as any).selected_customer_id) {

@@ -1,4 +1,5 @@
 import {useResponsibleName} from "@/hooks/useResponsibleName";
+import { abrirAnexo, validarAnexo } from '@/lib/anexos';
 import {readAllRows} from '@/lib/readAllRows';
 import {isClosedTask,closedInPeriod,taskDay} from '@/lib/taskViews';
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -241,6 +242,8 @@ export default function Tasks() {
     if (!user) return;
     setUploading(true);
     try {
+      const invalido = validarAnexo(file);
+      if (invalido) { toast.error(invalido); return; }
       const filePath = `${user.id}/${taskId}/${Date.now()}_${file.name}`;
       const { error: uploadError } = await supabase.storage.from('task-attachments').upload(filePath, file);
       if (uploadError) throw uploadError;
@@ -594,7 +597,7 @@ export default function Tasks() {
                           {taskAtts.map(att => (
                             <div key={att.id} className="flex items-center gap-3 bg-secondary/50 rounded-lg px-3 py-2.5 group/att">
                               <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
-                              <a href={att.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-foreground hover:text-primary flex-1 truncate">
+                              <a href="#" onClick={(e) => { e.preventDefault(); void abrirAnexo('task-attachments', att.file_url).catch(() => toast.error('Não foi possível abrir o anexo')); }} className="text-sm text-foreground hover:text-primary flex-1 truncate">
                                 {att.file_name}
                               </a>
                               <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" aria-label={`Ações do anexo ${att.file_name}`}><MoreHorizontal size={16}/></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem className="text-destructive" onSelect={()=>removeAttachment(att)}>Excluir anexo</DropdownMenuItem></DropdownMenuContent></DropdownMenu>

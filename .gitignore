@@ -24,3 +24,8 @@ dist-ssr
 *.sw?
 
 supabase/.temp/
+
+# Variáveis de ambiente locais (nunca versionar)
+.env
+.env.*
+!.env.example

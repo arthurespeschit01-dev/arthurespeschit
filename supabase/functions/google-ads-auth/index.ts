@@ -1,5 +1,6 @@
 // Inicia o fluxo OAuth do Google Ads. Usa as credenciais do dono do sistema.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { exigirClienteDoUsuario } from "../_shared/google-ads.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -32,6 +33,10 @@ Deno.serve(async (req) => {
     const { data: userData, error: userErr } = await supabase.auth.getUser();
     if (userErr || !userData?.user?.id) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+    }
+
+    if (!(await exigirClienteDoUsuario(supabase, clientId))) {
+      return new Response(JSON.stringify({ error: 'Cliente não encontrado' }), { status: 404, headers: corsHeaders });
     }
 
     // state = uuid~base64(origin) — origem usada no redirect final do callback
