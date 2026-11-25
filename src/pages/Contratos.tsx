@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { abrirAnexo, validarAnexo } from '@/lib/anexos';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { ExternalLink, Plus, Edit2, Trash2, FileText, Calendar, Search, Upload, Paperclip, Eye, X } from 'lucide-react';
@@ -105,6 +106,8 @@ export default function Contratos() {
     if (!user) return;
     setUploading(true);
     try {
+      const invalido = validarAnexo(file);
+      if (invalido) { toast.error(invalido); return; }
       const filePath = `${user.id}/${contractId}/${Date.now()}_${file.name}`;
       const { error: uploadError } = await supabase.storage.from('contract-attachments').upload(filePath, file);
       if (uploadError) throw uploadError;
@@ -291,9 +294,7 @@ export default function Contratos() {
                           <div key={att.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-secondary/30 border border-border/10">
                             <FileText className="w-4 h-4 text-primary shrink-0" />
                             <span className="text-sm text-foreground flex-1 truncate">{att.file_name}</span>
-                            <a href={att.file_url} target="_blank" rel="noopener noreferrer">
-                              <Button variant="ghost" size="sm" title="Visualizar"><Eye className="w-4 h-4" /></Button>
-                            </a>
+                            <Button variant="ghost" size="sm" title="Visualizar" onClick={() => void abrirAnexo('contract-attachments', att.file_url).catch(() => toast.error('Não foi possível abrir o anexo'))}><Eye className="w-4 h-4" /></Button>
                             <Button variant="ghost" size="sm" className="hover:text-destructive" onClick={() => removeAttachment(att)} title="Remover">
                               <X className="w-4 h-4" />
                             </Button>

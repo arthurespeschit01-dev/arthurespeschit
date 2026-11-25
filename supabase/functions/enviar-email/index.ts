@@ -1,3 +1,5 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { autorizarEnvioEmail, escapeHtml, iguaisSeguro } from '../_shared/security.ts';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -35,48 +37,55 @@ function buildHtml(icone: string, titulo: string, mensagem: string) {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   try {
-    const { destinatario, assunto, icone = '🔔', titulo, mensagem } = await req.json();
-    if (!destinatario || !assunto || !titulo || !mensagem) {
-      return new Response(JSON.stringify({ error: 'Campos obrigatórios faltando' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    const pedido = await req.json().catch(() => ({}));
+
+    // Quem está chamando: servidor (chave de serviço), usuário logado ou anônimo
+    const bearer = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    let chamador: Parameters<typeof autorizarEnvioEmail>[0] = { tipo: 'anonimo' };
+    if (bearer && iguaisSeguro(bearer, serviceKey)) {
+      chamador = { tipo: 'servico' };
+    } else if (bearer) {
+      const userClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+        global: { headers: { Authorization: `Bearer ${bearer}` } },
+        auth: { persistSession: false },
       });
+      const { data } = await userClient.auth.getUser();
+      if (data?.user) {
+        const { data: perfil } = await userClient.from('profiles').select('notif_email_destino').eq('user_id', data.user.id).maybeSingle();
+        chamador = { tipo: 'usuario', email: data.user.email ?? null, destinoSalvo: (perfil as any)?.notif_email_destino ?? null };
+      }
     }
 
+    const decisao = autorizarEnvioEmail(chamador, pedido);
+    if (!decisao.ok) return json({ error: decisao.erro }, decisao.status);
+
     const apiKey = Deno.env.get('RESEND_API_KEY');
-    if (!apiKey) {
-      return new Response(JSON.stringify({ error: 'RESEND_API_KEY não configurada' }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    if (!apiKey) return json({ error: 'RESEND_API_KEY não configurada' }, 500);
 
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         from: FROM,
-        to: [destinatario],
-        subject: assunto,
-        html: buildHtml(icone, titulo, mensagem),
+        to: [decisao.destinatario],
+        subject: decisao.assunto,
+        html: buildHtml(escapeHtml(decisao.icone), escapeHtml(decisao.titulo), escapeHtml(decisao.mensagem)),
       }),
     });
 
     const data = await res.json();
     if (!res.ok) {
-      console.error('Resend error:', data);
-      return new Response(JSON.stringify({ error: data }), {
-        status: res.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      console.error('Resend error:', data?.name || res.status);
+      return json({ error: 'Falha ao enviar o e-mail' }, 502);
     }
-
-    return new Response(JSON.stringify({ ok: true, id: data.id }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return json({ ok: true, id: data.id });
   } catch (e) {
     console.error(e);
-    return new Response(JSON.stringify({ error: String(e) }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return json({ error: 'Erro interno' }, 500);
   }
 });

@@ -1,4 +1,5 @@
 import AccountAccessBoundary from "./components/AccountAccessBoundary";
+import MfaGate from "@/components/MfaGate";
 import PilotVisualTheme from "./components/PilotVisualTheme";
 import { Suspense, useEffect } from "react";
 import { lazyWithRetry as lazy } from "@/lib/lazyWithRetry";
@@ -213,12 +214,12 @@ const App = () => (
           <Route path="/conectar-whatsapp/:token" element={<WorkspaceWhatsAppPair />} />
           <Route path="/captura/:token" element={<WorkspacePublic />} />
           <Route path="/reservar/:token" element={<WorkspacePublic />} />
-          <Route path="/*" element={<AuthProvider><PilotVisualTheme/><Routes>
+          <Route path="/*" element={<AuthProvider><PilotVisualTheme/><MfaGate><Routes>
             <Route path="/mcp/authorize" element={<McpAuthorize />} />
             <Route path="/convite-equipe/:token" element={<WorkspaceInvitation />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/*" element={<ProtectedRoutes />} />
-          </Routes></AuthProvider>} />
+          </Routes></MfaGate></AuthProvider>} />
         </Routes>
         </Suspense>
       </BrowserRouter>

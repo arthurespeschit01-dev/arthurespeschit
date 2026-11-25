@@ -105,11 +105,13 @@ export default function Estrategias() {
     };
 
     try {
+      const { data: { session: sessao } } = await supabase.auth.getSession();
       const resp = await fetch(STREAM_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${sessao?.access_token ?? ''}`,
         },
         body: JSON.stringify({ messages: history }),
       });

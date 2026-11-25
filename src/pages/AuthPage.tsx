@@ -5,7 +5,8 @@ import { Mail, Lock, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import logoCentralGestor from '@/assets/logo-central-gestor.png';
 
-export default function AuthPage({initialEmail = "", workspaceName, allowSignUp = true}: {initialEmail?: string; workspaceName?:string;allowSignUp?:boolean} = {}) {
+export default function AuthPage({initialEmail = "", workspaceName, allowSignUp = false}: {initialEmail?: string; workspaceName?:string;allowSignUp?:boolean} = {}) {
+  // Cadastro público desligado: contas novas só são criadas pelo administrador no Supabase
   const { signIn,signUp } = useAuth();
   const [mode,setMode]=useState<'login'|'signup'>('login');
   const [confirmPassword,setConfirmPassword]=useState('');
