@@ -1,5 +1,5 @@
 import ClientMeetingMinutes from "@/components/ClientMeetingMinutes";
-import { abrirAnexo, urlAssinada, validarAnexo } from '@/lib/anexos';
+import { abrirAnexo, urlAssinada, enviarAnexo, descartarAnexo, mensagemDeErro } from '@/lib/anexos';
 import ClientBillingFields from '@/components/ClientBillingFields';
 import {billingError,firstBillingDate,localDate} from '@/lib/billingSchedule';
 import ClientOperationFields from '@/components/ClientOperationFields';
@@ -503,19 +503,15 @@ export default function ClientDetail() {
     if (!user || !id) return;
     setUploading(true);
     try {
-      const invalido = validarAnexo(file);
-      if (invalido) { toast.error(invalido); return; }
-      const filePath = `${user.id}/${id}/${Date.now()}_${file.name}`;
-      const { error: uploadError } = await supabase.storage.from('client-attachments').upload(filePath, file);
-      if (uploadError) throw uploadError;
-      const { data: urlData } = supabase.storage.from('client-attachments').getPublicUrl(filePath);
-      await supabase.from('client_attachments').insert({
-        client_id: id, user_id: user.id, file_name: file.name, file_url: urlData.publicUrl, category: attachCategory,
+      const fileUrl = await enviarAnexo('client-attachments', `${user.id}/${id}`, file);
+      const { error: dbError } = await supabase.from('client_attachments').insert({
+        client_id: id, category: attachCategory, user_id: user.id, file_name: file.name, file_url: fileUrl,
       });
+      if (dbError) { await descartarAnexo('client-attachments', fileUrl); throw dbError; }
       toast.success('Arquivo anexado!');
       loadAttachments();
-    } catch {
-      toast.error('Erro ao enviar arquivo');
+    } catch (e) {
+      toast.error(mensagemDeErro(e));
     } finally {
       setUploading(false);
     }

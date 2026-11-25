@@ -35,9 +35,9 @@ describe('funções do servidor', () => {
 });
 
 describe('anexos e banco', () => {
-  it.each(['src/pages/ClientDetail.tsx', 'src/pages/Tasks.tsx', 'src/pages/Contratos.tsx'])('%s valida o arquivo e não expõe link público', (p) => {
+  it.each(['src/pages/ClientDetail.tsx', 'src/pages/Tasks.tsx', 'src/pages/Contratos.tsx'])('%s envia pelo fluxo validado e não expõe link público', (p) => {
     const s = ler(p);
-    expect(s).toMatch(/validarAnexo\(file\)/);
+    expect(s).toMatch(/enviarAnexo\(/);
     expect(s).not.toMatch(/href=\{att\.file_url\}/);
   });
   it('migração deixa os buckets de anexos privados e com limite', () => {

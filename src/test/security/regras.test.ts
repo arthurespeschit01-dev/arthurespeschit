@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  autorizarEnvioEmail, escapeHtml, origemPermitida, sanitizarMensagens, validarAnexo, caminhoDoAnexo, iguaisSeguro, EMAIL_TESTE,
+  autorizarEnvioEmail, escapeHtml, origemPermitida, sanitizarMensagens, validarAnexo, caminhoDoAnexo, iguaisSeguro, EMAIL_TESTE, nomeSeguro, tipoDoArquivo,
 } from '../../../supabase/functions/_shared/security';
 
 describe('enviar-email: quem pode enviar e o quê', () => {
@@ -58,8 +58,20 @@ describe('anexos', () => {
   it('recusa HTML, SVG e arquivos grandes', () => {
     expect(validarAnexo({ type: 'text/html', size: 10, name: 'a.html' })).not.toBeNull();
     expect(validarAnexo({ type: 'image/svg+xml', size: 10, name: 'a.svg' })).not.toBeNull();
-    expect(validarAnexo({ type: 'application/pdf', size: 21 * 1024 * 1024, name: 'a.pdf' })).not.toBeNull();
+    expect(validarAnexo({ type: 'application/pdf', size: 51 * 1024 * 1024, name: 'a.pdf' })).not.toBeNull();
     expect(validarAnexo({ type: 'application/pdf', size: 1000, name: 'a.pdf' })).toBeNull();
+  });
+  it('aceita PDF de 30 MB e arquivos que o Windows manda sem tipo', () => {
+    expect(validarAnexo({ type: 'application/pdf', size: 30 * 1024 * 1024, name: 'a.pdf' })).toBeNull();
+    expect(validarAnexo({ type: '', size: 1000, name: 'Contrato.PDF' })).toBeNull();
+    expect(validarAnexo({ type: 'application/x-zip-compressed', size: 1000, name: 'criativos.zip' })).toBeNull();
+    expect(tipoDoArquivo({ type: 'application/octet-stream', name: 'video.mov' })).toBe('video/quicktime');
+  });
+  it('gera nome sem acentos nem símbolos para o armazenamento', () => {
+    expect(nomeSeguro('Contrato Prestação de Serviço (v2)#final.PDF')).toBe('Contrato_Prestacao_de_Servico_v2_final.pdf');
+    expect(nomeSeguro('Criativo 1080×1920 – Black Friday!.mp4')).toBe('Criativo_1080_1920_Black_Friday.mp4');
+    expect(nomeSeguro('çãõ.png')).toBe('cao.png');
+    expect(nomeSeguro('.pdf')).toBe('arquivo.pdf');
   });
   it('extrai o caminho de URLs públicas antigas e de caminhos salvos', () => {
     const u = 'https://abc.supabase.co/storage/v1/object/public/task-attachments/uid/tid/171_nota%20fiscal.pdf';

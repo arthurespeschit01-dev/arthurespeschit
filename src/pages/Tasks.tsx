@@ -1,5 +1,5 @@
 import {useResponsibleName} from "@/hooks/useResponsibleName";
-import { abrirAnexo, validarAnexo } from '@/lib/anexos';
+import { abrirAnexo, enviarAnexo, descartarAnexo, mensagemDeErro } from '@/lib/anexos';
 import {readAllRows} from '@/lib/readAllRows';
 import {isClosedTask,closedInPeriod,taskDay} from '@/lib/taskViews';
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -242,19 +242,15 @@ export default function Tasks() {
     if (!user) return;
     setUploading(true);
     try {
-      const invalido = validarAnexo(file);
-      if (invalido) { toast.error(invalido); return; }
-      const filePath = `${user.id}/${taskId}/${Date.now()}_${file.name}`;
-      const { error: uploadError } = await supabase.storage.from('task-attachments').upload(filePath, file);
-      if (uploadError) throw uploadError;
-      const { data: urlData } = supabase.storage.from('task-attachments').getPublicUrl(filePath);
-      await supabase.from('task_attachments').insert({
-        task_id: taskId, user_id: user.id, file_name: file.name, file_url: urlData.publicUrl,
+      const fileUrl = await enviarAnexo('task-attachments', `${user.id}/${taskId}`, file);
+      const { error: dbError } = await supabase.from('task_attachments').insert({
+        task_id: taskId, user_id: user.id, file_name: file.name, file_url: fileUrl,
       });
+      if (dbError) { await descartarAnexo('task-attachments', fileUrl); throw dbError; }
       toast.success('Anexo adicionado!');
       load();
-    } catch {
-      toast.error('Erro ao enviar arquivo');
+    } catch (e) {
+      toast.error(mensagemDeErro(e));
     } finally {
       setUploading(false);
     }
