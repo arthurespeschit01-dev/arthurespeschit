@@ -100,33 +100,57 @@ export function sanitizarMensagens(
     .map((m: any) => ({ role: m.role, content: m.content.slice(0, maxChars) }));
 }
 
-// Anexos: tipos e tamanho aceitos
-export const ANEXO_MAX_BYTES = 20 * 1024 * 1024;
-export const ANEXO_TIPOS = [
-  "application/pdf",
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-  "image/gif",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/vnd.ms-powerpoint",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  "text/plain",
-  "text/csv",
-  "video/mp4",
-  "video/quicktime",
-  "audio/mpeg",
-  "audio/ogg",
-  "application/zip",
-];
+// Anexos: tipos e tamanho aceitos (50 MB é o máximo por arquivo no plano gratuito do Supabase)
+export const ANEXO_MAX_BYTES = 50 * 1024 * 1024;
+const TIPOS_POR_EXTENSAO: Record<string, string> = {
+  pdf: "application/pdf",
+  png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif", heic: "image/heic",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  txt: "text/plain", csv: "text/csv",
+  mp4: "video/mp4", mov: "video/quicktime", webm: "video/webm",
+  mp3: "audio/mpeg", ogg: "audio/ogg", wav: "audio/wav", m4a: "audio/mp4",
+  zip: "application/zip",
+};
+export const ANEXO_TIPOS = Array.from(new Set(Object.values(TIPOS_POR_EXTENSAO)));
+const SINONIMOS: Record<string, string> = {
+  "application/x-zip-compressed": "application/zip",
+  "audio/x-m4a": "audio/mp4",
+  "audio/x-wav": "audio/wav",
+  "audio/wave": "audio/wav",
+  "image/jpg": "image/jpeg",
+  "application/csv": "text/csv",
+};
+
+// Tipo do arquivo: usa o que o navegador informa e, quando vem vazio ou genérico (comum no Windows), deduz pela extensão
+export function tipoDoArquivo(arquivo: { type: string; name: string }): string {
+  const informado = SINONIMOS[arquivo.type] || arquivo.type;
+  if (informado && informado !== "application/octet-stream" && ANEXO_TIPOS.includes(informado)) return informado;
+  const ext = (arquivo.name.split(".").pop() || "").toLowerCase();
+  return TIPOS_POR_EXTENSAO[ext] || informado || "application/octet-stream";
+}
+
 export function validarAnexo(arquivo: { type: string; size: number; name: string }): string | null {
-  if (arquivo.size > ANEXO_MAX_BYTES) return "Arquivo maior que 20 MB.";
-  if (!ANEXO_TIPOS.includes(arquivo.type))
+  if (arquivo.size > ANEXO_MAX_BYTES) return "Arquivo maior que 50 MB. Comprima ou envie um link.";
+  if (!ANEXO_TIPOS.includes(tipoDoArquivo(arquivo)))
     return "Tipo de arquivo não permitido. Envie PDF, imagem, documento do Office, planilha, texto, vídeo, áudio ou ZIP.";
   return null;
+}
+
+// Nome seguro para o armazenamento: o Supabase recusa acentos e alguns símbolos no caminho.
+// O nome original continua salvo e aparecendo na tela.
+export function nomeSeguro(nome: string): string {
+  const partes = nome.split(".");
+  const ext = partes.length > 1 ? partes.pop()!.toLowerCase().replace(/[^a-z0-9]/g, "") : "";
+  const base = partes.join(".")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Za-z0-9._-]+/g, "_").replace(/_+/g, "_").replace(/^[_.-]+|[_.-]+$/g, "")
+    .slice(0, 80) || "arquivo";
+  return ext ? `${base}.${ext}` : base;
 }
 
 // Extrai o caminho do arquivo de uma URL pública antiga ou de um caminho já salvo

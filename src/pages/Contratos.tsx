@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { abrirAnexo, validarAnexo } from '@/lib/anexos';
+import { abrirAnexo, enviarAnexo, descartarAnexo, mensagemDeErro } from '@/lib/anexos';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { ExternalLink, Plus, Edit2, Trash2, FileText, Calendar, Search, Upload, Paperclip, Eye, X } from 'lucide-react';
@@ -106,19 +106,15 @@ export default function Contratos() {
     if (!user) return;
     setUploading(true);
     try {
-      const invalido = validarAnexo(file);
-      if (invalido) { toast.error(invalido); return; }
-      const filePath = `${user.id}/${contractId}/${Date.now()}_${file.name}`;
-      const { error: uploadError } = await supabase.storage.from('contract-attachments').upload(filePath, file);
-      if (uploadError) throw uploadError;
-      const { data: urlData } = supabase.storage.from('contract-attachments').getPublicUrl(filePath);
-      await supabase.from('contract_attachments').insert({
-        contract_id: contractId, user_id: user.id, file_name: file.name, file_url: urlData.publicUrl,
+      const fileUrl = await enviarAnexo('contract-attachments', `${user.id}/${contractId}`, file);
+      const { error: dbError } = await supabase.from('contract_attachments').insert({
+        contract_id: contractId, user_id: user.id, file_name: file.name, file_url: fileUrl,
       });
+      if (dbError) { await descartarAnexo('contract-attachments', fileUrl); throw dbError; }
       toast.success('Anexo adicionado!');
       load();
-    } catch {
-      toast.error('Erro ao enviar arquivo');
+    } catch (e) {
+      toast.error(mensagemDeErro(e));
     } finally {
       setUploading(false);
     }
