@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
         from: FROM,
         to: [decisao.destinatario],
         subject: decisao.assunto,
-        html: buildHtml(escapeHtml(decisao.icone), escapeHtml(decisao.titulo), escapeHtml(decisao.mensagem)),
+        html: buildHtml(escapeHtml(decisao.icone), escapeHtml(decisao.titulo), escapeHtml(decisao.mensagem).replace(/\n/g, '<br>')),
       }),
     });
 

@@ -140,14 +140,14 @@ function AgencyLegacySettings() {
         <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30 border border-border/50">
           <div>
             <p className="font-medium">Ativar notificações por email</p>
-            <p className="text-xs text-muted-foreground">Receba alertas no seu email para os gatilhos selecionados abaixo.</p>
+            <p className="text-xs text-muted-foreground">Um único e-mail por dia, às 8h, só com o que mudou ou precisa de ação.</p>
           </div>
           <Switch checked={emailAtivo} onCheckedChange={setEmailAtivo} />
         </div>
 
         {emailAtivo && (
           <div className="space-y-3 pt-2">
-            <TriggerRow label="Saldo baixo" desc="Alerta quando alguma conta de anúncios estiver abaixo do limite."
+            <TriggerRow label="Saldo baixo" desc="Só contas pré-pagas com campanha rodando nos últimos 7 dias."
               checked={cfg.saldo_baixo} onCheck={(v) => setField('saldo_baixo', v)}>
               <div className="flex items-center gap-2">
                 <Label className="text-xs">Alertar abaixo de R$</Label>
@@ -159,10 +159,10 @@ function AgencyLegacySettings() {
             <TriggerRow label="Vencimento de contrato" desc="Alerta 7 dias e 1 dia antes do vencimento."
               checked={cfg.contrato_vencimento} onCheck={(v) => setField('contrato_vencimento', v)} />
 
-            <TriggerRow label="Vencimento de pagamento" desc="Alerta 3 dias antes e no dia do vencimento."
+            <TriggerRow label="Vencimento de pagamento" desc="Alerta 3 dias antes e no dia do vencimento. Ignora clientes pausados ou encerrados."
               checked={cfg.pagamento_vencimento} onCheck={(v) => setField('pagamento_vencimento', v)} />
 
-            <TriggerRow label="Inadimplência" desc="Alerta quando cliente passar X dias em atraso."
+            <TriggerRow label="Inadimplência" desc="Só mensalidades ainda não pagas de clientes ativos. Lembra no máximo 1 vez por semana."
               checked={cfg.inadimplencia} onCheck={(v) => setField('inadimplencia', v)}>
               <div className="flex items-center gap-2">
                 <Label className="text-xs">Após</Label>
@@ -172,17 +172,17 @@ function AgencyLegacySettings() {
               </div>
             </TriggerRow>
 
-            <TriggerRow label="Meta Ads — verba acabando" desc="Alerta quando a campanha consumir uma % do orçamento."
+            <TriggerRow label="Meta Ads — verba acabando" desc="Só campanhas ativas de clientes ativos. Alerta quando restar pouco do orçamento."
               checked={cfg.meta_verba} onCheck={(v) => setField('meta_verba', v)}>
               <div className="flex items-center gap-2">
-                <Label className="text-xs">Alertar a partir de</Label>
+                <Label className="text-xs">Alertar quando restar</Label>
                 <Input type="number" className="w-20 h-8" value={cfg.meta_alerta_pct}
                   onChange={(e) => setField('meta_alerta_pct', Number(e.target.value))} />
                 <span className="text-xs text-muted-foreground">%</span>
               </div>
             </TriggerRow>
 
-            <TriggerRow label="Tasks vencendo" desc="Alerta no dia anterior ao prazo da task."
+            <TriggerRow label="Tasks vencendo" desc="Alerta na véspera do prazo e uma vez se atrasar. Ignora concluídas e canceladas."
               checked={cfg.task_vencendo} onCheck={(v) => setField('task_vencendo', v)} />
           </div>
         )}
