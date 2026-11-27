@@ -1,3 +1,4 @@
+import type React from 'react';
 // Seções novas do cadastro de cliente: documentos, contato, endereço, contrato, pagamento, receita variável e Asaas
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
@@ -29,12 +30,13 @@ export function SecaoDocumentos({ value, onChange, obrigatorio }: P & { obrigato
   );
 }
 
-export function SecaoEmails({ value, onChange, obrigatorio }: P & { obrigatorio: boolean }) {
+export function SecaoEmails({ value, onChange, obrigatorio, telefone }: P & { obrigatorio: boolean; telefone?: React.ReactNode }) {
   return (
-    <>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div><Label className={rotulo}>E-mail{obrigatorio ? ' *' : ''}</Label><Input type="email" value={value.email} onChange={(e) => onChange({ email: e.target.value })} placeholder="contato@cliente.com" className={campo} /></div>
-      <div><Label className={rotulo}>E-mail financeiro (opcional)</Label><Input type="email" value={value.billing_email} onChange={(e) => onChange({ billing_email: e.target.value })} placeholder="Recebe as cobranças, se diferente" className={campo} /></div>
-    </>
+      {telefone}
+      <div className="sm:col-span-2"><Label className={rotulo}>E-mail financeiro <span className="text-xs">(opcional)</span></Label><Input type="email" value={value.billing_email} onChange={(e) => onChange({ billing_email: e.target.value })} placeholder="Só se as cobranças forem para outro e-mail" className={campo} /></div>
+    </div>
   );
 }
 
