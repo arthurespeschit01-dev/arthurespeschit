@@ -17,7 +17,7 @@ const API_KEY = Deno.env.get('ASAAS_API_KEY') || '';
 let ENV = 'sandbox';
 let ORG = '';
 let BASE = 'https://api-sandbox.asaas.com/v3';
-const EVENTOS = ['PAYMENT_CREATED', 'PAYMENT_UPDATED', 'PAYMENT_CONFIRMED', 'PAYMENT_RECEIVED', 'PAYMENT_RECEIVED_IN_CASH',
+const EVENTOS = ['PAYMENT_CREATED', 'PAYMENT_UPDATED', 'PAYMENT_CONFIRMED', 'PAYMENT_RECEIVED',
   'PAYMENT_OVERDUE', 'PAYMENT_DELETED', 'PAYMENT_RESTORED', 'PAYMENT_REFUNDED', 'PAYMENT_PARTIALLY_REFUNDED', 'PAYMENT_CHARGEBACK_REQUESTED'];
 
 // Lê a configuração (banco; variáveis de ambiente têm prioridade se existirem)
