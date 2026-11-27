@@ -17,6 +17,7 @@ export type Alerta = {
 
 export const ativo = (c?: Cliente | null) => !c?.status || c.status === "Ativo";
 const pago = (m: Mensalidade) => m.status === "pago" || !!m.data_pagamento;
+const fechada = (m: Mensalidade) => pago(m) || m.status === "cancelado" || m.status === "estornado";
 const encerrada = (s?: string | null) => /^(conclu|cancel)/i.test(s || "");
 const contratoEncerrado = (s?: string | null) => /^(cancel|encerr)/i.test(s || "");
 const campanhaAtiva = (c: Campanha, hoje: Date) =>
@@ -54,7 +55,7 @@ export function montarAlertas(
   }
 
   // Mensalidades: só de clientes ativos e ainda não pagas
-  const abertas = d.mensalidades.filter((m) => !pago(m) && ativo(cli.get(m.cliente_id)));
+  const abertas = d.mensalidades.filter((m) => !fechada(m) && ativo(cli.get(m.cliente_id)));
   // Se o cliente já tem uma mensalidade POSTERIOR paga, a antiga ficou esquecida no sistema: não alerta
   const pagaDepois = (m: Mensalidade) => d.mensalidades.some((o) => o.cliente_id === m.cliente_id && pago(o) && o.vencimento > m.vencimento);
 

@@ -1,4 +1,6 @@
 import ClientMeetingMinutes from "@/components/ClientMeetingMinutes";
+import { sincronizarAsaas, useAsaasDisponivel } from '@/lib/asaasSync';
+import { receitaVariavel } from '@/lib/cadastroCliente';
 import { abrirAnexo, urlAssinada, enviarAnexo, descartarAnexo, mensagemDeErro } from '@/lib/anexos';
 import ClientBillingFields from '@/components/ClientBillingFields';
 import {billingError,firstBillingDate,localDate} from '@/lib/billingSchedule';
@@ -35,6 +37,8 @@ interface AccountIds {
 }
 
 interface Client {
+  auto_billing?: boolean | null; asaas_sync_status?: string | null; asaas_sync_error?: string | null; asaas_subscription_id?: string | null;
+  media_fee_pct?: number | null; media_fee_min?: number | null; revenue_fee_pct?: number | null; revenue_fee_min?: number | null;
   id: string; name: string; services: string; monthly_fee: number; contract_duration: string; status: string;
   payment_day: number | null; entry_date: string | null; first_payment_date: string | null; account_ids: AccountIds; verba_mensal: number; niche: string;
 }
@@ -83,6 +87,8 @@ export default function ClientDetail() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [client, setClient] = useState<Client | null>(null);
+  const asaas = useAsaasDisponivel();
+  const fmtBRL = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
   const [tab, setTab] = useState<'dados' | 'anexos' | 'meta' | 'google' | 'atas'>('dados');
   const [metaActiveAccount, setMetaActiveAccount] = useState<string | null>(null);
   const [importingMeta, setImportingMeta] = useState(false);
@@ -408,7 +414,8 @@ export default function ClientDetail() {
     toast.success('Cliente atualizado!');
     setEditClient(false);
     void progress.refetch();
-    loadClient();
+    if (client?.auto_billing && asaas.habilitado && id) void sincronizarAsaas(id, loadClient);
+    else loadClient();
   };
 
   const openNewCampaign = () => {
@@ -530,6 +537,7 @@ export default function ClientDetail() {
   const statusColor = (s: string) => {
     if (s === 'Ativo' || s === 'Ativa') return 'bg-emerald-500/20 text-emerald-400';
     if (s === 'Pausado' || s === 'Pausada') return 'bg-amber-500/20 text-amber-400';
+    if (s === 'Aguardando início') return 'bg-sky-500/20 text-sky-400';
     return 'bg-red-500/20 text-red-400';
   };
 
@@ -560,6 +568,24 @@ export default function ClientDetail() {
           </div>
         </div>
       </div>
+
+      {client.auto_billing && client.asaas_sync_status === 'erro' && asaas.habilitado && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+          <div className="text-sm"><p className="font-medium text-destructive">A cobrança no Asaas não foi gerada</p><p className="text-muted-foreground">{client.asaas_sync_error || 'Erro desconhecido.'}</p></div>
+          <Button size="sm" variant="outline" onClick={() => id && sincronizarAsaas(id, loadClient)}>Tentar de novo</Button>
+        </div>
+      )}
+      {(client.media_fee_pct != null || client.media_fee_min != null || client.revenue_fee_pct != null || client.revenue_fee_min != null) && (
+        <div className="rounded-lg border border-border/50 bg-secondary/30 p-3 text-sm space-y-1">
+          <p className="font-medium text-foreground">Receita variável</p>
+          {(client.media_fee_pct != null || client.media_fee_min != null) && (
+            <p className="text-muted-foreground">{client.media_fee_pct ?? 0}% sobre mídia (mín. {fmtBRL(Number(client.media_fee_min || 0))}): <span className="text-foreground font-medium">{fmtBRL(receitaVariavel(client.media_fee_pct, client.media_fee_min, client.verba_mensal) || 0)}</span> com a verba atual de {fmtBRL(Number(client.verba_mensal || 0))}</p>
+          )}
+          {(client.revenue_fee_pct != null || client.revenue_fee_min != null) && (
+            <p className="text-muted-foreground">{client.revenue_fee_pct ?? 0}% sobre faturamento (mín. {fmtBRL(Number(client.revenue_fee_min || 0))}): calculado no fechamento do mês.</p>
+          )}
+        </div>
+      )}
 
       {id && <ClientTicketLink key={id} clientId={id} />}
 
@@ -695,6 +721,7 @@ export default function ClientDetail() {
                   <Select value={clientForm.status} onValueChange={(v) => setClientForm({ ...clientForm, status: v })}>
                     <SelectTrigger className="bg-secondary/50 border-border/50 mt-1"><SelectValue /></SelectTrigger>
                     <SelectContent className="bg-card border-border">
+                      <SelectItem value="Aguardando início">Aguardando início</SelectItem>
                       <SelectItem value="Ativo">Ativo</SelectItem>
                       <SelectItem value="Pausado">Pausado</SelectItem>
                       <SelectItem value="Encerrado">Encerrado</SelectItem>

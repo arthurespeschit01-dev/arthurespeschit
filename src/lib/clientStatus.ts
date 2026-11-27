@@ -1,4 +1,4 @@
-export const CLIENT_STATUSES = ["Ativo", "Pausado", "Encerrado"] as const;
+export const CLIENT_STATUSES = ["Ativo", "Aguardando início", "Pausado", "Encerrado"] as const;
 export type ClientStatusFilter = (typeof CLIENT_STATUSES)[number] | "Todos";
 
 // Unknown or missing status must never silently reactivate an account.

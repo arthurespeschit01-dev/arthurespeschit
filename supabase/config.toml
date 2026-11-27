@@ -17,3 +17,9 @@ verify_jwt = false
 
 [functions.agency-whatsapp]
 verify_jwt = false
+
+[functions.asaas-sync]
+verify_jwt = true
+
+[functions.asaas-webhook]
+verify_jwt = false
