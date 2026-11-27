@@ -18,9 +18,17 @@ type Pagamento = {
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
   const admin = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-  const { data: cfg } = await admin.from('asaas_config').select('organization_id, webhook_token').eq('id', 1).maybeSingle();
-  const TOKEN = Deno.env.get('ASAAS_WEBHOOK_TOKEN') || cfg?.webhook_token || '';
-  const ORG = Deno.env.get('ASAAS_ORGANIZATION_ID') || cfg?.organization_id || '';
+  // Cada agência tem sua URL (?org=) e seu token; sem ?org é a conexão antiga
+  const orgParam = new URL(req.url).searchParams.get('org') || '';
+  let TOKEN = '', ORG = '';
+  if (/^[0-9a-f-]{36}$/i.test(orgParam)) {
+    const { data: conta } = await admin.from('asaas_contas').select('organization_id, webhook_token, chave_id').eq('organization_id', orgParam).maybeSingle();
+    if (conta?.chave_id) { TOKEN = conta.webhook_token; ORG = conta.organization_id; }
+  } else {
+    const { data: cfg } = await admin.from('asaas_config').select('organization_id, webhook_token').eq('id', 1).maybeSingle();
+    TOKEN = Deno.env.get('ASAAS_WEBHOOK_TOKEN') || cfg?.webhook_token || '';
+    ORG = Deno.env.get('ASAAS_ORGANIZATION_ID') || cfg?.organization_id || '';
+  }
   if (!TOKEN || !iguaisSeguro(req.headers.get('asaas-access-token') || '', TOKEN)) return new Response('Unauthorized', { status: 401 });
   const corpo = await req.json().catch(() => null);
   const evento = String(corpo?.event || '');
@@ -48,7 +56,7 @@ Deno.serve(async (req) => {
     if (!cliente && p.subscription) cliente = (await admin.from('clients').select('id, user_id, organization_id').eq('asaas_subscription_id', p.subscription).maybeSingle()).data;
     if (!cliente && p.customer) cliente = (await admin.from('clients').select('id, user_id, organization_id').eq('asaas_customer_id', p.customer).limit(1).maybeSingle()).data;
     if (!cliente) { await registrar('ignorado', 'cliente não encontrado'); return ok(); }
-    if (ORG && cliente.organization_id !== ORG) { await registrar('ignorado', 'outra organização', cliente.id); return ok(); }
+    if (!ORG || cliente.organization_id !== ORG) { await registrar('ignorado', 'outra organização', cliente.id); return ok(); }
 
     const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
     const dataPagamento = p.paymentDate || p.clientPaymentDate || p.confirmedDate || hoje;

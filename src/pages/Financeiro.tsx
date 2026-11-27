@@ -1,4 +1,5 @@
 import DeleteItemButton from '@/components/DeleteItemButton';
+import { baixaAsaas } from '@/lib/asaasSync';
 import ClientStatusFilter from '@/components/ClientStatusFilter';
 import { isActiveClient, matchesClientStatus, type ClientStatusFilter as StatusFilter } from '@/lib/clientStatus';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -172,8 +173,14 @@ export default function Financeiro() {
   const togglePago = async (m: Mensalidade) => {
     const novo = m.status === 'pago' ? 'pendente' as const : 'pago' as const;
     const dataPag = novo === 'pago' ? new Date().toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'}) : null;
+    if (m.asaas_payment_id) {
+      // Cobrança do Asaas: dá a baixa (ou desfaz) lá também
+      try { await baixaAsaas(m.id, novo === 'pago'); toast.success(novo === 'pago' ? 'Pago na Central e no Asaas.' : 'Pagamento desfeito na Central e no Asaas.'); }
+      catch (e) { toast.error((e as Error).message); return; }
+    } else {
     const {error}=await supabase.from('mensalidades').update({ status: novo, data_pagamento: dataPag }).eq('id', m.id).eq('user_id',user!.id).select('id').single();
     if(error){toast.error('Não foi possível confirmar o pagamento. Tente novamente.');return;}
+    }
     setMensalidades(prev => prev.map(x => x.id === m.id ? { ...x, status: novo, data_pagamento: dataPag } : x));
   };
 
