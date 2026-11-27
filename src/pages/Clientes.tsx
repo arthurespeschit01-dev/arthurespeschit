@@ -534,9 +534,9 @@ export default function Clientes() {
 
               <AccordionItem value="contato">
                 <AccordionTrigger className="text-sm font-semibold">2. Contato</AccordionTrigger>
-                <AccordionContent className="grid grid-cols-1 sm:grid-cols-3 gap-4 px-1">
-                  <SecaoEmails value={cad} onChange={mudarCad} obrigatorio={cad.auto_billing} />
-                  <div><Label className="text-muted-foreground text-sm">WhatsApp / Telefone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="Ex: 11999998888 (com DDD)" className="bg-secondary/50 border-border/50 mt-1" /></div>
+                <AccordionContent className="px-1">
+                  <SecaoEmails value={cad} onChange={mudarCad} obrigatorio={cad.auto_billing}
+                    telefone={<div><Label className="text-muted-foreground text-sm">WhatsApp / Telefone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="11999998888 (com DDD)" className="bg-secondary/50 border-border/50 mt-1" /></div>} />
                 </AccordionContent>
               </AccordionItem>
 
