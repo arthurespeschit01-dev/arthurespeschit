@@ -14,9 +14,31 @@ const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { sta
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const API_KEY = Deno.env.get('ASAAS_API_KEY') || '';
-const ENV = (Deno.env.get('ASAAS_ENV') || 'sandbox').toLowerCase();
-const ORG = Deno.env.get('ASAAS_ORGANIZATION_ID') || '';
-const BASE = ENV === 'production' ? 'https://api.asaas.com/v3' : 'https://api-sandbox.asaas.com/v3';
+let ENV = 'sandbox';
+let ORG = '';
+let BASE = 'https://api-sandbox.asaas.com/v3';
+const EVENTOS = ['PAYMENT_CREATED', 'PAYMENT_UPDATED', 'PAYMENT_CONFIRMED', 'PAYMENT_RECEIVED', 'PAYMENT_RECEIVED_IN_CASH',
+  'PAYMENT_OVERDUE', 'PAYMENT_DELETED', 'PAYMENT_RESTORED', 'PAYMENT_REFUNDED', 'PAYMENT_PARTIALLY_REFUNDED', 'PAYMENT_CHARGEBACK_REQUESTED'];
+
+// Lê a configuração (banco; variáveis de ambiente têm prioridade se existirem)
+async function carregarConfig(admin: ReturnType<typeof createClient>) {
+  const { data } = await admin.from('asaas_config').select('organization_id, ambiente, webhook_token, webhook_id, webhook_ambiente').eq('id', 1).maybeSingle();
+  ENV = (Deno.env.get('ASAAS_ENV') || data?.ambiente || 'sandbox').toLowerCase();
+  ORG = Deno.env.get('ASAAS_ORGANIZATION_ID') || data?.organization_id || '';
+  BASE = ENV === 'production' ? 'https://api.asaas.com/v3' : 'https://api-sandbox.asaas.com/v3';
+  return data;
+}
+
+// Registra o webhook no Asaas uma única vez por ambiente, com o token gerado pelo banco
+async function garantirWebhook(admin: ReturnType<typeof createClient>, cfg: { webhook_token: string; webhook_id: string | null; webhook_ambiente: string | null } | null, email: string) {
+  if (!cfg || (cfg.webhook_id && cfg.webhook_ambiente === ENV)) return;
+  const url = `${SUPABASE_URL}/functions/v1/asaas-webhook`;
+  const lista = await asaas('GET', '/webhooks?limit=100');
+  const existente = (lista?.data || []).find((w: { url?: string }) => w.url === url);
+  const corpo = { name: 'Central do Gestor', url, email, enabled: true, interrupted: false, apiVersion: 3, authToken: cfg.webhook_token, sendType: 'SEQUENTIALLY', events: EVENTOS };
+  const w = existente ? await asaas('POST', `/webhooks/${existente.id}`, corpo) : await asaas('POST', '/webhooks', corpo);
+  await admin.from('asaas_config').update({ webhook_id: w.id || existente?.id, webhook_ambiente: ENV }).eq('id', 1);
+}
 
 class ErroAsaas extends Error {}
 
@@ -43,13 +65,20 @@ Deno.serve(async (req) => {
   if (!u?.user) return json({ error: 'Não autorizado' }, 401);
 
   const body = await req.json().catch(() => ({}));
-  const configurado = !!API_KEY && !!ORG;
-
   const admin = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+  const cfg = await carregarConfig(admin);
+  const configurado = !!API_KEY && !!ORG;
   // Habilitado só para a organização dona da conta Asaas
   const { data: membro } = await admin.from('organization_members').select('organization_id').eq('user_id', u.user.id);
   const habilitado = configurado && (membro || []).some((m: { organization_id: string }) => m.organization_id === ORG);
-  if (body?.action === 'disponivel') return json({ habilitado, ambiente: ENV });
+  if (body?.action === 'disponivel') {
+    let webhook = !!cfg?.webhook_id && cfg?.webhook_ambiente === ENV;
+    if (habilitado && !webhook) {
+      try { await garantirWebhook(admin, cfg, u.user.email || ''); webhook = true; }
+      catch (e) { console.error('[asaas-sync] webhook', e); }
+    }
+    return json({ habilitado, ambiente: ENV, webhook });
+  }
 
   const clientId = String(body?.client_id || '');
   if (!/^[0-9a-f-]{36}$/i.test(clientId)) return json({ error: 'client_id inválido' }, 400);
