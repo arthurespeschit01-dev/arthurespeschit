@@ -6,8 +6,7 @@ import { efeitoDoEvento, lerReferencia } from '../_shared/asaas.ts';
 import { iguaisSeguro } from '../_shared/security.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const TOKEN = Deno.env.get('ASAAS_WEBHOOK_TOKEN') || '';
-const ORG = Deno.env.get('ASAAS_ORGANIZATION_ID') || '';
+
 const ok = (b: unknown = { ok: true }) => new Response(JSON.stringify(b), { headers: { 'Content-Type': 'application/json' } });
 
 type Pagamento = {
@@ -18,9 +17,11 @@ type Pagamento = {
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
-  if (!TOKEN || !iguaisSeguro(req.headers.get('asaas-access-token') || '', TOKEN)) return new Response('Unauthorized', { status: 401 });
-
   const admin = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+  const { data: cfg } = await admin.from('asaas_config').select('organization_id, webhook_token').eq('id', 1).maybeSingle();
+  const TOKEN = Deno.env.get('ASAAS_WEBHOOK_TOKEN') || cfg?.webhook_token || '';
+  const ORG = Deno.env.get('ASAAS_ORGANIZATION_ID') || cfg?.organization_id || '';
+  if (!TOKEN || !iguaisSeguro(req.headers.get('asaas-access-token') || '', TOKEN)) return new Response('Unauthorized', { status: 401 });
   const corpo = await req.json().catch(() => null);
   const evento = String(corpo?.event || '');
   const p: Pagamento | undefined = corpo?.payment;
