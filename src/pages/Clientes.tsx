@@ -566,18 +566,20 @@ export default function Clientes() {
                 <AccordionContent className="px-1"><SecaoVariavel value={cad} onChange={mudarCad} verbaMensal={Number(form.verba_mensal) || 0} /></AccordionContent>
               </AccordionItem>
 
-              {asaas.habilitado && (
-                <AccordionItem value="cobranca">
-                  <AccordionTrigger className="text-sm font-semibold">7. Cobrança automática (Asaas)</AccordionTrigger>
-                  <AccordionContent className="px-1">
+              <AccordionItem value="cobranca">
+                <AccordionTrigger className="text-sm font-semibold">7. Cobrança automática (Asaas)</AccordionTrigger>
+                <AccordionContent className="px-1">
+                  {asaas.habilitado ? (
                     <SecaoCobranca value={cad} onChange={mudarCad} ambiente={asaas.ambiente}
                       base={{ id: editing?.id, name: form.name, monthly_fee: Number(form.monthly_fee) || 0, first_payment_date: form.first_payment_date }} />
-                  </AccordionContent>
-                </AccordionItem>
-              )}
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Conecte o Asaas da agência em <a href="/configuracoes" className="text-primary hover:underline">Configurações</a> para gerar as cobranças automaticamente.</p>
+                  )}
+                </AccordionContent>
+              </AccordionItem>
 
               <AccordionItem value="servicos">
-                <AccordionTrigger className="text-sm font-semibold">{asaas.habilitado ? '8' : '7'}. Serviços, operação e contas</AccordionTrigger>
+                <AccordionTrigger className="text-sm font-semibold">8. Serviços, operação e contas</AccordionTrigger>
                 <AccordionContent className="space-y-4 px-1">
                   <div><Label className="text-muted-foreground text-sm">Serviços</Label><Textarea value={form.services} onChange={(e) => setForm({ ...form, services: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" /></div>
                   <ClientOperationFields value={operation} onChange={setOperation} />
