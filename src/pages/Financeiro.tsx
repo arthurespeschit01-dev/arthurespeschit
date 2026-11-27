@@ -28,7 +28,7 @@ interface Transacao {
 }
 interface Mensalidade {
   id: string; cliente_id: string; valor: number; vencimento: string; original_amount?:number|null; fee_adjusted_at?:string|null;
-  status: 'pago' | 'pendente' | 'atrasado'; data_pagamento: string | null;
+  status: 'pago' | 'pendente' | 'atrasado' | 'cancelado' | 'estornado'; data_pagamento: string | null; invoice_url?: string | null; asaas_payment_id?: string | null;
 }
 
 const CATEGORIAS_SAIDA = ['Ferramentas/SaaS', 'Freelancer', 'Impulsionamento', 'Infraestrutura', 'Outros'];
@@ -115,7 +115,7 @@ export default function Financeiro() {
 
   // Cobrança em aberto só existe para cliente ativo; o que já foi pago continua no histórico
   const ativoIds = new Set(clients.filter(isActiveClient).map(c => c.id));
-  const cobravel = (m: Mensalidade) => m.status === 'pago' || ativoIds.has(m.cliente_id);
+  const cobravel = (m: Mensalidade) => m.status === 'pago' || (ativoIds.has(m.cliente_id) && m.status !== 'cancelado' && m.status !== 'estornado');
   const mensVisiveis = mensalidades.filter(m => cobravel(m) && (statusFilter === 'Todos' || visibleClientIds.has(m.cliente_id)));
   const scopedInvoices=mensVisiveis;
   const feesMensais=clients.filter(c=>matchesClientStatus(c,statusFilter)).reduce((sum,c)=>sum+Number(c.monthly_fee||0),0);
@@ -230,6 +230,8 @@ export default function Financeiro() {
 
   const statusBadge = (s: string,due?:string) => {
     const today=new Date().toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'});
+    if (s === 'cancelado') return <Badge className="bg-muted text-muted-foreground border-border">Cancelada</Badge>;
+    if (s === 'estornado') return <Badge className="bg-muted text-muted-foreground border-border">Estornada</Badge>;
     if(s!=='pago'&&due&&due>=today)return <Badge className="bg-blue-500/15 text-blue-400 border-blue-500/30">{due===today?'Vence hoje':'A vencer'}</Badge>;
     if (s === 'pago') return <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">Pago</Badge>;
     if (s === 'atrasado') return <Badge className="bg-red-500/15 text-red-400 border-red-500/30">Atrasado</Badge>;
@@ -390,7 +392,7 @@ export default function Financeiro() {
                         <td className="p-3 font-medium">{c?.name || '-'}</td>
                         <td className="p-3">{fmt(Number(m.valor))}{m.original_amount!=null&&<p className="text-[10px] text-muted-foreground">Fee atualizado · original {fmt(Number(m.original_amount))}</p>}</td>
                         <td className="p-3 text-muted-foreground">{new Date(m.vencimento + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
-                        <td className="p-3">{statusBadge(m.status,m.vencimento)}</td>
+                        <td className="p-3">{statusBadge(m.status,m.vencimento)}{m.invoice_url && <a href={m.invoice_url} target="_blank" rel="noopener noreferrer" className="block text-[11px] text-primary hover:underline mt-1">Ver fatura Asaas</a>}</td>
                         <td className="p-3 text-right">
                           <div className="flex justify-end gap-2 flex-wrap">
                             {m.status !== 'pago' && (

@@ -1,6 +1,10 @@
 import ClientBillingFields from '@/components/ClientBillingFields';
 import {billingError,firstBillingDate,localDate} from '@/lib/billingSchedule';
 import ClientOperationFields from '@/components/ClientOperationFields';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { SecaoCobranca, SecaoContratoExtra, SecaoDocumentos, SecaoEmails, SecaoEndereco, SecaoModelo, SecaoVariavel } from '@/components/ClienteCadastroSecoes';
+import { cadastroDoCliente, cadastroVazio, colunasCadastro, erroCadastro, type DadosCadastro } from '@/lib/cadastroCliente';
+import { sincronizarAsaas, useAsaasDisponivel } from '@/lib/asaasSync';
 import { useClientProgress, progressLabel, operationFromProgress, emptyOperation, type OperationSelection } from '@/lib/clientProgress';
 import ClientStatusFilter from '@/components/ClientStatusFilter';
 import { matchesClientStatus, type ClientStatusFilter as StatusFilter } from '@/lib/clientStatus';
@@ -48,6 +52,9 @@ export default function Clientes() {
   const progress = useClientProgress();
   const [operation, setOperation] = useState<OperationSelection>({ ...emptyOperation });
   const [saving, setSaving] = useState(false);
+  const [cad, setCad] = useState<DadosCadastro>(cadastroVazio());
+  const mudarCad = (p: Partial<DadosCadastro>) => setCad((c) => ({ ...c, ...p }));
+  const asaas = useAsaasDisponivel();
   const [clients, setClients] = useState<Client[]>([]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('Ativo');
   const visibleClients = clients.filter(c => matchesClientStatus(c, statusFilter));
@@ -187,6 +194,7 @@ export default function Clientes() {
     setAdAccounts([]);
     setSelectedAdAccountId('');
     setForm({ name: '', services: '', monthly_fee: 0, contract_duration: '', status: 'Ativo', entry_date: localDate(), first_payment_date: firstBillingDate(localDate(),5), payment_day: '', verba_mensal: 0, niche: '', phone: '', account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '' } });
+    setCad(cadastroVazio());
     setStep('meta');
     setOpen(true);
     // Reusa o token Meta já autorizado anteriormente (de outro cliente), se válido.
@@ -235,6 +243,7 @@ export default function Clientes() {
       verba_mensal: c.verba_mensal || 0, niche: c.niche || '', phone: c.phone || '',
       account_ids: { bm: '', google_ads: '', tiktok_ads: '', linkedin_ads: '', ...c.account_ids },
     });
+    setCad(cadastroDoCliente(c as unknown as Record<string, unknown>));
     setStep('form');
     setOpen(true);
   };
@@ -245,9 +254,11 @@ export default function Clientes() {
     if (!form.name.trim()) { toast.error('Informe o nome do cliente'); return; }
     if (!form.niche.trim()) { toast.error('Informe o nicho do cliente'); return; }
     if (!form.verba_mensal || form.verba_mensal <= 0) { toast.error('Informe a verba mensal'); return; }
+    const erroCad = erroCadastro(cad, { id: editing?.id, name: form.name, monthly_fee: Number(form.monthly_fee), first_payment_date: form.first_payment_date });
+    if (erroCad) { toast.error(erroCad); return; }
     const payload = {
       name: form.name, services: form.services, monthly_fee: form.monthly_fee,
-      contract_duration: form.contract_duration, status: form.status,
+      contract_duration: cad.contract_months || form.contract_duration, status: form.status,
       entry_date:form.entry_date||null,first_payment_date:form.first_payment_date||null,payment_day: form.payment_day ? Number(form.payment_day) : null,
       account_ids: form.account_ids,
       verba_mensal: form.verba_mensal,
@@ -259,8 +270,11 @@ export default function Clientes() {
       p_id: editing?.id || null, p_client: payload,
       p_operation: operation.phase ? { ...operation } : null,
     });
+    if (error || !savedId) { setSaving(false); toast.error('Não foi possível confirmar o salvamento. Atualize a lista antes de tentar novamente.'); return; }
+    const { error: erroExtra } = await supabase.from('clients').update({ ...colunasCadastro(cad), auto_billing: cad.auto_billing && asaas.habilitado } as never).eq('id', savedId as string);
     setSaving(false);
-    if (error || !savedId) { toast.error('Não foi possível confirmar o salvamento. Atualize a lista antes de tentar novamente.'); return; }
+    if (erroExtra) toast.error('Cliente salvo, mas os dados de contrato e cobrança não foram gravados. Abra e salve de novo.');
+    else if (cad.auto_billing && asaas.habilitado) void sincronizarAsaas(savedId as string, load);
     void progress.refetch();
     if (editing) {
       toast.success('Cliente atualizado!');
@@ -295,6 +309,7 @@ export default function Clientes() {
   const statusColor = (s: string) => {
     if (s === 'Ativo') return 'bg-emerald-500/20 text-emerald-400';
     if (s === 'Pausado') return 'bg-amber-500/20 text-amber-400';
+    if (s === 'Aguardando início') return 'bg-sky-500/20 text-sky-400';
     return 'bg-red-500/20 text-red-400';
   };
 
@@ -490,46 +505,94 @@ export default function Clientes() {
             </div>
           ) : (
           <div className="space-y-4">
-            <div><Label htmlFor="client-name" className="text-muted-foreground text-sm">Nome do cliente *</Label><Input id="client-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" /></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><Label htmlFor="client-niche" className="text-muted-foreground text-sm">Nicho *</Label><Input id="client-niche" value={form.niche} onChange={(e) => setForm({ ...form, niche: e.target.value })} placeholder="Ex: Estética, E-commerce, SaaS" className="bg-secondary/50 border-border/50 mt-1" /></div>
-              <div><Label htmlFor="client-budget" className="text-muted-foreground text-sm">Verba mensal (R$) *</Label><Input id="client-budget" type="number" value={form.verba_mensal} onChange={(e) => setForm({ ...form, verba_mensal: Number(e.target.value) })} placeholder="Ex: 5000" className="bg-secondary/50 border-border/50 mt-1" /></div>
-            </div>
-            <ClientOperationFields value={operation} onChange={setOperation} />
-            <div><Label className="text-muted-foreground text-sm">Serviços</Label><Textarea value={form.services} onChange={(e) => setForm({ ...form, services: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" /></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><Label className="text-muted-foreground text-sm">Fee mensal (R$)</Label><Input type="number" value={form.monthly_fee} onChange={(e) => setForm({ ...form, monthly_fee: Number(e.target.value) })} className="bg-secondary/50 border-border/50 mt-1" /></div>
-              <div><Label className="text-muted-foreground text-sm">Duração</Label><Input value={form.contract_duration} onChange={(e) => setForm({ ...form, contract_duration: e.target.value })} placeholder="6 meses" className="bg-secondary/50 border-border/50 mt-1" /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <ClientBillingFields value={form} onChange={fields=>setForm(current=>({...current,...fields}))}/>
-              <div><Label className="text-muted-foreground text-sm">WhatsApp / Telefone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="Ex: 11999998888 (com DDD)" className="bg-secondary/50 border-border/50 mt-1" /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div></div>
-              <div>
-                <Label className="text-muted-foreground text-sm">Status</Label>
-                <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                  <SelectTrigger className="bg-secondary/50 border-border/50 mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent className="bg-card border-border">
-                    <SelectItem value="Ativo">Ativo</SelectItem>
-                    <SelectItem value="Pausado">Pausado</SelectItem>
-                    <SelectItem value="Encerrado">Encerrado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+            <Accordion type="multiple" defaultValue={['basicos', 'contato', 'contrato']} className="w-full">
+              <AccordionItem value="basicos">
+                <AccordionTrigger className="text-sm font-semibold">1. Dados básicos</AccordionTrigger>
+                <AccordionContent className="space-y-4 px-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div><Label htmlFor="client-name" className="text-muted-foreground text-sm">Nome do cliente (pessoa) *</Label><Input id="client-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" /></div>
+                    <div>
+                      <Label className="text-muted-foreground text-sm">Status</Label>
+                      <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                        <SelectTrigger className="bg-secondary/50 border-border/50 mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent className="bg-card border-border">
+                          <SelectItem value="Aguardando início">Aguardando início</SelectItem>
+                          <SelectItem value="Ativo">Ativo</SelectItem>
+                          <SelectItem value="Pausado">Pausado</SelectItem>
+                          <SelectItem value="Encerrado">Encerrado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <SecaoDocumentos value={cad} onChange={mudarCad} obrigatorio={cad.auto_billing} />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div><Label htmlFor="client-niche" className="text-muted-foreground text-sm">Nicho *</Label><Input id="client-niche" value={form.niche} onChange={(e) => setForm({ ...form, niche: e.target.value })} placeholder="Ex: Estética, E-commerce, SaaS" className="bg-secondary/50 border-border/50 mt-1" /></div>
+                    <div><Label htmlFor="client-budget" className="text-muted-foreground text-sm">Verba mensal de mídia (R$) *</Label><Input id="client-budget" type="number" value={form.verba_mensal} onChange={(e) => setForm({ ...form, verba_mensal: Number(e.target.value) })} placeholder="Ex: 5000" className="bg-secondary/50 border-border/50 mt-1" /></div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
 
-            {/* Account IDs */}
-            <div className="space-y-3 pt-2 border-t border-border">
-              <Label className="text-foreground text-sm font-semibold">IDs das Contas</Label>
-              <div className="grid grid-cols-2 gap-3">
-                <div><Label className="text-muted-foreground text-xs">BM (Business Manager)</Label><Input value={form.account_ids.bm || ''} onChange={(e) => updateAccountId('bm', e.target.value)} placeholder="ID da BM" className="bg-secondary/50 border-border/50 mt-1 text-sm" /></div>
-                <div><Label className="text-muted-foreground text-xs">Google Ads</Label><Input value={form.account_ids.google_ads || ''} onChange={(e) => updateAccountId('google_ads', e.target.value)} placeholder="ID Google Ads" className="bg-secondary/50 border-border/50 mt-1 text-sm" /></div>
-                <div><Label className="text-muted-foreground text-xs">TikTok Ads</Label><Input value={form.account_ids.tiktok_ads || ''} onChange={(e) => updateAccountId('tiktok_ads', e.target.value)} placeholder="ID TikTok Ads" className="bg-secondary/50 border-border/50 mt-1 text-sm" /></div>
-                <div><Label className="text-muted-foreground text-xs">LinkedIn Ads</Label><Input value={form.account_ids.linkedin_ads || ''} onChange={(e) => updateAccountId('linkedin_ads', e.target.value)} placeholder="ID LinkedIn Ads" className="bg-secondary/50 border-border/50 mt-1 text-sm" /></div>
-              </div>
-            </div>
+              <AccordionItem value="contato">
+                <AccordionTrigger className="text-sm font-semibold">2. Contato</AccordionTrigger>
+                <AccordionContent className="grid grid-cols-1 sm:grid-cols-3 gap-4 px-1">
+                  <SecaoEmails value={cad} onChange={mudarCad} obrigatorio={cad.auto_billing} />
+                  <div><Label className="text-muted-foreground text-sm">WhatsApp / Telefone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="Ex: 11999998888 (com DDD)" className="bg-secondary/50 border-border/50 mt-1" /></div>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="endereco">
+                <AccordionTrigger className="text-sm font-semibold">3. Endereço</AccordionTrigger>
+                <AccordionContent className="px-1"><SecaoEndereco value={cad} onChange={mudarCad} obrigatorio={cad.auto_billing} /></AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="contrato">
+                <AccordionTrigger className="text-sm font-semibold">4. Contrato</AccordionTrigger>
+                <AccordionContent className="space-y-4 px-1">
+                  <SecaoContratoExtra value={cad} onChange={mudarCad} obrigatorio={cad.auto_billing} />
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div><Label className="text-muted-foreground text-sm">Mensalidade (R$){cad.auto_billing ? ' *' : ''}</Label><Input type="number" value={form.monthly_fee} onChange={(e) => setForm({ ...form, monthly_fee: Number(e.target.value) })} className="bg-secondary/50 border-border/50 mt-1" /></div>
+                  </div>
+                  <ClientBillingFields value={form} onChange={fields=>setForm(current=>({...current,...fields}))}/>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="modelo">
+                <AccordionTrigger className="text-sm font-semibold">5. Modelo de pagamento</AccordionTrigger>
+                <AccordionContent className="px-1"><SecaoModelo value={cad} onChange={mudarCad} /></AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="variavel">
+                <AccordionTrigger className="text-sm font-semibold">6. Receita variável</AccordionTrigger>
+                <AccordionContent className="px-1"><SecaoVariavel value={cad} onChange={mudarCad} verbaMensal={Number(form.verba_mensal) || 0} /></AccordionContent>
+              </AccordionItem>
+
+              {asaas.habilitado && (
+                <AccordionItem value="cobranca">
+                  <AccordionTrigger className="text-sm font-semibold">7. Cobrança automática (Asaas)</AccordionTrigger>
+                  <AccordionContent className="px-1">
+                    <SecaoCobranca value={cad} onChange={mudarCad} ambiente={asaas.ambiente}
+                      base={{ id: editing?.id, name: form.name, monthly_fee: Number(form.monthly_fee) || 0, first_payment_date: form.first_payment_date }} />
+                  </AccordionContent>
+                </AccordionItem>
+              )}
+
+              <AccordionItem value="servicos">
+                <AccordionTrigger className="text-sm font-semibold">{asaas.habilitado ? '8' : '7'}. Serviços, operação e contas</AccordionTrigger>
+                <AccordionContent className="space-y-4 px-1">
+                  <div><Label className="text-muted-foreground text-sm">Serviços</Label><Textarea value={form.services} onChange={(e) => setForm({ ...form, services: e.target.value })} className="bg-secondary/50 border-border/50 mt-1" /></div>
+                  <ClientOperationFields value={operation} onChange={setOperation} />
+                  <div className="space-y-3 pt-2 border-t border-border">
+                    <Label className="text-foreground text-sm font-semibold">IDs das Contas</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div><Label className="text-muted-foreground text-xs">BM (Business Manager)</Label><Input value={form.account_ids.bm || ''} onChange={(e) => updateAccountId('bm', e.target.value)} placeholder="ID da BM" className="bg-secondary/50 border-border/50 mt-1 text-sm" /></div>
+                      <div><Label className="text-muted-foreground text-xs">Google Ads</Label><Input value={form.account_ids.google_ads || ''} onChange={(e) => updateAccountId('google_ads', e.target.value)} placeholder="ID Google Ads" className="bg-secondary/50 border-border/50 mt-1 text-sm" /></div>
+                      <div><Label className="text-muted-foreground text-xs">TikTok Ads</Label><Input value={form.account_ids.tiktok_ads || ''} onChange={(e) => updateAccountId('tiktok_ads', e.target.value)} placeholder="ID TikTok Ads" className="bg-secondary/50 border-border/50 mt-1 text-sm" /></div>
+                      <div><Label className="text-muted-foreground text-xs">LinkedIn Ads</Label><Input value={form.account_ids.linkedin_ads || ''} onChange={(e) => updateAccountId('linkedin_ads', e.target.value)} placeholder="ID LinkedIn Ads" className="bg-secondary/50 border-border/50 mt-1 text-sm" /></div>
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
 
             <Button disabled={saving} onClick={save} className="w-full neon-glow">Salvar</Button>
           </div>
